@@ -124,7 +124,7 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    cpu.memory = try std.fs.cwd().readFileAlloc(alloc, "Tetris.dump", std.math.maxInt(usize));
+    cpu.memory = try std.fs.cwd().readFileAlloc(alloc, "playground/Tetris.dump", std.math.maxInt(usize));
     defer alloc.free(cpu.memory);
 
     // From Tetris Registers.txt
