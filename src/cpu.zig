@@ -235,7 +235,7 @@ pub fn main() !void {
                 break: op Operation{ .deltaPC =  1, .cycles = 8 };
             }, 
             // Dec r16
-            0x0B, 0x1B, 0xB3, 0x3B => op: {
+            0x0B, 0x1B, 0x2B, 0x3B => op: {
                 const sourceVar: CPU.R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                 const source: *u16 = cpu.getFromR16Variant(sourceVar);
                 source.* -= 1;
@@ -302,7 +302,20 @@ pub fn main() !void {
                 const dest: *u8 = &cpu.registers.r8.A;
                 dest.* ^= source.*;
 
+                cpu.registers.r8.F.Flags.zero = dest.* == 0;
+
                 break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // OR a, r8
+            0xB0...0xB7 => op: {
+                const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = cpu.getFromR8Variant(sourceVar);
+                const dest: *u8 = &cpu.registers.r8.A;
+                dest.* |= source.*;
+
+                cpu.registers.r8.F.Flags.zero = dest.* == 0;
+
+                break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
             },
             // PUSH r16stk
             0xC5, 0xD5, 0xE5, 0xF5 => op: {
