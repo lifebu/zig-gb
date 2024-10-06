@@ -157,9 +157,9 @@ pub fn main() !void {
             },
             // LD r16mem, a
             0x02, 0x12, 0x22, 0x32 => op: {
-                const sourceVar: CPU.R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                const source: *u8 = cpu.getFromR16MemVariant(sourceVar);
-                const dest: *u8 = &cpu.registers.r8.A;
+                const source: *u8 = &cpu.registers.r8.A;
+                const destVar: CPU.R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const dest: *u8 = cpu.getFromR16MemVariant(destVar);
                 dest.* = source.*;
 
                 break: op Operation{ .deltaPC =  1, .cycles = 8 };
@@ -169,11 +169,6 @@ pub fn main() !void {
                 const sourceVar: CPU.R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                 const source: *u16 = cpu.getFromR16Variant(sourceVar);
                 source.* += 1;
-
-                cpu.registers.r8.F.Flags.zero = source.* == 0; 
-                cpu.registers.r8.F.Flags.nBCD = false;
-                // TODO: Maybe helper function?
-                cpu.registers.r8.F.Flags.halfBCD = (source.* & 0b0000_1111) == 0; 
 
                 break: op Operation{ .deltaPC = 1, .cycles = 8 };
             },
@@ -230,18 +225,35 @@ pub fn main() !void {
 
                 break: op Operation { .deltaPC = 3, .cycles = 20 };
             },
-            // ADD HL, r16
+            // LD a, r16mem
+            0x0A, 0x1A, 0x2A, 0x3A => op: {
+                const sourceVar: CPU.R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u8 = cpu.getFromR16MemVariant(sourceVar);
+                const dest: *u8 = &cpu.registers.r8.A;
+                dest.* = source.*;
+
+                break: op Operation{ .deltaPC =  1, .cycles = 8 };
+            }, 
+            // Dec r16
+            0x0B, 0x1B, 0xB3, 0x3B => op: {
+                const sourceVar: CPU.R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u16 = cpu.getFromR16Variant(sourceVar);
+                source.* -= 1;
+
+                break: op Operation{ .deltaPC = 1, .cycles = 8 };
+            },
             0x09, 0x19, 0x29, 0x39 => op : {
                 const sourceVar: CPU.R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                 const source: *u16 = cpu.getFromR16Variant(sourceVar);
                 cpu.registers.r16.HL += source.*;
 
                 cpu.registers.r8.F.Flags.nBCD = false;
-                cpu.registers.r8.F.Flags.halfBCD = false; // TODO: if carry from bit 11.
-                cpu.registers.r8.F.Flags.carry = false; // TODO: if carry from bit 15.
+                cpu.registers.r8.F.Flags.halfBCD = false; // TODO: set if carry from bit 11 (12th).
+                cpu.registers.r8.F.Flags.carry = false; // TODO: set if carry from bit 15 (16th).
 
                 break: op Operation { .deltaPC = 1, .cycles = 8 };
             },
+            // TODO: Inser next operand here (RRCA).
             // RRA
             0x1F => op: {
                 const A: *u8 = &cpu.registers.r8.A;
