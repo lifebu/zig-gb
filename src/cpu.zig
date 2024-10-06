@@ -212,7 +212,37 @@ pub fn main() !void {
 
                 break: op Operation{ .deltaPC = 2, .cycles = if (destVar == .HL) 12 else 8 };
             },
-            // RRRA
+            // RLCA
+            0x07 => op: {
+                const A: *u8 = &cpu.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
+                A.* <<= 1;
+
+                cpu.registers.r8.F.Flags.carry = shiftedBit;
+                cpu.registers.r8.F.Flags.zero = A.* == 0;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // LD (imm16),SP
+            0x08 => op: {
+                const source: *align(1) u16 = @ptrCast(&cpu.memory[cpu.pc + 1]);
+                cpu.sp = source.*;
+
+                break: op Operation { .deltaPC = 3, .cycles = 20 };
+            },
+            // ADD HL, r16
+            0x09, 0x19, 0x29, 0x39 => op : {
+                const sourceVar: CPU.R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u16 = cpu.getFromR16Variant(sourceVar);
+                cpu.registers.r16.HL += source.*;
+
+                cpu.registers.r8.F.Flags.nBCD = false;
+                cpu.registers.r8.F.Flags.halfBCD = false; // TODO: if carry from bit 11.
+                cpu.registers.r8.F.Flags.carry = false; // TODO: if carry from bit 15.
+
+                break: op Operation { .deltaPC = 1, .cycles = 8 };
+            },
+            // RRA
             0x1F => op: {
                 const A: *u8 = &cpu.registers.r8.A;
                 const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
@@ -221,6 +251,7 @@ pub fn main() !void {
                 const carry: u8 = @intFromBool(cpu.registers.r8.F.Flags.carry);
                 A.* = A.* & (carry << 7);
                 cpu.registers.r8.F.Flags.carry = shiftedBit;
+                cpu.registers.r8.F.Flags.zero = A.* == 0;
 
                 break: op Operation { .deltaPC = 1, .cycles = 4 };
             },
@@ -250,7 +281,7 @@ pub fn main() !void {
                 const dest: *u8 = cpu.getFromR8Variant(destVar);
                 dest.* = source.*;
 
-                break :op Operation{ .deltaPC = 1, .cycles = 4 };
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL or destVar == .HL) 8 else 4 };
             },
             // XOR a, r8
             0xA8...0xAF => op: {
@@ -269,7 +300,7 @@ pub fn main() !void {
                 stack.* = source.*;
                 cpu.sp -= 2;
 
-                break: op Operation{ .deltaPC = 3, .cycles = 12 };
+                break: op Operation{ .deltaPC = 3, .cycles = 16 };
             },
             // JP imm16
             0xC3 => op : {
