@@ -141,6 +141,7 @@ pub fn main() !void {
     // TODO: implement cycle accuracy (with PPU!).
     while (!cpu.isHalted and !cpu.isStopped and !cpu.isPanicked) {
         const opcode: u8 = cpu.memory[cpu.pc];
+        std.debug.print("{x}: {x}\n", .{cpu.pc, opcode});
         // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
         const operation: Operation = try switch (opcode) {
             // NOOP
@@ -289,8 +290,9 @@ pub fn main() !void {
             // JR r8
             0x18 => op: {
                 // TODO: Out of memoery?
-                const relDest: u8 = cpu.memory[cpu.pc + 1];
-                cpu.pc = cpu.pc + relDest;
+                const relDest: i8 = @bitCast(cpu.memory[cpu.pc + 1]); 
+                cpu.pc += 2; // size of instruction.
+                cpu.pc += relDest;
 
                 break: op Operation { .deltaPC = 0, .cycles =  12 };
             },
@@ -307,13 +309,15 @@ pub fn main() !void {
 
                 break: op Operation { .deltaPC = 1, .cycles = 4 };
             },
-            // JR const imm8
+            // JR cond imm8
             0x20, 0x30, 0x28, 0x38 => op: {
                 const condVar: CPU.CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
                 const cond: bool = cpu.getFromCondVariant(condVar);
                 // TODO: Out of memoery?
-                const relDest: u8 = if(cond) cpu.memory[cpu.pc + 1] else 0;
-                cpu.pc = cpu.pc + relDest;
+                const relDest: i8 = @bitCast(cpu.memory[cpu.pc + 1]); 
+
+                cpu.pc += 2; // size of instruction
+                cpu.pc += if(cond) relDest else 0;
 
                 break: op Operation { .deltaPC = 0, .cycles =  if (cond) 12 else 8 };
             },
@@ -367,12 +371,26 @@ pub fn main() !void {
             0xB0...0xB7 => op: {
                 const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
                 const source: *u8 = cpu.getFromR8Variant(sourceVar);
+                const A: *u8 = &cpu.registers.r8.A;
+
+                cpu.registers.r8.F.Flags.zero = A.* == source.*;
+                cpu.registers.r8.F.Flags.nBCD = true;
+                // True: Set if no borrow from bit 4
+                cpu.registers.r8.F.Flags.halfBCD = true;
+                cpu.registers.r8.F.Flags.carry = A.* < source.*;
+
+                break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // CP a, r8
+            0xB8...0xBF => op: {
+                const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = cpu.getFromR8Variant(sourceVar);
                 const dest: *u8 = &cpu.registers.r8.A;
                 dest.* |= source.*;
 
                 cpu.registers.r8.F.Flags.zero = dest.* == 0;
 
-                break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
             },
             // PUSH r16stk
             0xC5, 0xD5, 0xE5, 0xF5 => op: {
