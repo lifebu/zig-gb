@@ -33,6 +33,7 @@ const CPU = struct {
             H: u8 = 0,
         },
     };
+
     registers: Registers = .{ .r16 = .{} },
 
     memory: []u8 = undefined,
@@ -42,7 +43,9 @@ const CPU = struct {
     sp: u16 = 0,
     cycle: u32 = 0,
     // TODO: Maybe state flags?
-    isRunning: bool = true,
+    isStopped: bool = false,
+    isHalted: bool = false,
+    isPanicked: bool = false,
 
     // Instruction Variants (Sets of instructions that do the same, but to different targets/source).
     const R8Variant = enum(u8) { B, C, D, E, H, L, HL, A, };
@@ -136,7 +139,7 @@ pub fn main() !void {
     cpu.sp = 0xFFFE;
 
     // TODO: implement cycle accuracy (with PPU!).
-    while (cpu.isRunning) {
+    while (!cpu.isHalted and !cpu.isStopped and !cpu.isPanicked) {
         const opcode: u8 = cpu.memory[cpu.pc];
         // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
         const operation: Operation = try switch (opcode) {
@@ -242,6 +245,7 @@ pub fn main() !void {
 
                 break: op Operation{ .deltaPC = 1, .cycles = 8 };
             },
+            // ADD HL, R16
             0x09, 0x19, 0x29, 0x39 => op : {
                 const sourceVar: CPU.R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                 const source: *u16 = cpu.getFromR16Variant(sourceVar);
@@ -253,7 +257,43 @@ pub fn main() !void {
 
                 break: op Operation { .deltaPC = 1, .cycles = 8 };
             },
-            // TODO: Inser next operand here (RRCA).
+            // RRCA
+            0x0F => op: {
+                const A: *u8 = &cpu.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
+                A.* >>= 1;
+
+                cpu.registers.r8.F.Flags.carry = shiftedBit;
+                cpu.registers.r8.F.Flags.zero = A.* == 0;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // STOP
+            0x10 => op: {
+                cpu.isStopped = true;
+                break: op Operation { .deltaPC = 2, .cycles = 4};
+            },
+            // RLA
+            0x17 => op: {
+                const A: *u8 = &cpu.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
+                A.* <<= 1;
+
+                const carry: u8 = @intFromBool(cpu.registers.r8.F.Flags.carry);
+                A.* = A.* & carry;
+                cpu.registers.r8.F.Flags.carry = shiftedBit;
+                cpu.registers.r8.F.Flags.zero = A.* == 0;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // JR r8
+            0x18 => op: {
+                // TODO: Out of memoery?
+                const relDest: u8 = cpu.memory[cpu.pc + 1];
+                cpu.pc = cpu.pc + relDest;
+
+                break: op Operation { .deltaPC = 0, .cycles =  12 };
+            },
             // RRA
             0x1F => op: {
                 const A: *u8 = &cpu.registers.r8.A;
@@ -267,7 +307,7 @@ pub fn main() !void {
 
                 break: op Operation { .deltaPC = 1, .cycles = 4 };
             },
-            // JR imm8
+            // JR const imm8
             0x20, 0x30, 0x28, 0x38 => op: {
                 const condVar: CPU.CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
                 const cond: bool = cpu.getFromCondVariant(condVar);
@@ -277,13 +317,30 @@ pub fn main() !void {
 
                 break: op Operation { .deltaPC = 0, .cycles =  if (cond) 12 else 8 };
             },
+            // DAA
+            0x27 => op: {
+                // TODO: This feels like something i can skip for now (Decimal adjust register A (BCD)).
+                std.debug.print("OPERATION_NOT_IMPLEMENTED: DAA: 0x27\n", .{});
+                cpu.isPanicked = true;
+                break: op CPUError.OPERATION_NOT_IMPLEMENTED;
+            },
+            // CPL (complement A)
+            0x2F => op: {
+                const A: *u8 = &cpu.registers.r8.A;
+                A.* = ~A.*;
+
+                cpu.registers.r8.F.Flags.nBCD = true;
+                cpu.registers.r8.F.Flags.halfBCD = true;
+
+                break: op Operation{ .deltaPC = 1, .cycles = 4 };
+            },
             // LD r8, r8
             0x40...0x7F => op: {
                 // TODO: Break the range, this is not readable honestly!
                 // HALT
                 if(opcode == 0x76) {
                     // TODO: implement HALT Bug 
-                    cpu.isRunning = false;
+                    cpu.isHalted = true;
                     break :op Operation{ .deltaPC = 1, .cycles = 4 };
                 }
 
@@ -338,7 +395,7 @@ pub fn main() !void {
             // ERROR!
             else => op: {
                 std.debug.print("OPERATION_NOT_IMPLEMENTED: {x}\n", .{opcode});
-                cpu.isRunning = false;
+                cpu.isPanicked = true;
                 break: op CPUError.OPERATION_NOT_IMPLEMENTED;
             }
         };

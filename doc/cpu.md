@@ -6,3 +6,10 @@
 - You can then use the output and compare that to my cpu.
 - If I structure it correctly i should be able to find differences in the resulting memory and use a structure to know which instruction did create a diff.
 - you can use 128Bytes per Instruction.
+
+# GB resources:
+https://gbdev.io/
+
+# Known test roms:
+https://gbdev.io/resources.html#emulator-development
+https://gbdev.gg8.se/files/roms/blargg-gb-tests/
