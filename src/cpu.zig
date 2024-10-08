@@ -34,6 +34,8 @@ const CPU = struct {
         },
     };
 
+    const highPage: u16 = 0xFF00;
+
     registers: Registers = .{ .r16 = .{} },
 
     memory: []u8 = undefined,
@@ -290,9 +292,12 @@ pub fn main() !void {
             // JR r8
             0x18 => op: {
                 // TODO: Out of memoery?
+                // TODO: All this conversion smells like spaghetti, is there an easier way?
                 const relDest: i8 = @bitCast(cpu.memory[cpu.pc + 1]); 
-                cpu.pc += 2; // size of instruction.
-                cpu.pc += relDest;
+                var pcCast: i32 = cpu.pc;
+                pcCast += 2; // size of instruction.
+                pcCast += relDest;
+                cpu.pc = @intCast(pcCast); 
 
                 break: op Operation { .deltaPC = 0, .cycles =  12 };
             },
@@ -314,10 +319,12 @@ pub fn main() !void {
                 const condVar: CPU.CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
                 const cond: bool = cpu.getFromCondVariant(condVar);
                 // TODO: Out of memoery?
+                // TODO: All this conversion smells like spaghetti, is there an easier way?
                 const relDest: i8 = @bitCast(cpu.memory[cpu.pc + 1]); 
-
-                cpu.pc += 2; // size of instruction
-                cpu.pc += if(cond) relDest else 0;
+                var pcCast: i32 = cpu.pc;
+                pcCast += 2; // size of instruction.
+                pcCast += if(cond) relDest else 0;
+                cpu.pc = @intCast(pcCast); 
 
                 break: op Operation { .deltaPC = 0, .cycles =  if (cond) 12 else 8 };
             },
@@ -348,7 +355,7 @@ pub fn main() !void {
                     break :op Operation{ .deltaPC = 1, .cycles = 4 };
                 }
 
-                const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const sourceVar: CPU .R8Variant = @enumFromInt(opcode & 0b0000_0111);
                 const source: *u8 = cpu.getFromR8Variant(sourceVar);
                 const destVar: CPU.R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
                 const dest: *u8 = cpu.getFromR8Variant(destVar);
@@ -371,6 +378,17 @@ pub fn main() !void {
             0xB0...0xB7 => op: {
                 const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
                 const source: *u8 = cpu.getFromR8Variant(sourceVar);
+                const dest: *u8 = &cpu.registers.r8.A;
+                dest.* |= source.*;
+
+                cpu.registers.r8.F.Flags.zero = dest.* == 0;
+
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // CP a, r8
+            0xB8...0xBF => op: {
+                const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = cpu.getFromR8Variant(sourceVar);
                 const A: *u8 = &cpu.registers.r8.A;
 
                 cpu.registers.r8.F.Flags.zero = A.* == source.*;
@@ -380,17 +398,6 @@ pub fn main() !void {
                 cpu.registers.r8.F.Flags.carry = A.* < source.*;
 
                 break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
-            },
-            // CP a, r8
-            0xB8...0xBF => op: {
-                const sourceVar: CPU.R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                const source: *u8 = cpu.getFromR8Variant(sourceVar);
-                const dest: *u8 = &cpu.registers.r8.A;
-                dest.* |= source.*;
-
-                cpu.registers.r8.F.Flags.zero = dest.* == 0;
-
-                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
             },
             // PUSH r16stk
             0xC5, 0xD5, 0xE5, 0xF5 => op: {
@@ -404,11 +411,51 @@ pub fn main() !void {
             },
             // JP imm16
             0xC3 => op : {
-                // TODO: Out of memoery? Crashes because if misalignment! => Helper function
+                // TODO: Out of memory? Crashes because if misalignment! => Helper function
                 const target: *align(1) u16 = @ptrCast(&cpu.memory[cpu.pc + 1]);
                 cpu.pc = target.*;
 
                 break: op Operation { .deltaPC = 0, .cycles =  16 };
+            },
+            // LDH [imm8], a
+            0xE0 => op: {
+                // TODO: Out of memory?
+                const source: *u8 = @ptrCast(&cpu.memory[cpu.pc + 1]);
+                cpu.memory[CPU.highPage + source.*] = cpu.registers.r8.A;
+
+                // TODO: If we create this thing first and you can only do that via a function in the cpu, 
+                // then you are able to check if with the requested delta pc you would be able to access out of memory!
+                break: op Operation { .deltaPC = 2, .cycles = 12 };
+            },
+            // LDH a, [imm8]
+            0xF0 => op: {
+                // TODO: Out of memory?
+                const source: *u8 = @ptrCast(&cpu.memory[cpu.pc + 1]);
+                cpu.registers.r8.A = cpu.memory[CPU.highPage + source.*];
+
+                break: op Operation { .deltaPC = 2, .cycles = 12 };
+            },
+            // DI (Disable Interrupts)
+            0xF3 => op: {
+                // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
+                break: op Operation { .deltaPC = 1, .cycles =  4 };
+            },
+            // CP a, imm8
+            0xFE => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                // Difference is only if we use an immediate value or not. Can we make this a better re-use?
+                // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
+                // So I can change the mask to improve this! Cycle time is the same as HL!
+                const source: *u8 = &cpu.memory[cpu.pc + 1];
+                const A: *u8 = &cpu.registers.r8.A;
+
+                cpu.registers.r8.F.Flags.zero = A.* == source.*;
+                cpu.registers.r8.F.Flags.nBCD = true;
+                // True: Set if no borrow from bit 4
+                cpu.registers.r8.F.Flags.halfBCD = true;
+                cpu.registers.r8.F.Flags.carry = A.* < source.*;
+
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
             },
             // ERROR!
             else => op: {
