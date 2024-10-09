@@ -20,6 +20,7 @@ pub fn main() !void {
     // Position window in the middle of the screen.
     const resolution: sf.c.sfVideoMode = sf.c.sfVideoMode_getDesktopMode();
     window.setPosition(.{ .x = @intCast(resolution.width / 2 - WINDOW_WIDTH / 2), .y = @intCast(resolution.height / 2 - WINDOW_HEIGHT / 2) });
+    window.setFramerateLimit(60);
 
     // textures
     const BACKGROUND = "data/background.png";
@@ -51,7 +52,8 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var cpu = try _cpu.CPU.init(alloc, "playground/Tetris.gb");
+    var cpu = try _cpu.CPU.init(alloc, "playground/Tetris.dump");
+    //var cpu = try _cpu.CPU.init(alloc, "playground/cpu_instrs/individual/09-op r,r.gb");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};
