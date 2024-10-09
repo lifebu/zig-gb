@@ -149,7 +149,7 @@ pub const CPU = struct {
         // TODO: implement cycle accuracy (with PPU!).
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             const opcode: u8 = self.memory[self.pc];
-            std.debug.print("{x}: {x}\n", .{self.pc, opcode});
+            //std.debug.print("{x}: {x}\n", .{self.pc, opcode});
             // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
             const operation: Operation = try switch (opcode) {
                 // NOOP

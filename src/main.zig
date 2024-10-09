@@ -1,6 +1,8 @@
 const std = @import("std");
 // TODO: This is strange!
 const _cpu = @import("cpu.zig");
+// TODO: This is strange!
+const _ppu = @import("ppu.zig");
 
 const sf = struct {
     usingnamespace @import("sfml");
@@ -52,6 +54,13 @@ pub fn main() !void {
     var cpu = try _cpu.CPU.init(alloc, "playground/Tetris.gb");
     defer cpu.deinit();
 
+    var ppu = _ppu.PPU{};
+
+    var pixels = try alloc.alloc(sf.Color, WINDOW_WIDTH * WINDOW_HEIGHT);
+    defer alloc.free(pixels);
+
+    @memset(pixels, sf.Color.Magenta);
+
     while (window.isOpen()) {
         while (window.pollEvent()) |event| {
             if (event == .closed) {
@@ -63,6 +72,8 @@ pub fn main() !void {
             }
         }
 
+        try ppu.updatePixels(&cpu.memory, &pixels);
+        try cpuTexture.updateFromPixels(pixels, null);
         try cpu.frame();
 
         window.clear(sf.Color.Black);
