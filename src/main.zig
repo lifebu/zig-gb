@@ -7,8 +7,10 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var cpu = try _cpu.CPU.init(alloc);
+    var cpu = try _cpu.CPU.init(alloc, "playground/Tetris.gb");
     defer cpu.deinit();
 
-    try cpu.frame();
+    while(true) {
+        try cpu.frame();
+    }
 }

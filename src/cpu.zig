@@ -35,7 +35,8 @@ pub const CPU = struct {
         },
     };
 
-    const highPage: u16 = 0xFF00;
+    const HIGH_PAGE: u16 = 0xFF00;
+    const CYCLES_PER_FRAME: u32 = 70_226;
 
     registers: Registers = .{ .r16 = .{} },
 
@@ -51,11 +52,12 @@ pub const CPU = struct {
     isHalted: bool = false,
     isPanicked: bool = false,
 
-    pub fn init(alloc: std.mem.Allocator) !Self {
+    pub fn init(alloc: std.mem.Allocator, gbFile: []const u8) !Self {
         var cpu = CPU{ .allocator = alloc };
 
-        // Some Testdata.
-        cpu.memory = try std.fs.cwd().readFileAlloc(alloc, "playground/Tetris.dump", std.math.maxInt(usize));
+        cpu.memory = try alloc.alloc(u8, 0x10000);
+        _ = try std.fs.cwd().readFile(gbFile, cpu.memory);
+
         cpu.registers.r16.AF = 0x01B0;
         cpu.registers.r16.BC = 0x0013;
         cpu.registers.r16.DE = 0x00D8;
@@ -141,10 +143,11 @@ pub const CPU = struct {
         OPERATION_NOT_IMPLEMENTED,
     };
 
-    // TODO: This does a single frame of cpu code need to wait for ppu and syncing.
     pub fn frame(self: *Self) !void {
+        self.cycle = 0;
+
         // TODO: implement cycle accuracy (with PPU!).
-        while (!self.isHalted and !self.isStopped and !self.isPanicked) {
+        while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             const opcode: u8 = self.memory[self.pc];
             std.debug.print("{x}: {x}\n", .{self.pc, opcode});
             // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
@@ -424,7 +427,7 @@ pub const CPU = struct {
                 0xE0 => op: {
                     // TODO: Out of memory?
                     const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.memory[highPage + source.*] = self.registers.r8.A;
+                    self.memory[HIGH_PAGE + source.*] = self.registers.r8.A;
 
                     // TODO: If we create this thing first and you can only do that via a function in the self. 
                     // then you are able to check if with the requested delta pc you would be able to access out of memory!
@@ -434,7 +437,7 @@ pub const CPU = struct {
                 0xF0 => op: {
                     // TODO: Out of memory?
                     const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.registers.r8.A = self.memory[highPage + source.*];
+                    self.registers.r8.A = self.memory[HIGH_PAGE + source.*];
 
                     break: op Operation { .deltaPC = 2, .cycles = 12 };
                 },
