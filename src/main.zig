@@ -1,6 +1,14 @@
 const std = @import("std");
-const cpu = @import("cpu.zig");
+// TODO: This is strange!
+const _cpu = @import("cpu.zig");
 
 pub fn main() !void {
-    try cpu.main();
+    var allocator = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = allocator.allocator();
+    defer _ = allocator.deinit();
+
+    var cpu = try _cpu.CPU.init(alloc);
+    defer cpu.deinit();
+
+    try cpu.frame();
 }
