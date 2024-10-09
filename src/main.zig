@@ -53,7 +53,7 @@ pub fn main() !void {
     defer _ = allocator.deinit();
 
     var cpu = try _cpu.CPU.init(alloc, "playground/Tetris.dump");
-    //var cpu = try _cpu.CPU.init(alloc, "playground/cpu_instrs/individual/09-op r,r.gb");
+    //var cpu = try _cpu.CPU.init(alloc, "playground/test_roms/cpu_instrs/individual/09-op r,r.gb");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};

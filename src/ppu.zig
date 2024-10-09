@@ -69,12 +69,6 @@ pub const PPU = struct {
                 const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
                 const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
                 const colorID: u8 = firstBit + (secondBit << 1); // LSB first
-                
-                if(colorID != 0) {
-                    var a: u8 = 0;
-                    a = 10;
-                }
-
                 pixels.*[x + (y * RESOLUTION_WIDTH)] = colorPalette[colorID];
             }
         }

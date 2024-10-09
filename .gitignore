@@ -5,3 +5,6 @@ zig-out/
 # proprietary testdata
 playground/*
 *.gb
+
+# vim
+Session.vim
