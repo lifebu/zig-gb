@@ -3,6 +3,7 @@ const std = @import("std");
 const _cpu = @import("cpu.zig");
 // TODO: This is strange!
 const _ppu = @import("ppu.zig");
+const blargg = @import("blargg_parser.zig");
 
 const sf = struct {
     usingnamespace @import("sfml");
@@ -52,8 +53,8 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var cpu = try _cpu.CPU.init(alloc, "playground/Tetris.dump");
-    //var cpu = try _cpu.CPU.init(alloc, "playground/test_roms/cpu_instrs/individual/09-op r,r.gb");
+    // var cpu = try _cpu.CPU.init(alloc, "playground/tetris.dump");
+    var cpu = try _cpu.CPU.init(alloc, "playground/cpu_instrs.dump");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};
@@ -76,11 +77,33 @@ pub fn main() !void {
 
         try ppu.updatePixels(&cpu.memory, &pixels);
         try cpuTexture.updateFromPixels(pixels, null);
-        try cpu.frame();
+        //try cpu.frame();
 
         window.clear(sf.Color.Black);
         gpuTexture.updateFromTexture(cpuTexture, null);
         window.draw(gpuSprite, null);
         window.display();
     }
+}
+
+test "expect passing blargg cpu_instrs: '09-op r,r.gb'" {
+    const alloc = std.testing.allocator;
+
+    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb");
+    defer cpu.deinit();
+
+    var lastPC: u16 = 0;
+    while (lastPC != cpu.pc) {
+        lastPC = cpu.pc;
+        try cpu.frame();
+    }
+
+    const output: std.ArrayList(u8) = try blargg.parseOutput(&cpu, alloc);
+    defer output.deinit();
+
+    const passed: bool = blargg.hasPassed(&output);
+    if (!passed) {
+        std.debug.print("{s}\n", .{output.items});
+    }
+    try std.testing.expect(passed);
 }

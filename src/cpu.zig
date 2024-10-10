@@ -56,6 +56,8 @@ pub const CPU = struct {
         var cpu = CPU{ .allocator = alloc };
 
         cpu.memory = try alloc.alloc(u8, 0x10000);
+        errdefer alloc.free(cpu.memory);
+
         _ = try std.fs.cwd().readFile(gbFile, cpu.memory);
 
         cpu.registers.r16.AF = 0x01B0;
