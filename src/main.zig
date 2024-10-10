@@ -86,24 +86,41 @@ pub fn main() !void {
     }
 }
 
-test "expect passing blargg cpu_instrs: '09-op r,r.gb'" {
+test "expect passing blargg gb roms" {
+    const testRoms =  [_][]const u8{
+         "test_data/blargg_roms/cpu_instrs/individual/01-special.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/02-interrupts.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/03-op sh,hl.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/04-op r,imm.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/05-op rp.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/07-jr,jp,call.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/08-misc instrs.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/10-bit ops.gb", 
+         "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb", 
+    }; 
+
     const alloc = std.testing.allocator;
 
-    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb");
-    defer cpu.deinit();
+    for (testRoms, 0..) |testRom, i| {
+        std.debug.print("{d}: Testing: {s}\n", .{i, testRom});
+        var cpu = try _cpu.CPU.init(alloc, testRom);
+        defer cpu.deinit();
 
-    var lastPC: u16 = 0;
-    while (lastPC != cpu.pc) {
-        lastPC = cpu.pc;
-        try cpu.frame();
+        var lastPC: u16 = 0;
+        while (lastPC != cpu.pc) {
+            lastPC = cpu.pc;
+            try cpu.frame();
+        }
+
+        const output: std.ArrayList(u8) = try blargg.parseOutput(&cpu, alloc);
+        defer output.deinit();
+
+        const passed: bool = blargg.hasPassed(&output);
+        if (!passed) {
+            std.debug.print("{s}\n", .{output.items});
+        }
+        try std.testing.expect(passed);
     }
-
-    const output: std.ArrayList(u8) = try blargg.parseOutput(&cpu, alloc);
-    defer output.deinit();
-
-    const passed: bool = blargg.hasPassed(&output);
-    if (!passed) {
-        std.debug.print("{s}\n", .{output.items});
-    }
-    try std.testing.expect(passed);
 }
