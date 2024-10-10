@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "Debug",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/zig-gb",
@@ -22,6 +22,16 @@
             ]
         },
         {
+            "name": "Debug Test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/${fileBasenameNoExtension}-test",
+            "MIMode": "gdb",
+            "preLaunchTask": "build-test",
+            "cwd": "${workspaceFolder}"
+        },
+        /*
+        {
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
@@ -30,5 +40,6 @@
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "zig build"
         },
+        */
     ]
 }

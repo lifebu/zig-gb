@@ -10,6 +10,11 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "build-test",
+            "type": "shell",
+            "command": "zig test --test-no-exec -femit-bin=zig-out/bin/${fileBasenameNoExtension}-test ${file}",
         }
     ]
 }
