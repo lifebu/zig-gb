@@ -18,5 +18,8 @@ https://gbdev.io/resources.html#emulator-development
 https://gbdev.gg8.se/files/roms/blargg-gb-tests/
 
 
-# TODO
-- Implement testing output parsing.
+# Saving memory.
+- To save on memory and to have more of the actual emulator be cache friendly I can use some of the memory of the gameboy itself for the emulator.
+- Echo RAM is a memory region around 7kb that the gb does not use (access to it gets rerouted to the WRAM).
+- So i can place some of my data there.
+- This means the entire program could just use the 64kByte of the memory range of the GB.
