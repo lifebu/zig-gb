@@ -53,8 +53,7 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    // var cpu = try _cpu.CPU.init(alloc, "playground/tetris.dump");
-    var cpu = try _cpu.CPU.init(alloc, "playground/cpu_instrs.dump");
+    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/01-special.gb");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};
@@ -77,7 +76,7 @@ pub fn main() !void {
 
         try ppu.updatePixels(&cpu.memory, &pixels);
         try cpuTexture.updateFromPixels(pixels, null);
-        //try cpu.frame();
+        try cpu.frame();
 
         window.clear(sf.Color.Black);
         gpuTexture.updateFromTexture(cpuTexture, null);
@@ -88,17 +87,17 @@ pub fn main() !void {
 
 test "expect passing blargg gb roms" {
     const testRoms =  [_][]const u8{
-         "test_data/blargg_roms/cpu_instrs/individual/01-special.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/02-interrupts.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/03-op sh,hl.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/04-op r,imm.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/05-op rp.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/07-jr,jp,call.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/08-misc instrs.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/10-bit ops.gb", 
-         "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/01-special.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/02-interrupts.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/03-op sh,hl.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/04-op r,imm.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/05-op rp.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/07-jr,jp,call.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/08-misc instrs.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/10-bit ops.gb", 
+        "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb", 
     }; 
 
     const alloc = std.testing.allocator;

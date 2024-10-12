@@ -151,7 +151,8 @@ pub const CPU = struct {
         // TODO: implement cycle accuracy (with PPU!).
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             const opcode: u8 = self.memory[self.pc];
-            //std.debug.print("{x}: {x}\n", .{self.pc, opcode});
+
+            // std.debug.print("{x}: {x}\n", .{self.pc, opcode});
             // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
             const operation: Operation = try switch (opcode) {
                 // NOOP
@@ -407,15 +408,40 @@ pub const CPU = struct {
 
                     break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },
+                // RET cond
+                0xC0, 0xC8, 0xD0, 0xD8 => op: {
+                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
+                    const cond: bool = self.getFromCondVariant(condVar);
+
+                    if(cond) {
+                        const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                        self.pc = retAddress.*;
+                        self.sp += 2;
+                    }
+
+                    break :op Operation{ .deltaPC = if (cond) 0 else 1, .cycles = if(cond) 20 else 8 };
+                },
+                // POP r16stk
+                0xC1, 0xD1, 0xE1, 0xF1 => op: {
+                    const destVar: R16StkVariant = @enumFromInt(opcode & 0b0011_0000 >> 4);
+                    const dest: *u16 = self.getFromR16StkVariant(destVar);
+
+                    const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                    dest.* = stack.*;
+                    self.sp += 2;
+
+                    break: op Operation{ .deltaPC = 1, .cycles = 16 };
+                },
                 // PUSH r16stk
                 0xC5, 0xD5, 0xE5, 0xF5 => op: {
                     const sourceVar: R16StkVariant = @enumFromInt(opcode & 0b0011_0000 >> 4);
                     const source: *u16 = self.getFromR16StkVariant(sourceVar);
+
+                    self.sp -= 2;
                     const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
                     stack.* = source.*;
-                    self.sp -= 2;
 
-                    break: op Operation{ .deltaPC = 3, .cycles = 16 };
+                    break: op Operation{ .deltaPC = 1, .cycles = 16 };
                 },
                 // JP imm16
                 0xC3 => op : {
@@ -424,6 +450,55 @@ pub const CPU = struct {
                     self.pc = target.*;
 
                     break: op Operation { .deltaPC = 0, .cycles =  16 };
+                },
+                // CALL cond imm16
+                0xC4, 0xCC, 0xD4, 0xDC => op : {
+                    // TODO: It looks like all the variants use the same two bits mostly. Can this be used to make the code better?
+                    // TODO: same code as unconditional call, combine the code!
+                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
+                    const cond: bool = self.getFromCondVariant(condVar);
+
+                    if(cond) {
+                        // push next address onto stack.
+                        self.sp -= 2;
+                        const nextInstr: u16 = self.pc + 3;
+                        const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                        stack.* = nextInstr;
+
+                        // TODO: Out of memory?
+                        // jump to imm16
+                        const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                        self.pc = target.*;
+                    }
+
+                    break: op Operation { .deltaPC = if(cond) 0 else 3, .cycles = if(cond) 24 else 12 };
+                },
+                // RET
+                0xC9 => op : {
+                    // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
+                    // TODO: Can I compbine those? return and conditional return have the same opcode structure, they only differ by the first bit.
+                    const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                    self.pc = retAddress.*;
+                    self.sp += 2;
+
+                    break: op Operation { .deltaPC = 0, .cycles =  24 };
+                },
+                // CALL imm16
+                0xCD => op : {
+                    // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional call.
+                    // TODO: Can I compbine those? Call and conditional call have the same opcode structure, they only differ by the first bit.
+                    // push next address onto stack.
+                    self.sp -= 2;
+                    const nextInstr: u16 = self.pc + 3;
+                    const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                    stack.* = nextInstr;
+
+                    // TODO: Out of memory?
+                    // jump to imm16
+                    const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                    self.pc = target.*;
+
+                    break: op Operation { .deltaPC = 0, .cycles =  24 };
                 },
                 // LDH [imm8], a
                 0xE0 => op: {
@@ -435,11 +510,44 @@ pub const CPU = struct {
                     // then you are able to check if with the requested delta pc you would be able to access out of memory!
                     break: op Operation { .deltaPC = 2, .cycles = 12 };
                 },
+                // LD [imm16], a
+                0xEA => op: {
+                    // TODO: Out of memory?
+                    const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                    self.memory[source.*] = self.registers.r8.A;
+
+                    break: op Operation { .deltaPC = 3, .cycles = 16 };
+                },
+                // AND a, imm8
+                0xE6 => op: {
+                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                    // Difference is only if we use an immediate value or not. Can we make this a better re-use?
+                    // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
+                    // So I can change the mask to improve this! Cycle time is the same as HL!
+                    const source: *u8 = &self.memory[self.pc + 1];
+                    const A: *u8 = &self.registers.r8.A;
+                    A.* &= source.*;
+
+                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = true;
+                    self.registers.r8.F.Flags.carry = false;
+
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
+                },
                 // LDH a, [imm8]
                 0xF0 => op: {
                     // TODO: Out of memory?
                     const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
                     self.registers.r8.A = self.memory[HIGH_PAGE + source.*];
+
+                    break: op Operation { .deltaPC = 3, .cycles = 16 };
+                },
+                // LD a, [imm16]
+                0xFA => op: {
+                    // TODO: Out of memory?
+                    const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                    self.registers.r8.A = self.memory[source.*];
 
                     break: op Operation { .deltaPC = 2, .cycles = 12 };
                 },
