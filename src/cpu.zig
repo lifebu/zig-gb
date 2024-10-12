@@ -193,7 +193,7 @@ pub const CPU = struct {
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             self.debugPrintState();
 
-            if(self.pc == 0x0207 and self.registers.r8.H == 0x43 and self.registers.r8.L == 0x67) {
+            if(self.pc == 0xC06C) {
                 var a: u32 = 0;
                 a += 1;
             }
@@ -201,7 +201,7 @@ pub const CPU = struct {
             const oldValAddr: u16 = 0xC366;
             const oldVal: u8 = self.memory[oldValAddr];
 
-            const opcode: u8 = self.memory[self.pc];
+            var opcode: u8 = self.memory[self.pc];
             // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
             const operation: Operation = try switch (opcode) {
                 // NOOP
@@ -366,7 +366,7 @@ pub const CPU = struct {
                     A.* >>= 1;
 
                     const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    A.* = A.* & (carry << 7);
+                    A.* |= (carry << 7);
                     self.registers.r8.F.Flags.carry = shiftedBit;
                     self.registers.r8.F.Flags.zero = A.* == 0;
 
@@ -430,7 +430,7 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.zero = a.* == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (a.* & 0xF) < (source.* & 0xF);
+                    self.registers.r8.F.Flags.halfBCD = (a.* & 0x0F) < (source.* & 0x0F);
                     // TODO: no-borrow => any digit of a is less then source => binary: if at any point a is 0 and source is 1?
                     self.registers.r8.F.Flags.carry = a.* == 0;
 
@@ -472,7 +472,7 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.zero = A.* == source.*;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (A.* & 0xF) < (source.* & 0xF);
+                    self.registers.r8.F.Flags.halfBCD = (A.* & 0x0F) < (source.* & 0x0F);
                     self.registers.r8.F.Flags.carry = A.* < source.*;
 
                     break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
@@ -542,6 +542,22 @@ pub const CPU = struct {
 
                     break: op Operation { .deltaPC = if(cond) 0 else 3, .cycles = if(cond) 24 else 12 };
                 },
+                // ADD a, imm8
+                0xC6 => op: {
+                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                    const source: *u8 = &self.memory[self.pc + 1];
+                    const A: *u8 = &self.registers.r8.A;
+                    A.* +%= source.*;
+
+                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    // TODO: Set if carry from bit 3.
+                    self.registers.r8.F.Flags.halfBCD = false;
+                    // TODO: Set if carry from bit 7.
+                    self.registers.r8.F.Flags.carry = false;
+
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
+                },  
                 // RET
                 0xC9 => op : {
                     // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
@@ -551,6 +567,50 @@ pub const CPU = struct {
                     self.sp += 2;
 
                     break: op Operation { .deltaPC = 0, .cycles =  24 };
+                },
+                // PREFIX CB
+                0xCB => op: {
+                    // TODO: Maybe there is solution without nesting this?
+                    opcode = self.memory[self.pc + 1];
+                    break: op try switch (opcode) {
+                        // RR r8 
+                        0x18...0x1F => op_pfx : {
+                            // TODO: RR and RRA is basically the same?
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                            source.* >>= 1;
+
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                            source.* |= (carry << 7);
+                            self.registers.r8.F.Flags.carry = shiftedBit;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // SRL r8
+                        0x38...0x3F => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                            source.* >>= 1;
+
+                            self.registers.r8.F.Flags.carry = shiftedBit;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        else => op_pfx: {
+                            std.debug.print("OPERATION_NOT_IMPLEMENTED: {X}{X}\n", .{0xCB, opcode});
+                            self.isPanicked = true;
+                            break: op_pfx CPUError.OPERATION_NOT_IMPLEMENTED;
+                        }
+                    };
                 },
                 // CALL imm16
                 0xCD => op : {
@@ -569,6 +629,21 @@ pub const CPU = struct {
 
                     break: op Operation { .deltaPC = 0, .cycles =  24 };
                 },
+                // SUB a, r8
+                0xD6 => op: {
+                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                    const source: *u8 = &self.memory[self.pc + 1];
+                    const A: *u8 = &self.registers.r8.A;
+                    A.* -%= source.*;
+
+                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = true;
+                    self.registers.r8.F.Flags.halfBCD = (A.* & 0x0F) < (source.* & 0x0F);
+                    // TODO: no-borrow => any digit of a is less then source => binary: if at any point a is 0 and source is 1?
+                    self.registers.r8.F.Flags.carry = A.* == 0;
+
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
+                },  
                 // LDH [imm8], a
                 0xE0 => op: {
                     // TODO: Out of memory?
@@ -636,12 +711,11 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.zero = A.* == source.*;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (A.* & 0xF) < (source.* & 0xF);
+                    self.registers.r8.F.Flags.halfBCD = (A.* & 0x0F) < (source.* & 0x0F);
                     self.registers.r8.F.Flags.carry = A.* < source.*;
 
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },
-                // ERROR!
                 else => op: {
                     std.debug.print("OPERATION_NOT_IMPLEMENTED: {x}\n", .{opcode});
                     self.isPanicked = true;
