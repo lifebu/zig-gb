@@ -146,25 +146,43 @@ pub const CPU = struct {
     };
 
     fn debugPrintState(self: *Self) void {
-        // Debug printing copied from: https://github.com/Ryp/gb-emu-zig
-        std.debug.print("PC {x:0>4} SP {x:0>4}", .{ self.pc, self.sp });
-        std.debug.print(" A {x:0>2} Flags {s} {s} {s} {s}", .{
-            self.registers.r8.A,
-            if (self.registers.r8.F.Flags.zero) "Z" else "_",
-            if (self.registers.r8.F.Flags.nBCD) "N" else "_",
-            if (self.registers.r8.F.Flags.halfBCD) "H" else "_",
-            if (self.registers.r8.F.Flags.carry) "C" else "_",
-        });
-        std.debug.print(" B {x:0>2} C {x:0>2}", .{ self.registers.r8.B, self.registers.r8.C });
-        std.debug.print(" D {x:0>2} E {x:0>2}", .{ self.registers.r8.D, self.registers.r8.E });
-        std.debug.print(" H {x:0>2} L {x:0>2}", .{ self.registers.r8.H, self.registers.r8.L });
-        std.debug.print(" | {x} {x} {x} {x} | ", .{
-            self.memory[self.pc], 
-            self.memory[self.pc + 1], 
-            self.memory[self.pc + 2], 
-            self.memory[self.pc + 3], 
-        });
-        std.debug.print("\n", .{});
+        const useGBLogs: bool = true;
+        if(useGBLogs) {
+            // Debug printing for: https://github.com/wheremyfoodat/Gameboy-logs
+            std.debug.print("A: {X:0>2} F: {X:0>2} ", .{ self.registers.r8.A, self.registers.r8.F.F });
+            std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ self.registers.r8.B, self.registers.r8.C });
+            std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ self.registers.r8.D, self.registers.r8.E });
+            std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ self.registers.r8.H, self.registers.r8.L });
+            std.debug.print("SP: {X:0>4} PC: 00:{X:0>4} ", .{ self.sp, self.pc });
+            std.debug.print("({X:0>2} {X:0>2} {X:0>2} {X:0>2})", .{
+                self.memory[self.pc], 
+                self.memory[self.pc + 1], 
+                self.memory[self.pc + 2], 
+                self.memory[self.pc + 3], 
+            });
+            std.debug.print("\n", .{});
+        }
+        else {
+            // Debug printing copied from: https://github.com/Ryp/gb-emu-zig
+            std.debug.print("PC {x:0>4} SP {x:0>4}", .{ self.pc, self.sp });
+            std.debug.print(" A {x:0>2} Flags {s} {s} {s} {s}", .{
+                self.registers.r8.A,
+                if (self.registers.r8.F.Flags.zero) "Z" else "_",
+                if (self.registers.r8.F.Flags.nBCD) "N" else "_",
+                if (self.registers.r8.F.Flags.halfBCD) "H" else "_",
+                if (self.registers.r8.F.Flags.carry) "C" else "_",
+            });
+            std.debug.print(" B {x:0>2} C {x:0>2}", .{ self.registers.r8.B, self.registers.r8.C });
+            std.debug.print(" D {x:0>2} E {x:0>2}", .{ self.registers.r8.D, self.registers.r8.E });
+            std.debug.print(" H {x:0>2} L {x:0>2}", .{ self.registers.r8.H, self.registers.r8.L });
+            std.debug.print(" | {x} {x} {x} {x} | ", .{
+                self.memory[self.pc], 
+                self.memory[self.pc + 1], 
+                self.memory[self.pc + 2], 
+                self.memory[self.pc + 3], 
+            });
+            std.debug.print("\n", .{});
+        }
     }
 
 
@@ -174,6 +192,14 @@ pub const CPU = struct {
         // TODO: implement cycle accuracy (with PPU!).
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             self.debugPrintState();
+
+            if(self.pc == 0x0207 and self.registers.r8.H == 0x43 and self.registers.r8.L == 0x67) {
+                var a: u32 = 0;
+                a += 1;
+            }
+
+            const oldValAddr: u16 = 0xC366;
+            const oldVal: u8 = self.memory[oldValAddr];
 
             const opcode: u8 = self.memory[self.pc];
             // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
@@ -395,6 +421,21 @@ pub const CPU = struct {
 
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL or destVar == .HL) 8 else 4 };
                 },
+                // SUB a, r8
+                0x90...0x97 => op: {
+                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    const a: *u8 = &self.registers.r8.A;
+                    a.* -%= source.*;
+
+                    self.registers.r8.F.Flags.zero = a.* == 0;
+                    self.registers.r8.F.Flags.nBCD = true;
+                    self.registers.r8.F.Flags.halfBCD = (a.* & 0xF) < (source.* & 0xF);
+                    // TODO: no-borrow => any digit of a is less then source => binary: if at any point a is 0 and source is 1?
+                    self.registers.r8.F.Flags.carry = a.* == 0;
+
+                    break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+                },  
                 // XOR a, r8
                 0xA8...0xAF => op: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
@@ -403,6 +444,9 @@ pub const CPU = struct {
                     dest.* ^= source.*;
 
                     self.registers.r8.F.Flags.zero = dest.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
+                    self.registers.r8.F.Flags.carry = false;
 
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },
@@ -428,8 +472,7 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.zero = A.* == source.*;
                     self.registers.r8.F.Flags.nBCD = true;
-                    // True: Set if no borrow from bit 4
-                    self.registers.r8.F.Flags.halfBCD = true;
+                    self.registers.r8.F.Flags.halfBCD = (A.* & 0xF) < (source.* & 0xF);
                     self.registers.r8.F.Flags.carry = A.* < source.*;
 
                     break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
@@ -567,7 +610,7 @@ pub const CPU = struct {
                     const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
                     self.registers.r8.A = self.memory[HIGH_PAGE + source.*];
 
-                    break: op Operation { .deltaPC = 3, .cycles = 16 };
+                    break: op Operation { .deltaPC = 2, .cycles = 12 };
                 },
                 // LD a, [imm16]
                 0xFA => op: {
@@ -575,7 +618,7 @@ pub const CPU = struct {
                     const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
                     self.registers.r8.A = self.memory[source.*];
 
-                    break: op Operation { .deltaPC = 2, .cycles = 12 };
+                    break: op Operation { .deltaPC = 3, .cycles = 16 };
                 },
                 // DI (Disable Interrupts)
                 0xF3 => op: {
@@ -593,8 +636,7 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.zero = A.* == source.*;
                     self.registers.r8.F.Flags.nBCD = true;
-                    // True: Set if no borrow from bit 4
-                    self.registers.r8.F.Flags.halfBCD = true;
+                    self.registers.r8.F.Flags.halfBCD = (A.* & 0xF) < (source.* & 0xF);
                     self.registers.r8.F.Flags.carry = A.* < source.*;
 
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
@@ -606,9 +648,15 @@ pub const CPU = struct {
                     break: op CPUError.OPERATION_NOT_IMPLEMENTED;
                 }
             };
+            const newVal: u8 = self.memory[oldValAddr];
+            if (newVal != oldVal) {
+                var b: u8 = 10;
+                b += 1;
+            }
 
             self.pc += operation.deltaPC;
             self.cycle += operation.cycles;
+
         }
     }
 };

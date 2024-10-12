@@ -21,6 +21,15 @@ diff playground/cpu_log_bad.txt playground/cpu_log_good.txt > playground/cpu_log
 use other zig gb emulator for Testing
 https://github.com/Ryp/gb-emu-zig
 
+## Testing PPU
+It would be awesome to have the same trace testing for the ppu.
+
+### Maybe I can automate this process better?
+I can run a generator process that creates the cpu logfiles with each instruction being a particular test-rom.
+Would be awesome if this would work for all .gb files.
+Maybe I can create a fork of a known good emulator for this?
+Maybe my emulator can do that later once it's super stable?
+
 # GB resources:
 https://gbdev.io/
 
