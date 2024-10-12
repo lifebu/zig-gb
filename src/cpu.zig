@@ -7,11 +7,11 @@ pub const CPU = struct {
     const FlagRegister = packed union {
         F: u8,
         Flags: packed struct {
-            zero: bool = false,
-            nBCD: bool = false,
-            halfBCD: bool = false,
-            carry: bool = false,
             _: u4 = 0,
+            carry: bool = false,
+            halfBCD: bool = false,
+            nBCD: bool = false,
+            zero: bool = false,
         },
     };
 
@@ -77,7 +77,6 @@ pub const CPU = struct {
     const R8Variant = enum(u8) { B, C, D, E, H, L, HL, A, };
     pub fn getFromR8Variant(self: *Self, variant: R8Variant) *u8 {
         return switch (variant) {
-            .A => &self.registers.r8.A,
             .B => &self.registers.r8.B,
             .C => &self.registers.r8.C,
             .D => &self.registers.r8.D,
@@ -85,6 +84,7 @@ pub const CPU = struct {
             .H => &self.registers.r8.H,
             .L => &self.registers.r8.L,
             .HL => &self.memory[self.registers.r16.HL],
+            .A => &self.registers.r8.A,
         };
     }
 
@@ -145,14 +145,31 @@ pub const CPU = struct {
         OPERATION_NOT_IMPLEMENTED,
     };
 
+    pub fn debugPrintState(self: *Self) void {
+        // Debug printing copied from: https://github.com/Ryp/gb-emu-zig
+        std.debug.print("PC {x:0>4} SP {x:0>4}", .{ self.pc, self.sp });
+        std.debug.print(" A {x:0>2} Flags {s} {s} {s} {s}", .{
+            self.registers.r8.A,
+            if (self.registers.r8.F.Flags.zero) "Z" else "_",
+            if (self.registers.r8.F.Flags.nBCD) "N" else "_",
+            if (self.registers.r8.F.Flags.halfBCD) "H" else "_",
+            if (self.registers.r8.F.Flags.carry) "C" else "_",
+        });
+        std.debug.print(" B {x:0>2} C {x:0>2}", .{ self.registers.r8.B, self.registers.r8.C });
+        std.debug.print(" D {x:0>2} E {x:0>2}", .{ self.registers.r8.D, self.registers.r8.E });
+        std.debug.print(" H {x:0>2} L {x:0>2}", .{ self.registers.r8.H, self.registers.r8.L });
+        std.debug.print("| {x} | ", .{self.memory[self.pc]});
+        std.debug.print("\n", .{});
+    }
+
     pub fn frame(self: *Self) !void {
         self.cycle = 0;
 
         // TODO: implement cycle accuracy (with PPU!).
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
-            const opcode: u8 = self.memory[self.pc];
+            self.debugPrintState();
 
-            // std.debug.print("{x}: {x}\n", .{self.pc, opcode});
+            const opcode: u8 = self.memory[self.pc];
             // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
             const operation: Operation = try switch (opcode) {
                 // NOOP
@@ -207,7 +224,7 @@ pub const CPU = struct {
                     source.* -%= 1;
 
                     self.registers.r8.F.Flags.zero = source.* == 0; 
-                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.nBCD = true;
                     // TODO: Helper function?
                     self.registers.r8.F.Flags.halfBCD = (source.* & 0b0000_1111) == 0b1111; 
 
@@ -325,7 +342,7 @@ pub const CPU = struct {
                 },
                 // JR cond imm8
                 0x20, 0x30, 0x28, 0x38 => op: {
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
+                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
                     const cond: bool = self.getFromCondVariant(condVar);
                     // TODO: Out of memoery?
                     // TODO: All this conversion smells like spaghetti, is there an easier way?
@@ -410,7 +427,7 @@ pub const CPU = struct {
                 },
                 // RET cond
                 0xC0, 0xC8, 0xD0, 0xD8 => op: {
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
+                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
                     const cond: bool = self.getFromCondVariant(condVar);
 
                     if(cond) {
@@ -423,7 +440,7 @@ pub const CPU = struct {
                 },
                 // POP r16stk
                 0xC1, 0xD1, 0xE1, 0xF1 => op: {
-                    const destVar: R16StkVariant = @enumFromInt(opcode & 0b0011_0000 >> 4);
+                    const destVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                     const dest: *u16 = self.getFromR16StkVariant(destVar);
 
                     const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
@@ -455,7 +472,7 @@ pub const CPU = struct {
                 0xC4, 0xCC, 0xD4, 0xDC => op : {
                     // TODO: It looks like all the variants use the same two bits mostly. Can this be used to make the code better?
                     // TODO: same code as unconditional call, combine the code!
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 4);
+                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
                     const cond: bool = self.getFromCondVariant(condVar);
 
                     if(cond) {
