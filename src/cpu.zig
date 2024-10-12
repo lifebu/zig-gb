@@ -145,7 +145,7 @@ pub const CPU = struct {
         OPERATION_NOT_IMPLEMENTED,
     };
 
-    pub fn debugPrintState(self: *Self) void {
+    fn debugPrintState(self: *Self) void {
         // Debug printing copied from: https://github.com/Ryp/gb-emu-zig
         std.debug.print("PC {x:0>4} SP {x:0>4}", .{ self.pc, self.sp });
         std.debug.print(" A {x:0>2} Flags {s} {s} {s} {s}", .{
@@ -158,9 +158,15 @@ pub const CPU = struct {
         std.debug.print(" B {x:0>2} C {x:0>2}", .{ self.registers.r8.B, self.registers.r8.C });
         std.debug.print(" D {x:0>2} E {x:0>2}", .{ self.registers.r8.D, self.registers.r8.E });
         std.debug.print(" H {x:0>2} L {x:0>2}", .{ self.registers.r8.H, self.registers.r8.L });
-        std.debug.print("| {x} | ", .{self.memory[self.pc]});
+        std.debug.print(" | {x} {x} {x} {x} | ", .{
+            self.memory[self.pc], 
+            self.memory[self.pc + 1], 
+            self.memory[self.pc + 2], 
+            self.memory[self.pc + 3], 
+        });
         std.debug.print("\n", .{});
     }
+
 
     pub fn frame(self: *Self) !void {
         self.cycle = 0;
@@ -408,6 +414,9 @@ pub const CPU = struct {
                     dest.* |= source.*;
 
                     self.registers.r8.F.Flags.zero = dest.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
+                    self.registers.r8.F.Flags.carry = false;
 
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },
@@ -451,7 +460,7 @@ pub const CPU = struct {
                 },
                 // PUSH r16stk
                 0xC5, 0xD5, 0xE5, 0xF5 => op: {
-                    const sourceVar: R16StkVariant = @enumFromInt(opcode & 0b0011_0000 >> 4);
+                    const sourceVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                     const source: *u16 = self.getFromR16StkVariant(sourceVar);
 
                     self.sp -= 2;
