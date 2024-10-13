@@ -193,7 +193,7 @@ pub const CPU = struct {
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             self.debugPrintState();
 
-            if(self.pc == 0xC06C) {
+            if(self.pc == 0xC7CC) {
                 var a: u32 = 0;
                 a += 1;
             }
@@ -232,7 +232,7 @@ pub const CPU = struct {
                 0x03, 0x13, 0x23, 0x33 => op: {
                     const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                     const source: *u16 = self.getFromR16Variant(sourceVar);
-                    source.* += 1;
+                    source.* +%= 1;
 
                     break: op Operation{ .deltaPC = 1, .cycles = 8 };
                 },
@@ -240,26 +240,26 @@ pub const CPU = struct {
                 0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C => op : {
                     const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
-                    source.* +%= 1;
+                    const result: u8 = source.* +% 1;
 
-                    self.registers.r8.F.Flags.zero = source.* == 0; 
+                    self.registers.r8.F.Flags.zero = result == 0; 
                     self.registers.r8.F.Flags.nBCD = false;
-                    // TODO: Maybe helper function?
-                    self.registers.r8.F.Flags.halfBCD = (source.* & 0b0000_1111) == 0; 
+                    self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) +% 1) & 0x10) == 0x10; 
 
+                    source.* = result;
                     break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
                 },
                 // DEC r8
                 0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D => op : {
                     const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
-                    source.* -%= 1;
+                    const result: u8 = source.* -% 1;
 
-                    self.registers.r8.F.Flags.zero = source.* == 0; 
+                    self.registers.r8.F.Flags.zero = result == 0; 
                     self.registers.r8.F.Flags.nBCD = true;
-                    // TODO: Helper function?
-                    self.registers.r8.F.Flags.halfBCD = (source.* & 0b0000_1111) == 0b1111; 
+                    self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) -% 1) & 0x10) == 0x10; 
 
+                    source.* = result;
                     break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
                 },
                 // LD r8, imm8
@@ -285,7 +285,7 @@ pub const CPU = struct {
                 // LD (imm16),SP
                 0x08 => op: {
                     const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.sp = source.*;
+                    source.* = self.sp;
 
                     break: op Operation { .deltaPC = 3, .cycles = 20 };
                 },
@@ -310,12 +310,13 @@ pub const CPU = struct {
                 0x09, 0x19, 0x29, 0x39 => op : {
                     const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                     const source: *u16 = self.getFromR16Variant(sourceVar);
-                    self.registers.r16.HL += source.*;
+                    const result = @addWithOverflow(self.registers.r16.HL, source.*);
 
                     self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false; // TODO: set if carry from bit 11 (12th).
-                    self.registers.r8.F.Flags.carry = false; // TODO: set if carry from bit 15 (16th).
+                    self.registers.r8.F.Flags.halfBCD = (((self.registers.r16.HL & 0xFFF) + (source.* & 0xFFF)) & 0x1000) ==  0x1000;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
+                    self.registers.r16.HL = result.@"0";
                     break: op Operation { .deltaPC = 1, .cycles = 8 };
                 },
                 // RRCA
@@ -368,7 +369,9 @@ pub const CPU = struct {
                     const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
                     A.* |= (carry << 7);
                     self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.zero = false;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
 
                     break: op Operation { .deltaPC = 1, .cycles = 4 };
                 },
@@ -426,14 +429,14 @@ pub const CPU = struct {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
                     const a: *u8 = &self.registers.r8.A;
-                    a.* -%= source.*;
+                    const result = @subWithOverflow(a.*, source.*);
 
-                    self.registers.r8.F.Flags.zero = a.* == 0;
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (a.* & 0x0F) < (source.* & 0x0F);
-                    // TODO: no-borrow => any digit of a is less then source => binary: if at any point a is 0 and source is 1?
-                    self.registers.r8.F.Flags.carry = a.* == 0;
+                    self.registers.r8.F.Flags.halfBCD = (((a.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
+                    a.* = result.@"0";
                     break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },  
                 // XOR a, r8
@@ -469,11 +472,12 @@ pub const CPU = struct {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
                     const A: *u8 = &self.registers.r8.A;
+                    const result = @subWithOverflow(A.*, source.*);
 
                     self.registers.r8.F.Flags.zero = A.* == source.*;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (A.* & 0x0F) < (source.* & 0x0F);
-                    self.registers.r8.F.Flags.carry = A.* < source.*;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
                     break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },
@@ -547,15 +551,14 @@ pub const CPU = struct {
                     // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
                     const source: *u8 = &self.memory[self.pc + 1];
                     const A: *u8 = &self.registers.r8.A;
-                    A.* +%= source.*;
+                    const result = @addWithOverflow(A.*, source.*);
 
-                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = false;
-                    // TODO: Set if carry from bit 3.
-                    self.registers.r8.F.Flags.halfBCD = false;
-                    // TODO: Set if carry from bit 7.
-                    self.registers.r8.F.Flags.carry = false;
+                    self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
+                    A.* = result.@"0";
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },  
                 // RET
@@ -581,13 +584,12 @@ pub const CPU = struct {
                             const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
                             source.* >>= 1;
 
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
-
                             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
                             source.* |= (carry << 7);
                             self.registers.r8.F.Flags.carry = shiftedBit;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
 
                             break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
                         },
@@ -629,19 +631,34 @@ pub const CPU = struct {
 
                     break: op Operation { .deltaPC = 0, .cycles =  24 };
                 },
+                // ADC a, imm8
+                0xCE => op: {
+                    const source: *u8 = &self.memory[self.pc + 1];
+                    const A: *u8 = &self.registers.r8.A;
+                    const sourceCarry: u8 = source.* + @intFromBool(self.registers.r8.F.Flags.carry);
+                    const result = @addWithOverflow(A.*, sourceCarry);
+
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    A.* = result.@"0";
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
+                },  
                 // SUB a, r8
                 0xD6 => op: {
                     // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
                     const source: *u8 = &self.memory[self.pc + 1];
                     const A: *u8 = &self.registers.r8.A;
-                    A.* -%= source.*;
+                    const result = @subWithOverflow(A.*, source.*);
 
-                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (A.* & 0x0F) < (source.* & 0x0F);
-                    // TODO: no-borrow => any digit of a is less then source => binary: if at any point a is 0 and source is 1?
-                    self.registers.r8.F.Flags.carry = A.* == 0;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
+                    A.* = result.@"0";
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },  
                 // LDH [imm8], a
@@ -679,6 +696,28 @@ pub const CPU = struct {
 
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },
+                // JP (HL)
+                0xE9 => op : {
+                    // TODO: This code is basically the same as JP imm16, and JP and JP Cond is basically the same, combine them!
+                    // TODO: Out of memory? Crashes because if misalignment! => Helper function
+                    self.pc = self.registers.r16.HL;
+
+                    break: op Operation { .deltaPC = 0, .cycles =  4 };
+                },
+                // XOR a, imm8
+                0xEE => op: {
+                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                    const source: *u8 = &self.memory[self.pc + 1];
+                    const A: *u8 = &self.registers.r8.A;
+                    A.* ^= source.*;
+
+                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
+                    self.registers.r8.F.Flags.carry = false;
+
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
+                },
                 // LDH a, [imm8]
                 0xF0 => op: {
                     // TODO: Out of memory?
@@ -700,6 +739,12 @@ pub const CPU = struct {
                     // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
                     break: op Operation { .deltaPC = 1, .cycles =  4 };
                 },
+                // LD SP, HL
+                0xF9 => op: {
+                    self.sp = self.registers.r16.HL;
+
+                    break: op Operation { .deltaPC = 1, .cycles = 8 };
+                },
                 // CP a, imm8
                 0xFE => op: {
                     // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
@@ -708,11 +753,12 @@ pub const CPU = struct {
                     // So I can change the mask to improve this! Cycle time is the same as HL!
                     const source: *u8 = &self.memory[self.pc + 1];
                     const A: *u8 = &self.registers.r8.A;
+                    const result = @subWithOverflow(A.*, source.*);
 
-                    self.registers.r8.F.Flags.zero = A.* == source.*;
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (A.* & 0x0F) < (source.* & 0x0F);
-                    self.registers.r8.F.Flags.carry = A.* < source.*;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },

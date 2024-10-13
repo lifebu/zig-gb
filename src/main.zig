@@ -53,7 +53,7 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/01-special.gb");
+    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/03-op sp,hl.gb");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};
