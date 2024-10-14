@@ -191,7 +191,7 @@ pub const CPU = struct {
 
         // TODO: implement cycle accuracy (with PPU!).
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
-            self.debugPrintState();
+            //self.debugPrintState();
 
             if(self.pc == 0xC7CC) {
                 var a: u32 = 0;
@@ -406,6 +406,22 @@ pub const CPU = struct {
 
                     break: op Operation{ .deltaPC = 1, .cycles = 4 };
                 },
+                // SCF (Set Carry Flag)
+                0x37 => op: {
+                    self.registers.r8.F.Flags.carry = true;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
+
+                    break: op Operation { .deltaPC = 1, .cycles = 4 };
+                },
+                // CCF (Complement Carry Flag)
+                0x3F => op: {
+                    self.registers.r8.F.Flags.carry = !self.registers.r8.F.Flags.carry;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
+
+                    break: op Operation { .deltaPC = 1, .cycles = 4 };
+                },
                 // LD r8, r8
                 0x40...0x7F => op: {
                     // TODO: Break the range, this is not readable honestly!
@@ -439,6 +455,36 @@ pub const CPU = struct {
                     a.* = result.@"0";
                     break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },  
+                // SBC a, imm8
+                0x98...0x9F => op: {
+                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    const A: *u8 = &self.registers.r8.A;
+                    const sourceCarry: u8 = source.* + @intFromBool(self.registers.r8.F.Flags.carry);
+                    const result = @subWithOverflow(A.*, sourceCarry);
+
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                    self.registers.r8.F.Flags.nBCD = true;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    A.* = result.@"0";
+                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+                },  
+                // AND a, r8
+                0xA0...0xA7 => op: {
+                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    const A: *u8 = &self.registers.r8.A;
+                    A.* &= source.*;
+
+                    self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = true;
+                    self.registers.r8.F.Flags.carry = false;
+
+                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+                },
                 // XOR a, r8
                 0xA8...0xAF => op: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
@@ -504,6 +550,17 @@ pub const CPU = struct {
                     self.sp += 2;
 
                     break: op Operation{ .deltaPC = 1, .cycles = 16 };
+                },                
+                // JP cond imm16
+                0xC2, 0xD2, 0xCA, 0xDA => op: {
+                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
+                    const cond: bool = self.getFromCondVariant(condVar);
+
+                    // TODO: Out of memoery?
+                    const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                    self.pc = if(cond) target.* else (self.pc + 3);
+
+                    break: op Operation { .deltaPC = 0, .cycles =  if (cond) 16 else 12 };
                 },
                 // PUSH r16stk
                 0xC5, 0xD5, 0xE5, 0xF5 => op: {
@@ -606,6 +663,37 @@ pub const CPU = struct {
                             self.registers.r8.F.Flags.zero = source.* == 0;
                             
                             break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // BIT bit,r8
+                        0x40...0x7F => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
+                            const result: u8 = source.* & (@as(u8, 1) << bitIndex);
+
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = true;
+                            self.registers.r8.F.Flags.zero = result == 0;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
+                        },
+                        // RES bit,r8
+                        0x80...0xBF => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
+                            source.* &= ~(@as(u8, 1) << bitIndex);
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
+                        },
+                        // SET bit,r8
+                        0xC0...0xFF => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
+                            source.* |= (@as(u8, 1) << bitIndex);
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
                         },
                         else => op_pfx: {
                             std.debug.print("OPERATION_NOT_IMPLEMENTED: {X}{X}\n", .{0xCB, opcode});
