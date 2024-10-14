@@ -302,7 +302,7 @@ pub const CPU = struct {
                 0x0B, 0x1B, 0x2B, 0x3B => op: {
                     const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                     const source: *u16 = self.getFromR16Variant(sourceVar);
-                    source.* -= 1;
+                    source.* -%= 1;
 
                     break: op Operation{ .deltaPC = 1, .cycles = 8 };
                 },
@@ -440,6 +440,37 @@ pub const CPU = struct {
 
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL or destVar == .HL) 8 else 4 };
                 },
+                // ADD a, r8
+                0x80...0x87 => op: {
+                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    const A: *u8 = &self.registers.r8.A;
+                    const result = @addWithOverflow(A.*, source.*);
+
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    A.* = result.@"0";
+                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+                },
+                // ADC a, r8
+                0x88...0x8F => op: {
+                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    const A: *u8 = &self.registers.r8.A;
+                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
+                    const result = @addWithOverflow(A.*, sourceCarry);
+
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    A.* = result.@"0";
+                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+                },  
                 // SUB a, r8
                 0x90...0x97 => op: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
@@ -460,7 +491,7 @@ pub const CPU = struct {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* + @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
                     const result = @subWithOverflow(A.*, sourceCarry);
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
@@ -735,7 +766,7 @@ pub const CPU = struct {
                 0xCE => op: {
                     const source: *u8 = &self.memory[self.pc + 1];
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* + @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
                     const result = @addWithOverflow(A.*, sourceCarry);
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
@@ -776,7 +807,7 @@ pub const CPU = struct {
                     // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
                     const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* + @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
                     const result = @subWithOverflow(A.*, sourceCarry);
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;

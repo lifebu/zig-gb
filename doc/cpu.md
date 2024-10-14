@@ -21,6 +21,19 @@ diff playground/cpu_log_bad.txt playground/cpu_log_good.txt > playground/cpu_log
 use other zig gb emulator for Testing
 https://github.com/Ryp/gb-emu-zig
 
+## Current Results:
+01-special.gb: DAA missing.
+02-interrupts.gb: No interrupts.
+03-op sp,hl.gb: Infinite loop?
+04-op r,imm.gb: Infinite loop?
+05-op rp.gb: PASSED!
+06-ld r,r.gb: PASSED!
+07-jr,jp,call,ret,rst.gb: Test always resets, so fail? 
+08-misc instrs.gb: Test always resets, so fail? 
+09-op r,r.gb: Missing instruction: 0xCB37.
+10-bit ops.gb: PASSED!
+11-op a,(hl).gb: Missing Instruction: 0xCB37 
+
 ## Testing PPU
 It would be awesome to have the same trace testing for the ppu.
 
