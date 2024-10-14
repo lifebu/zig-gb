@@ -455,7 +455,7 @@ pub const CPU = struct {
                     a.* = result.@"0";
                     break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },  
-                // SBC a, imm8
+                // SBC a, r8
                 0x98...0x9F => op: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
@@ -617,7 +617,19 @@ pub const CPU = struct {
 
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },  
+                },
+                // RST target
+                0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF => op : {
+                    const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
+
+                    self.sp -= 2;
+                    const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                    stack.* = self.pc;
+
+                    self.pc = target;
+
+                    break: op Operation{ .deltaPC = 0, .cycles = 32 };
+                },
                 // RET
                 0xC9 => op : {
                     // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
@@ -626,7 +638,7 @@ pub const CPU = struct {
                     self.pc = retAddress.*;
                     self.sp += 2;
 
-                    break: op Operation { .deltaPC = 0, .cycles =  24 };
+                    break: op Operation { .deltaPC = 0, .cycles =  16 };
                 },
                 // PREFIX CB
                 0xCB => op: {
@@ -749,6 +761,32 @@ pub const CPU = struct {
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },  
+                // RETI
+                0xD9 => op : {
+                    const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                    self.pc = retAddress.*;
+                    self.sp += 2;
+
+                    // TODO: Also enable interrupts.
+
+                    break: op Operation { .deltaPC = 0, .cycles =  16 };
+                },
+                // SBC a, imm8
+                0xDE => op: {
+                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                    const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                    const A: *u8 = &self.registers.r8.A;
+                    const sourceCarry: u8 = source.* + @intFromBool(self.registers.r8.F.Flags.carry);
+                    const result = @subWithOverflow(A.*, sourceCarry);
+
+                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                    self.registers.r8.F.Flags.nBCD = true;
+                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    A.* = result.@"0";
+                    break :op Operation{ .deltaPC = 1, .cycles = 8 };
+                },  
                 // LDH [imm8], a
                 0xE0 => op: {
                     // TODO: Out of memory?
@@ -758,6 +796,12 @@ pub const CPU = struct {
                     // TODO: If we create this thing first and you can only do that via a function in the self. 
                     // then you are able to check if with the requested delta pc you would be able to access out of memory!
                     break: op Operation { .deltaPC = 2, .cycles = 12 };
+                },
+                // LD [c], a
+                0xE2 => op: {
+                    self.memory[HIGH_PAGE + self.registers.r8.C] = self.registers.r8.A;
+
+                    break: op Operation { .deltaPC = 1, .cycles = 8 };
                 },
                 // LD [imm16], a
                 0xEA => op: {
@@ -783,6 +827,22 @@ pub const CPU = struct {
                     self.registers.r8.F.Flags.carry = false;
 
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
+                },
+                // ADD SP, imm8 (signed)
+                0xE8 => op: {
+                    // TODO: Out of memoery?
+                    // TODO: All this conversion smells like spaghetti, is there an easier way?
+                    const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
+                    const spCast: i32 = self.sp;
+                    const result = @addWithOverflow(spCast, deltaSP);
+                    self.sp = @intCast(result.@"0");
+
+                    self.registers.r8.F.Flags.zero = false;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = ((spCast & 0x0F) +% (deltaSP & 0x0F)) > 0x0F;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    break :op Operation{ .deltaPC = 2, .cycles = 16 };
                 },
                 // JP (HL)
                 0xE9 => op : {
@@ -814,6 +874,12 @@ pub const CPU = struct {
 
                     break: op Operation { .deltaPC = 2, .cycles = 12 };
                 },
+                // LD a, [c]
+                0xF2 => op: {
+                    self.registers.r8.A = self.memory[HIGH_PAGE + self.registers.r8.C];
+
+                    break: op Operation { .deltaPC = 1, .cycles = 8 };
+                },
                 // LD a, [imm16]
                 0xFA => op: {
                     // TODO: Out of memory?
@@ -827,11 +893,46 @@ pub const CPU = struct {
                     // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
                     break: op Operation { .deltaPC = 1, .cycles =  4 };
                 },
+                // OR a, imm8
+                0xF6 => op: {
+                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                    const source: *u8 = &self.memory[self.pc + 1];
+                    const dest: *u8 = &self.registers.r8.A;
+                    dest.* |= source.*;
+
+                    self.registers.r8.F.Flags.zero = dest.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
+                    self.registers.r8.F.Flags.carry = false;
+
+                    break :op Operation{ .deltaPC = 1, .cycles = 8 };
+                },
+                // LD HL, SP+imm8(signed)
+                0xF8 => op: {
+                    // TODO: Out of memoery?
+                    // TODO: All this conversion smells like spaghetti, is there an easier way?
+                    const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
+                    const spCast: i32 = self.sp;
+                    const result = @addWithOverflow(spCast, deltaSP);
+                    self.registers.r16.HL = @intCast(result.@"0");
+
+                    self.registers.r8.F.Flags.zero = false;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = ((spCast & 0x0F) +% (deltaSP & 0x0F)) > 0x0F;
+                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                    break :op Operation{ .deltaPC = 2, .cycles = 12 };
+                },
                 // LD SP, HL
                 0xF9 => op: {
                     self.sp = self.registers.r16.HL;
 
                     break: op Operation { .deltaPC = 1, .cycles = 8 };
+                },
+                // EI (Enable Interrupts)
+                0xFB => op: {
+                    // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
+                    break: op Operation { .deltaPC = 1, .cycles =  4 };
                 },
                 // CP a, imm8
                 0xFE => op: {
