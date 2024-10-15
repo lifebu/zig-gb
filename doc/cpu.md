@@ -28,11 +28,11 @@ https://github.com/Ryp/gb-emu-zig
 04-op r,imm.gb: Infinite loop?
 05-op rp.gb: PASSED!
 06-ld r,r.gb: PASSED!
-07-jr,jp,call,ret,rst.gb: Test always resets, so fail? 
-08-misc instrs.gb: Test always resets, so fail? 
+07-jr,jp,call,ret,rst.gb: Infinite loop? 
+08-misc instrs.gb: Passed! 
 09-op r,r.gb: Test Failed
 10-bit ops.gb: PASSED!
-11-op a,(hl).gb: Missing Instruction: 0xCB37 
+11-op a,(hl).gb: Missing Instruction: 0x27, but before it spits out broken instructions! 
 
 ## Testing PPU
 It would be awesome to have the same trace testing for the ppu.

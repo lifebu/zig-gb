@@ -58,6 +58,8 @@ pub const CPU = struct {
         cpu.memory = try alloc.alloc(u8, 0x10000);
         errdefer alloc.free(cpu.memory);
 
+        @memset(cpu.memory, 0);
+
         _ = try std.fs.cwd().readFile(gbFile, cpu.memory);
 
         cpu.registers.r16.AF = 0x01B0;
@@ -191,14 +193,14 @@ pub const CPU = struct {
 
         // TODO: implement cycle accuracy (with PPU!).
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
-            //self.debugPrintState();
+            // self.debugPrintState();
 
-            if(self.pc == 0xC7CC) {
+            if(self.pc == 0xC67E) {
                 var a: u32 = 0;
                 a += 1;
             }
 
-            const oldValAddr: u16 = 0xC366;
+            const oldValAddr: u16 = 0xDD02;
             const oldVal: u8 = self.memory[oldValAddr];
 
             var opcode: u8 = self.memory[self.pc];
@@ -285,7 +287,8 @@ pub const CPU = struct {
                 // LD (imm16),SP
                 0x08 => op: {
                     const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    source.* = self.sp;
+                    const dest: *align(1) u16 = @ptrCast(&self.memory[source.*]);
+                    dest.* = self.sp;
 
                     break: op Operation { .deltaPC = 3, .cycles = 20 };
                 },
@@ -579,6 +582,11 @@ pub const CPU = struct {
                     const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
                     dest.* = stack.*;
                     self.sp += 2;
+
+                    // If you do a pop on the AF register (0xF1), you need to make sure that the lowest nibble stays 0.
+                    if(destVar == .AF) {
+                        dest.* &= 0xFFF0;
+                    }
 
                     break: op Operation{ .deltaPC = 1, .cycles = 16 };
                 },                
