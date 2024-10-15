@@ -30,7 +30,7 @@ https://github.com/Ryp/gb-emu-zig
 06-ld r,r.gb: PASSED!
 07-jr,jp,call,ret,rst.gb: Test always resets, so fail? 
 08-misc instrs.gb: Test always resets, so fail? 
-09-op r,r.gb: Missing instruction: 0xCB37.
+09-op r,r.gb: Test Failed
 10-bit ops.gb: PASSED!
 11-op a,(hl).gb: Missing Instruction: 0xCB37 
 

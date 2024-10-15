@@ -675,7 +675,54 @@ pub const CPU = struct {
                 0xCB => op: {
                     // TODO: Maybe there is solution without nesting this?
                     opcode = self.memory[self.pc + 1];
-                    break: op try switch (opcode) {
+                    break: op switch (opcode) {
+                        // RLC r8
+                        0x00...0x07 => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                            source.* <<= 1;
+
+                            const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                            source.* = source.* & carry;
+                            self.registers.r8.F.Flags.carry = shiftedBit;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // RRC r8 
+                        0x08...0x0F => op_pfx : {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: u8 = (source.* & 0b0000_0001);
+                            source.* >>= 1;
+
+                            source.* |= (shiftedBit << 7);
+                            self.registers.r8.F.Flags.carry = shiftedBit == 1;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // RL r8
+                        0x10...0x17 => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                            source.* <<= 1;
+
+                            const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                            source.* &= carry;
+                            self.registers.r8.F.Flags.carry = shiftedBit;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
                         // RR r8 
                         0x18...0x1F => op_pfx : {
                             // TODO: RR and RRA is basically the same?
@@ -686,6 +733,47 @@ pub const CPU = struct {
 
                             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
                             source.* |= (carry << 7);
+                            self.registers.r8.F.Flags.carry = shiftedBit;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // SLA r8
+                        0x20...0x27 => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                            source.* <<= 1;
+
+                            self.registers.r8.F.Flags.carry = shiftedBit;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // SWAP r8
+                        0x30...0x37 => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            source.* = (source.* << 4) | (source.* >> 4);
+
+                            self.registers.r8.F.Flags.carry = false;
+                            self.registers.r8.F.Flags.zero = source.* == 0;
+                            self.registers.r8.F.Flags.nBCD = false;
+                            self.registers.r8.F.Flags.halfBCD = false;
+
+                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                        },
+                        // SRA r8
+                        0x28...0x2F => op_pfx: {
+                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                            const source: *u8 = self.getFromR8Variant(sourceVar);
+                            const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                            source.* >>= 1;
+
                             self.registers.r8.F.Flags.carry = shiftedBit;
                             self.registers.r8.F.Flags.zero = source.* == 0;
                             self.registers.r8.F.Flags.nBCD = false;
@@ -738,11 +826,6 @@ pub const CPU = struct {
 
                             break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
                         },
-                        else => op_pfx: {
-                            std.debug.print("OPERATION_NOT_IMPLEMENTED: {X}{X}\n", .{0xCB, opcode});
-                            self.isPanicked = true;
-                            break: op_pfx CPUError.OPERATION_NOT_IMPLEMENTED;
-                        }
                     };
                 },
                 // CALL imm16
