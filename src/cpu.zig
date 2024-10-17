@@ -8,6 +8,7 @@ pub const CPU = struct {
         F: u8,
         Flags: packed struct {
             _: u4 = 0,
+            // TODO: consider to use u1 instead of bool so I have less conversions!
             carry: bool = false,
             halfBCD: bool = false,
             nBCD: bool = false,
@@ -993,15 +994,16 @@ pub const CPU = struct {
                     // TODO: Out of memoery?
                     // TODO: All this conversion smells like spaghetti, is there an easier way?
                     const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
-                    const spCast: i32 = self.sp;
-                    const result = @addWithOverflow(spCast, deltaSP);
-                    self.sp = @intCast(result.@"0");
 
                     self.registers.r8.F.Flags.zero = false;
                     self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = ((spCast & 0x0F) +% (deltaSP & 0x0F)) > 0x0F;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+                    const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
+                    self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
+                    // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
+                    const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
+                    self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
 
+                    self.sp +%= @as(u16, @bitCast(@as(i16, deltaSP)));
                     break :op Operation{ .deltaPC = 2, .cycles = 16 };
                 },
                 // JP (HL)
@@ -1070,16 +1072,17 @@ pub const CPU = struct {
                 // LD HL, SP+imm8(signed)
                 0xF8 => op: {
                     // TODO: Out of memoery?
-                    // TODO: All this conversion smells like spaghetti, is there an easier way?
                     const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
-                    const spCast: i32 = self.sp;
-                    const result = @addWithOverflow(spCast, deltaSP);
-                    self.registers.r16.HL = @intCast(result.@"0");
 
                     self.registers.r8.F.Flags.zero = false;
                     self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = ((spCast & 0x0F) +% (deltaSP & 0x0F)) > 0x0F;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+                    const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
+                    self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
+                    // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
+                    const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
+                    self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
+
+                    self.registers.r16.HL = self.sp +% @as(u16, @bitCast(@as(i16, deltaSP)));
 
                     break :op Operation{ .deltaPC = 2, .cycles = 12 };
                 },

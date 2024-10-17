@@ -24,7 +24,7 @@ https://github.com/Ryp/gb-emu-zig
 ## Current Results:
 01-special.gb: Passed
 02-interrupts.gb: No interrupts.
-03-op sp,hl.gb: Truncation panic.
+03-op sp,hl.gb: Passed
 04-op r,imm.gb: Passed
 05-op rp.gb: Passed
 06-ld r,r.gb: Passed
