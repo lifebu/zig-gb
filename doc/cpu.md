@@ -22,17 +22,17 @@ use other zig gb emulator for Testing
 https://github.com/Ryp/gb-emu-zig
 
 ## Current Results:
-01-special.gb: DAA missing.
+01-special.gb: Passed
 02-interrupts.gb: No interrupts.
-03-op sp,hl.gb: Infinite loop?
-04-op r,imm.gb: Infinite loop?
-05-op rp.gb: PASSED!
-06-ld r,r.gb: PASSED!
+03-op sp,hl.gb: Truncation panic.
+04-op r,imm.gb: Passed
+05-op rp.gb: Passed
+06-ld r,r.gb: Passed
 07-jr,jp,call,ret,rst.gb: Infinite loop? 
-08-misc instrs.gb: Passed! 
-09-op r,r.gb: Test Failed
-10-bit ops.gb: PASSED!
-11-op a,(hl).gb: Missing Instruction: 0x27, but before it spits out broken instructions! 
+08-misc instrs.gb: Passed
+09-op r,r.gb: Test Failed (alot)
+10-bit ops.gb: Passed
+11-op a,(hl).gb: Failed (alot) 
 
 ## Testing PPU
 It would be awesome to have the same trace testing for the ppu.

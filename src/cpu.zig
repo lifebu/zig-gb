@@ -195,7 +195,11 @@ pub const CPU = struct {
         while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
             // self.debugPrintState();
 
-            if(self.pc == 0xC67E) {
+            if(self.pc == 0xDEF8 and 
+                self.memory[0xDEF8] == 0xCE and 
+                self.memory[0xDEF8 + 1] == 0x0F and 
+                self.registers.r8.A == 0x00 and 
+                self.registers.r8.F.F == 0x10) {
                 var a: u32 = 0;
                 a += 1;
             }
@@ -394,11 +398,31 @@ pub const CPU = struct {
                 },
                 // DAA
                 0x27 => op: {
-                    // TODO: This feels like something i can skip for now (Decimal adjust register A (BCD)).
-                    std.debug.print("OPERATION_NOT_IMPLEMENTED: DAA: 0x27\n", .{});
-                    self.isPanicked = true;
-                    break: op CPUError.OPERATION_NOT_IMPLEMENTED;
-                    // TODO: Would be break: op Operation{ .deltaPC = 1, .cycles = 4 };
+                    const a: u8 = self.registers.r8.A;
+                    const halfBCD = self.registers.r8.F.Flags.halfBCD;
+                    const carry = self.registers.r8.F.Flags.carry;
+                    const subtract = self.registers.r8.F.Flags.nBCD;
+
+                    var offset: u8 = 0;
+                    var shouldCarry: bool = false;
+
+                    if((!subtract and ((a & 0xF) > 0x09)) or halfBCD) {
+                        offset |= 0x06;
+                    }
+            
+                    if((!subtract and (a > 0x99)) or carry) {
+                        offset |= 0x60;
+                        shouldCarry = true;
+                    }
+
+                    const result = if (subtract) a -% offset else a +% offset;
+                    self.registers.r8.A = result;
+
+                    self.registers.r8.F.Flags.carry = shouldCarry;
+                    self.registers.r8.F.Flags.zero = result == 0;
+                    self.registers.r8.F.Flags.halfBCD = false;
+
+                    break: op Operation{ .deltaPC = 1, .cycles = 4 };
                 },
                 // CPL (complement A)
                 0x2F => op: {
@@ -464,13 +488,16 @@ pub const CPU = struct {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
-                    const result = @addWithOverflow(A.*, sourceCarry);
+                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry = @addWithOverflow(source.*, carry);
+                    const result = @addWithOverflow(A.*, sourceCarry.@"0");
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
 
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
@@ -495,13 +522,16 @@ pub const CPU = struct {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                     const source: *u8 = self.getFromR8Variant(sourceVar);
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
-                    const result = @subWithOverflow(A.*, sourceCarry);
+                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry = @subWithOverflow(source.*, carry);
+                    const result = @subWithOverflow(A.*, sourceCarry.@"0");
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+                    const sourceHalfBCD: bool = (((source.* & 0x0F) -% (carry & 0x0F)) & 0x10) == 0x10;
+                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                    self.registers.r8.F.Flags.carry = sourceCarry.@"0" == 1 or result.@"1" == 1;
 
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
@@ -858,13 +888,16 @@ pub const CPU = struct {
                 0xCE => op: {
                     const source: *u8 = &self.memory[self.pc + 1];
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
-                    const result = @addWithOverflow(A.*, sourceCarry);
+                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry = @addWithOverflow(source.*, carry);
+                    const result = @addWithOverflow(A.*, sourceCarry.@"0");
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
 
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
@@ -899,13 +932,16 @@ pub const CPU = struct {
                     // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
                     const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
                     const A: *u8 = &self.registers.r8.A;
-                    const sourceCarry: u8 = source.* +% @intFromBool(self.registers.r8.F.Flags.carry);
-                    const result = @subWithOverflow(A.*, sourceCarry);
+                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                    const sourceCarry = @addWithOverflow(source.*, carry);
+                    const result = @subWithOverflow(A.*, sourceCarry.@"0");
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
+                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
 
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 2, .cycles = 8 };
