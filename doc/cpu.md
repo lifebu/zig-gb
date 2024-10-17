@@ -58,3 +58,9 @@ https://gbdev.gg8.se/files/roms/blargg-gb-tests/
 - This means the entire program could just use the 64kByte of the memory range of the GB.
 
 
+
+# Current Command Review:
+Correct:
+- All variant encodings.
+- All deltaPC and cycle count.
+- All instructions, variants that can be verified with register checks.

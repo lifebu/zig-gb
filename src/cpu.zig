@@ -398,6 +398,7 @@ pub const CPU = struct {
                     std.debug.print("OPERATION_NOT_IMPLEMENTED: DAA: 0x27\n", .{});
                     self.isPanicked = true;
                     break: op CPUError.OPERATION_NOT_IMPLEMENTED;
+                    // TODO: Would be break: op Operation{ .deltaPC = 1, .cycles = 4 };
                 },
                 // CPL (complement A)
                 0x2F => op: {
@@ -588,7 +589,7 @@ pub const CPU = struct {
                         dest.* &= 0xFFF0;
                     }
 
-                    break: op Operation{ .deltaPC = 1, .cycles = 16 };
+                    break: op Operation{ .deltaPC = 1, .cycles = 12 };
                 },                
                 // JP cond imm16
                 0xC2, 0xD2, 0xCA, 0xDA => op: {
@@ -667,7 +668,7 @@ pub const CPU = struct {
 
                     self.pc = target;
 
-                    break: op Operation{ .deltaPC = 0, .cycles = 32 };
+                    break: op Operation{ .deltaPC = 0, .cycles = 16 };
                 },
                 // RET
                 0xC9 => op : {
@@ -907,7 +908,7 @@ pub const CPU = struct {
                     self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
                     A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 1, .cycles = 8 };
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },  
                 // LDH [imm8], a
                 0xE0 => op: {
@@ -1027,7 +1028,7 @@ pub const CPU = struct {
                     self.registers.r8.F.Flags.halfBCD = false;
                     self.registers.r8.F.Flags.carry = false;
 
-                    break :op Operation{ .deltaPC = 1, .cycles = 8 };
+                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
                 },
                 // LD HL, SP+imm8(signed)
                 0xF8 => op: {
