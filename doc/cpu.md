@@ -28,7 +28,7 @@ https://github.com/Ryp/gb-emu-zig
 04-op r,imm.gb: Passed
 05-op rp.gb: Passed
 06-ld r,r.gb: Passed
-07-jr,jp,call,ret,rst.gb: Infinite loop? 
+07-jr,jp,call,ret,rst.gb: Passed 
 08-misc instrs.gb: Passed
 09-op r,r.gb: Test Failed (alot)
 10-bit ops.gb: Passed

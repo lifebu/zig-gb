@@ -692,9 +692,10 @@ pub const CPU = struct {
                 0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF => op : {
                     const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
 
+                    // push next address onto stack.
                     self.sp -= 2;
                     const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                    stack.* = self.pc;
+                    stack.* = self.pc + 1;
 
                     self.pc = target;
 
