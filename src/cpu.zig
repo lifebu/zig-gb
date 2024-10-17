@@ -591,7 +591,7 @@ pub const CPU = struct {
                     self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
                     self.registers.r8.F.Flags.carry = result.@"1" == 1;
 
-                    break :op Operation{ .deltaPC = 2, .cycles = if (sourceVar == .HL) 8 else 4 };
+                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
                 },
                 // RET cond
                 0xC0, 0xC8, 0xD0, 0xD8 => op: {
