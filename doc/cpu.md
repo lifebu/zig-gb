@@ -30,9 +30,9 @@ https://github.com/Ryp/gb-emu-zig
 06-ld r,r.gb: Passed
 07-jr,jp,call,ret,rst.gb: Passed 
 08-misc instrs.gb: Passed
-09-op r,r.gb: Test Failed (alot)
+09-op r,r.gb: Passed
 10-bit ops.gb: Passed
-11-op a,(hl).gb: Failed (alot) 
+11-op a,(hl).gb: Passed 
 
 ## Testing PPU
 It would be awesome to have the same trace testing for the ppu.

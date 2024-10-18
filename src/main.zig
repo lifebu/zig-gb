@@ -53,7 +53,7 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb");
+    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};
@@ -156,20 +156,23 @@ test {
     defer testDir.close();
 
     var iter: std.fs.Dir.Iterator = testDir.iterate();
+    var idx: u32 = 1;
     while(try iter.next()) |dirEntry| {
         std.debug.assert(dirEntry.kind == .file);
+        std.debug.print("{d}: Testing: {s}\n", .{idx, dirEntry.name});
+        idx += 1;
 
-        std.debug.print("Testing: {s}\n", .{dirEntry.name});
         const testFile: []u8 = try testDir.readFileAlloc(alloc, dirEntry.name, 1 * 1024 * 1024);
         defer alloc.free(testFile);
 
         const json = try std.json.parseFromSlice([]TestType, alloc, testFile, .{ .ignore_unknown_fields = true });
         defer json.deinit();
 
+        var cpu = try _cpu.CPU.init(alloc, null);
+        defer cpu.deinit();
+
         const testConfig: []TestType = json.value;
         for(testConfig) |testCase| {
-            var cpu = try _cpu.CPU.init(alloc, null);
-            defer cpu.deinit();
 
             cpu.pc = testCase.initial.pc;
             cpu.sp = testCase.initial.sp;
@@ -221,7 +224,6 @@ test {
                 return err;
             };
         }
-        
     }
 
 

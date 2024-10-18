@@ -266,11 +266,12 @@ pub const CPU = struct {
             // RLCA
             0x07 => op: {
                 const A: *u8 = &self.registers.r8.A;
-                const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
+                const shiftedBit: u8 = (A.* & 0x80);
                 A.* <<= 1;
 
-                self.registers.r8.F.Flags.carry = shiftedBit;
-                self.registers.r8.F.Flags.zero = A.* == 0;
+                A.* |= (shiftedBit >> 7);
+                self.registers.r8.F.Flags.carry = shiftedBit == 0x80;
+                self.registers.r8.F.Flags.zero = false;
                 self.registers.r8.F.Flags.nBCD = false;
                 self.registers.r8.F.Flags.halfBCD = false; 
 
@@ -318,11 +319,12 @@ pub const CPU = struct {
             // RRCA
             0x0F => op: {
                 const A: *u8 = &self.registers.r8.A;
-                const shiftedBit: bool = (A.* & 0x01) == 0x01;
+                const shiftedBit: u8 = A.* & 0x01;
                 A.* >>= 1;
 
-                self.registers.r8.F.Flags.carry = shiftedBit;
-                self.registers.r8.F.Flags.zero = A.* == 0;
+                A.* |= (shiftedBit << 7);
+                self.registers.r8.F.Flags.carry = shiftedBit == 0x01;
+                self.registers.r8.F.Flags.zero = false;
                 self.registers.r8.F.Flags.nBCD = false;
                 self.registers.r8.F.Flags.halfBCD = false;
 
@@ -331,7 +333,7 @@ pub const CPU = struct {
             // STOP
             0x10 => op: {
                 self.isStopped = true;
-                break: op Operation { .deltaPC = 2, .cycles = 4};
+                break: op Operation { .deltaPC = 1, .cycles = 4};
             },
             // RLA
             0x17 => op: {
@@ -342,7 +344,7 @@ pub const CPU = struct {
                 const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
                 A.* |= carry;
                 self.registers.r8.F.Flags.carry = shiftedBit;
-                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.zero = false;
                 self.registers.r8.F.Flags.nBCD = false;
                 self.registers.r8.F.Flags.halfBCD = false;
 
@@ -350,12 +352,9 @@ pub const CPU = struct {
             },
             // JR r8
             0x18 => op: {
-                // TODO: All this conversion smells like spaghetti, is there an easier way?
                 const relDest: i8 = @bitCast(self.memory[self.pc +% 1]); 
-                var pcCast: i32 = self.pc;
-                pcCast += 2; // size of instruction.
-                pcCast += relDest;
-                self.pc = @intCast(pcCast); 
+                self.pc +%= @as(u16, @bitCast(@as(i16, relDest))); 
+                self.pc +%= 2; // size of instruction 
 
                 break: op Operation { .deltaPC = 0, .cycles =  12 };
             },
@@ -378,12 +377,10 @@ pub const CPU = struct {
             0x20, 0x30, 0x28, 0x38 => op: {
                 const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
                 const cond: bool = self.getFromCondVariant(condVar);
-                // TODO: All this conversion smells like spaghetti, is there an easier way?
+
                 const relDest: i8 = @bitCast(self.memory[self.pc +% 1]); 
-                var pcCast: i32 = self.pc;
-                pcCast += 2; // size of instruction.
-                pcCast += if(cond) relDest else 0;
-                self.pc = @intCast(pcCast); 
+                self.pc +%= if (cond) @as(u16, @bitCast(@as(i16, relDest))) else 0;
+                self.pc +%= 2; // size of instruction 
 
                 break: op Operation { .deltaPC = 0, .cycles =  if (cond) 12 else 8 };
             },
@@ -684,7 +681,7 @@ pub const CPU = struct {
                 // push next address onto stack.
                 self.sp -= 2;
                 const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                stack.* = self.pc + 1;
+                stack.* = self.pc +% 1;
 
                 self.pc = target;
 
@@ -709,12 +706,11 @@ pub const CPU = struct {
                     0x00...0x07 => op_pfx: {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* &  0x80) == 0x80;
+                        const shiftedBit: u8 = source.* & 0x80;
                         source.* <<= 1;
 
-                        const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                        source.* |= carry;
-                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        source.* |= (shiftedBit >> 7);
+                        self.registers.r8.F.Flags.carry = shiftedBit == 0x80;
                         self.registers.r8.F.Flags.zero = source.* == 0;
                         self.registers.r8.F.Flags.nBCD = false;
                         self.registers.r8.F.Flags.halfBCD = false;
