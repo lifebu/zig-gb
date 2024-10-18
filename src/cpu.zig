@@ -286,6 +286,8 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.carry = shiftedBit;
                     self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false; 
 
                     break: op Operation { .deltaPC = 1, .cycles = 4 };
                 },
@@ -335,6 +337,8 @@ pub const CPU = struct {
 
                     self.registers.r8.F.Flags.carry = shiftedBit;
                     self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
 
                     break: op Operation { .deltaPC = 1, .cycles = 4 };
                 },
@@ -353,6 +357,8 @@ pub const CPU = struct {
                     A.* = A.* & carry;
                     self.registers.r8.F.Flags.carry = shiftedBit;
                     self.registers.r8.F.Flags.zero = A.* == 0;
+                    self.registers.r8.F.Flags.nBCD = false;
+                    self.registers.r8.F.Flags.halfBCD = false;
 
                     break: op Operation { .deltaPC = 1, .cycles = 4 };
                 },
@@ -524,15 +530,15 @@ pub const CPU = struct {
                     const source: *u8 = self.getFromR8Variant(sourceVar);
                     const A: *u8 = &self.registers.r8.A;
                     const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    const sourceCarry = @subWithOverflow(source.*, carry);
+                    const sourceCarry = @addWithOverflow(source.*, carry);
                     const result = @subWithOverflow(A.*, sourceCarry.@"0");
 
                     self.registers.r8.F.Flags.zero = result.@"0" == 0;
                     self.registers.r8.F.Flags.nBCD = true;
-                    const sourceHalfBCD: bool = (((source.* & 0x0F) -% (carry & 0x0F)) & 0x10) == 0x10;
+                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
                     const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
                     self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-                    self.registers.r8.F.Flags.carry = sourceCarry.@"0" == 1 or result.@"1" == 1;
+                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
 
                     A.* = result.@"0";
                     break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
