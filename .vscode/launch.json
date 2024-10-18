@@ -23,10 +23,10 @@
         },
         {
             "name": "Debug Test",
-            "type": "cppdbg",
+            "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/${fileBasenameNoExtension}-test",
-            "MIMode": "gdb",
+            //"MIMode": "gdb",
             "preLaunchTask": "build-test",
             "cwd": "${workspaceFolder}"
         },

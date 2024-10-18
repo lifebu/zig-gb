@@ -318,7 +318,7 @@ pub const CPU = struct {
             // RRCA
             0x0F => op: {
                 const A: *u8 = &self.registers.r8.A;
-                const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
+                const shiftedBit: bool = (A.* & 0x01) == 0x01;
                 A.* >>= 1;
 
                 self.registers.r8.F.Flags.carry = shiftedBit;
@@ -336,11 +336,11 @@ pub const CPU = struct {
             // RLA
             0x17 => op: {
                 const A: *u8 = &self.registers.r8.A;
-                const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
+                const shiftedBit: bool = (A.* & 0x80) == 0x80;
                 A.* <<= 1;
 
                 const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                A.* = A.* & carry;
+                A.* |= carry;
                 self.registers.r8.F.Flags.carry = shiftedBit;
                 self.registers.r8.F.Flags.zero = A.* == 0;
                 self.registers.r8.F.Flags.nBCD = false;
@@ -362,7 +362,7 @@ pub const CPU = struct {
             // RRA
             0x1F => op: {
                 const A: *u8 = &self.registers.r8.A;
-                const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
+                const shiftedBit: bool = (A.* & 0x01) == 0x01;
                 A.* >>= 1;
 
                 const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
@@ -703,18 +703,17 @@ pub const CPU = struct {
             // PREFIX CB
             0xCB => op: {
                 // TODO: Maybe there is solution without nesting this?
-                // TODO: when we access memory like this we need to module it.
                 opcode = self.memory[self.pc +% 1];
                 break: op switch (opcode) {
                     // RLC r8
                     0x00...0x07 => op_pfx: {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                        const shiftedBit: bool = (source.* &  0x80) == 0x80;
                         source.* <<= 1;
 
                         const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                        source.* = source.* & carry;
+                        source.* |= carry;
                         self.registers.r8.F.Flags.carry = shiftedBit;
                         self.registers.r8.F.Flags.zero = source.* == 0;
                         self.registers.r8.F.Flags.nBCD = false;
@@ -726,7 +725,7 @@ pub const CPU = struct {
                     0x08...0x0F => op_pfx : {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: u8 = (source.* & 0b0000_0001);
+                        const shiftedBit: u8 = (source.* & 0x01);
                         source.* >>= 1;
 
                         source.* |= (shiftedBit << 7);
@@ -741,11 +740,11 @@ pub const CPU = struct {
                     0x10...0x17 => op_pfx: {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                        const shiftedBit: bool = (source.* & 0x80) == 0x80;
                         source.* <<= 1;
 
                         const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                        source.* &= carry;
+                        source.* |= carry;
                         self.registers.r8.F.Flags.carry = shiftedBit;
                         self.registers.r8.F.Flags.zero = source.* == 0;
                         self.registers.r8.F.Flags.nBCD = false;
@@ -758,7 +757,7 @@ pub const CPU = struct {
                         // TODO: RR and RRA is basically the same?
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                        const shiftedBit: bool = (source.* & 0x01) == 0x01;
                         source.* >>= 1;
 
                         const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
@@ -774,7 +773,7 @@ pub const CPU = struct {
                     0x20...0x27 => op_pfx: {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                        const shiftedBit: bool = (source.* & 0x80) == 0x80;
                         source.* <<= 1;
 
                         self.registers.r8.F.Flags.carry = shiftedBit;
@@ -801,9 +800,11 @@ pub const CPU = struct {
                     0x28...0x2F => op_pfx: {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                        const shiftedBit: bool = (source.* & 0x01) == 0x01;
+                        const msb: u8 = source.* & 0x80;
                         source.* >>= 1;
 
+                        source.* |= msb;
                         self.registers.r8.F.Flags.carry = shiftedBit;
                         self.registers.r8.F.Flags.zero = source.* == 0;
                         self.registers.r8.F.Flags.nBCD = false;
@@ -815,7 +816,7 @@ pub const CPU = struct {
                     0x38...0x3F => op_pfx: {
                         const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
                         const source: *u8 = self.getFromR8Variant(sourceVar);
-                        const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                        const shiftedBit: bool = (source.* & 0x01) == 0x01;
                         source.* >>= 1;
 
                         self.registers.r8.F.Flags.carry = shiftedBit;
