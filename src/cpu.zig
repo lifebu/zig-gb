@@ -53,7 +53,7 @@ pub const CPU = struct {
     isHalted: bool = false,
     isPanicked: bool = false,
 
-    pub fn init(alloc: std.mem.Allocator, gbFile: []const u8) !Self {
+    pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
         var cpu = CPU{ .allocator = alloc };
 
         cpu.memory = try alloc.alloc(u8, 0x10000);
@@ -61,7 +61,9 @@ pub const CPU = struct {
 
         @memset(cpu.memory, 0);
 
-        _ = try std.fs.cwd().readFile(gbFile, cpu.memory);
+        if (gbFile) |file| {
+            _ = try std.fs.cwd().readFile(file, cpu.memory);
+        }
 
         cpu.registers.r16.AF = 0x01B0;
         cpu.registers.r16.BC = 0x0013;
@@ -188,697 +190,468 @@ pub const CPU = struct {
         }
     }
 
-
-    pub fn frame(self: *Self) !void {
-        self.cycle = 0;
-
-        // TODO: implement cycle accuracy (with PPU!).
-        while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
-            // self.debugPrintState();
-
-            if(self.pc == 0xDEF8 and 
-                self.memory[0xDEF8] == 0xCE and 
-                self.memory[0xDEF8 + 1] == 0x0F and 
-                self.registers.r8.A == 0x00 and 
-                self.registers.r8.F.F == 0x10) {
-                var a: u32 = 0;
-                a += 1;
-            }
-
-            const oldValAddr: u16 = 0xDD02;
-            const oldVal: u8 = self.memory[oldValAddr];
-
-            var opcode: u8 = self.memory[self.pc];
-            // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
-            const operation: Operation = try switch (opcode) {
-                // NOOP
-                0x00 => Operation{ .deltaPC = 1, .cycles = 4 },
-                // LD r16, imm16
-                0x01, 0x11, 0x21, 0x31 => op: {
-                    // TODO: Maybe create a function that does a safety check if we access memory wrong? 
-                    // If you have a 3 Byte instruction at the last byte of memory, this would break.
-                    // TODO: I should wrap the ptrCast and alignCast in a function, as I need to do that a lot.
-                    // TODO: And I need to do the elignment correctly everyhwere I access memory.
-                    const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    const destVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const dest: *u16 = self.getFromR16Variant(destVar);
-                    dest.* = source.*;
-
-                    break: op Operation{ .deltaPC = 3, .cycles = 12 };
-                },
-                // LD r16mem, a
-                0x02, 0x12, 0x22, 0x32 => op: {
-                    const source: *u8 = &self.registers.r8.A;
-                    const destVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const dest: *u8 = self.getFromR16MemVariant(destVar);
-                    dest.* = source.*;
-
-                    break: op Operation{ .deltaPC =  1, .cycles = 8 };
-                },
-                // Inc r16
-                0x03, 0x13, 0x23, 0x33 => op: {
-                    const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const source: *u16 = self.getFromR16Variant(sourceVar);
-                    source.* +%= 1;
-
-                    break: op Operation{ .deltaPC = 1, .cycles = 8 };
-                },
-                // INC r8
-                0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C => op : {
-                    const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const result: u8 = source.* +% 1;
-
-                    self.registers.r8.F.Flags.zero = result == 0; 
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) +% 1) & 0x10) == 0x10; 
-
-                    source.* = result;
-                    break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
-                },
-                // DEC r8
-                0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D => op : {
-                    const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const result: u8 = source.* -% 1;
-
-                    self.registers.r8.F.Flags.zero = result == 0; 
-                    self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) -% 1) & 0x10) == 0x10; 
-
-                    source.* = result;
-                    break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
-                },
-                // LD r8, imm8
-                0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E => op: {
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-                    const dest: *u8 = self.getFromR8Variant(destVar);
-                    dest.* = source.*;
-
-                    break: op Operation{ .deltaPC = 2, .cycles = if (destVar == .HL) 12 else 8 };
-                },
-                // RLCA
-                0x07 => op: {
-                    const A: *u8 = &self.registers.r8.A;
-                    const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
-                    A.* <<= 1;
-
-                    self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = A.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false; 
-
-                    break: op Operation { .deltaPC = 1, .cycles = 4 };
-                },
-                // LD (imm16),SP
-                0x08 => op: {
-                    const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    const dest: *align(1) u16 = @ptrCast(&self.memory[source.*]);
-                    dest.* = self.sp;
-
-                    break: op Operation { .deltaPC = 3, .cycles = 20 };
-                },
-                // LD a, r16mem
-                0x0A, 0x1A, 0x2A, 0x3A => op: {
-                    const sourceVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const source: *u8 = self.getFromR16MemVariant(sourceVar);
-                    const dest: *u8 = &self.registers.r8.A;
-                    dest.* = source.*;
-
-                    break: op Operation{ .deltaPC =  1, .cycles = 8 };
-                }, 
-                // Dec r16
-                0x0B, 0x1B, 0x2B, 0x3B => op: {
-                    const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const source: *u16 = self.getFromR16Variant(sourceVar);
-                    source.* -%= 1;
-
-                    break: op Operation{ .deltaPC = 1, .cycles = 8 };
-                },
-                // ADD HL, R16
-                0x09, 0x19, 0x29, 0x39 => op : {
-                    const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const source: *u16 = self.getFromR16Variant(sourceVar);
-                    const result = @addWithOverflow(self.registers.r16.HL, source.*);
-
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = (((self.registers.r16.HL & 0xFFF) + (source.* & 0xFFF)) & 0x1000) ==  0x1000;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    self.registers.r16.HL = result.@"0";
-                    break: op Operation { .deltaPC = 1, .cycles = 8 };
-                },
-                // RRCA
-                0x0F => op: {
-                    const A: *u8 = &self.registers.r8.A;
-                    const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
-                    A.* >>= 1;
-
-                    self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = A.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 4 };
-                },
-                // STOP
-                0x10 => op: {
-                    self.isStopped = true;
-                    break: op Operation { .deltaPC = 2, .cycles = 4};
-                },
-                // RLA
-                0x17 => op: {
-                    const A: *u8 = &self.registers.r8.A;
-                    const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
-                    A.* <<= 1;
-
-                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    A.* = A.* & carry;
-                    self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = A.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 4 };
-                },
-                // JR r8
-                0x18 => op: {
-                    // TODO: Out of memoery?
-                    // TODO: All this conversion smells like spaghetti, is there an easier way?
-                    const relDest: i8 = @bitCast(self.memory[self.pc + 1]); 
-                    var pcCast: i32 = self.pc;
-                    pcCast += 2; // size of instruction.
-                    pcCast += relDest;
-                    self.pc = @intCast(pcCast); 
-
-                    break: op Operation { .deltaPC = 0, .cycles =  12 };
-                },
-                // RRA
-                0x1F => op: {
-                    const A: *u8 = &self.registers.r8.A;
-                    const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
-                    A.* >>= 1;
-
-                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    A.* |= (carry << 7);
-                    self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = false;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 4 };
-                },
-                // JR cond imm8
-                0x20, 0x30, 0x28, 0x38 => op: {
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
-                    const cond: bool = self.getFromCondVariant(condVar);
-                    // TODO: Out of memoery?
-                    // TODO: All this conversion smells like spaghetti, is there an easier way?
-                    const relDest: i8 = @bitCast(self.memory[self.pc + 1]); 
-                    var pcCast: i32 = self.pc;
-                    pcCast += 2; // size of instruction.
-                    pcCast += if(cond) relDest else 0;
-                    self.pc = @intCast(pcCast); 
-
-                    break: op Operation { .deltaPC = 0, .cycles =  if (cond) 12 else 8 };
-                },
-                // DAA
-                0x27 => op: {
-                    const a: u8 = self.registers.r8.A;
-                    const halfBCD = self.registers.r8.F.Flags.halfBCD;
-                    const carry = self.registers.r8.F.Flags.carry;
-                    const subtract = self.registers.r8.F.Flags.nBCD;
-
-                    var offset: u8 = 0;
-                    var shouldCarry: bool = false;
-
-                    if((!subtract and ((a & 0xF) > 0x09)) or halfBCD) {
-                        offset |= 0x06;
-                    }
-            
-                    if((!subtract and (a > 0x99)) or carry) {
-                        offset |= 0x60;
-                        shouldCarry = true;
-                    }
-
-                    const result = if (subtract) a -% offset else a +% offset;
-                    self.registers.r8.A = result;
-
-                    self.registers.r8.F.Flags.carry = shouldCarry;
-                    self.registers.r8.F.Flags.zero = result == 0;
-                    self.registers.r8.F.Flags.halfBCD = false;
-
-                    break: op Operation{ .deltaPC = 1, .cycles = 4 };
-                },
-                // CPL (complement A)
-                0x2F => op: {
-                    const A: *u8 = &self.registers.r8.A;
-                    A.* = ~A.*;
-
-                    self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = true;
-
-                    break: op Operation{ .deltaPC = 1, .cycles = 4 };
-                },
-                // SCF (Set Carry Flag)
-                0x37 => op: {
-                    self.registers.r8.F.Flags.carry = true;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 4 };
-                },
-                // CCF (Complement Carry Flag)
-                0x3F => op: {
-                    self.registers.r8.F.Flags.carry = !self.registers.r8.F.Flags.carry;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 4 };
-                },
-                // LD r8, r8
-                0x40...0x7F => op: {
-                    // TODO: Break the range, this is not readable honestly!
-                    // HALT
-                    if(opcode == 0x76) {
-                        // TODO: implement HALT Bug 
-                        self.isHalted = true;
-                        break :op Operation{ .deltaPC = 1, .cycles = 4 };
-                    }
-
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-                    const dest: *u8 = self.getFromR8Variant(destVar);
-                    dest.* = source.*;
-
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL or destVar == .HL) 8 else 4 };
-                },
-                // ADD a, r8
-                0x80...0x87 => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const A: *u8 = &self.registers.r8.A;
-                    const result = @addWithOverflow(A.*, source.*);
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },
-                // ADC a, r8
-                0x88...0x8F => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const A: *u8 = &self.registers.r8.A;
-                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    const sourceCarry = @addWithOverflow(source.*, carry);
-                    const result = @addWithOverflow(A.*, sourceCarry.@"0");
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },  
-                // SUB a, r8
-                0x90...0x97 => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const a: *u8 = &self.registers.r8.A;
-                    const result = @subWithOverflow(a.*, source.*);
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((a.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    a.* = result.@"0";
-                    break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },  
-                // SBC a, r8
-                0x98...0x9F => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const A: *u8 = &self.registers.r8.A;
-                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    const sourceCarry = @addWithOverflow(source.*, carry);
-                    const result = @subWithOverflow(A.*, sourceCarry.@"0");
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = true;
-                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },  
-                // AND a, r8
-                0xA0...0xA7 => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const A: *u8 = &self.registers.r8.A;
-                    A.* &= source.*;
-
-                    self.registers.r8.F.Flags.zero = A.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = true;
-                    self.registers.r8.F.Flags.carry = false;
-
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },
-                // XOR a, r8
-                0xA8...0xAF => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const dest: *u8 = &self.registers.r8.A;
-                    dest.* ^= source.*;
-
-                    self.registers.r8.F.Flags.zero = dest.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-                    self.registers.r8.F.Flags.carry = false;
-
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },
-                // OR a, r8
-                0xB0...0xB7 => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const dest: *u8 = &self.registers.r8.A;
-                    dest.* |= source.*;
-
-                    self.registers.r8.F.Flags.zero = dest.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-                    self.registers.r8.F.Flags.carry = false;
-
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },
-                // CP a, r8
-                0xB8...0xBF => op: {
-                    const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const A: *u8 = &self.registers.r8.A;
-                    const result = @subWithOverflow(A.*, source.*);
-
-                    self.registers.r8.F.Flags.zero = A.* == source.*;
-                    self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
-                },
-                // RET cond
-                0xC0, 0xC8, 0xD0, 0xD8 => op: {
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
-                    const cond: bool = self.getFromCondVariant(condVar);
-
-                    if(cond) {
-                        const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                        self.pc = retAddress.*;
-                        self.sp += 2;
-                    }
-
-                    break :op Operation{ .deltaPC = if (cond) 0 else 1, .cycles = if(cond) 20 else 8 };
-                },
-                // POP r16stk
-                0xC1, 0xD1, 0xE1, 0xF1 => op: {
-                    const destVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const dest: *u16 = self.getFromR16StkVariant(destVar);
-
-                    const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                    dest.* = stack.*;
-                    self.sp += 2;
-
-                    // If you do a pop on the AF register (0xF1), you need to make sure that the lowest nibble stays 0.
-                    if(destVar == .AF) {
-                        dest.* &= 0xFFF0;
-                    }
-
-                    break: op Operation{ .deltaPC = 1, .cycles = 12 };
-                },                
-                // JP cond imm16
-                0xC2, 0xD2, 0xCA, 0xDA => op: {
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
-                    const cond: bool = self.getFromCondVariant(condVar);
-
-                    // TODO: Out of memoery?
-                    const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.pc = if(cond) target.* else (self.pc + 3);
-
-                    break: op Operation { .deltaPC = 0, .cycles =  if (cond) 16 else 12 };
-                },
-                // PUSH r16stk
-                0xC5, 0xD5, 0xE5, 0xF5 => op: {
-                    const sourceVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-                    const source: *u16 = self.getFromR16StkVariant(sourceVar);
-
-                    self.sp -= 2;
-                    const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                    stack.* = source.*;
-
-                    break: op Operation{ .deltaPC = 1, .cycles = 16 };
-                },
-                // JP imm16
-                0xC3 => op : {
-                    // TODO: Out of memory? Crashes because if misalignment! => Helper function
-                    const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.pc = target.*;
-
-                    break: op Operation { .deltaPC = 0, .cycles =  16 };
-                },
-                // CALL cond imm16
-                0xC4, 0xCC, 0xD4, 0xDC => op : {
-                    // TODO: It looks like all the variants use the same two bits mostly. Can this be used to make the code better?
-                    // TODO: same code as unconditional call, combine the code!
-                    const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
-                    const cond: bool = self.getFromCondVariant(condVar);
-
-                    if(cond) {
-                        // push next address onto stack.
-                        self.sp -= 2;
-                        const nextInstr: u16 = self.pc + 3;
-                        const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                        stack.* = nextInstr;
-
-                        // TODO: Out of memory?
-                        // jump to imm16
-                        const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                        self.pc = target.*;
-                    }
-
-                    break: op Operation { .deltaPC = if(cond) 0 else 3, .cycles = if(cond) 24 else 12 };
-                },
-                // ADD a, imm8
-                0xC6 => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const A: *u8 = &self.registers.r8.A;
-                    const result = @addWithOverflow(A.*, source.*);
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },
-                // RST target
-                0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF => op : {
-                    const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
-
-                    // push next address onto stack.
-                    self.sp -= 2;
-                    const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                    stack.* = self.pc + 1;
-
-                    self.pc = target;
-
-                    break: op Operation{ .deltaPC = 0, .cycles = 16 };
-                },
-                // RET
-                0xC9 => op : {
-                    // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
-                    // TODO: Can I compbine those? return and conditional return have the same opcode structure, they only differ by the first bit.
+    pub fn step(self: *Self) !void {
+        // self.debugPrintState();
+
+        var opcode: u8 = self.memory[self.pc];
+        // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
+        const operation: Operation = try switch (opcode) {
+            // NOOP
+            0x00 => Operation{ .deltaPC = 1, .cycles = 4 },
+            // LD r16, imm16
+            0x01, 0x11, 0x21, 0x31 => op: {
+                // TODO: Maybe create a function that does a safety check if we access memory wrong? 
+                // If you have a 3 Byte instruction at the last byte of memory, this would break.
+                // TODO: I should wrap the ptrCast and alignCast in a function, as I need to do that a lot.
+                // TODO: And I need to do the elignment correctly everyhwere I access memory.
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const destVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const dest: *u16 = self.getFromR16Variant(destVar);
+                dest.* = source.*;
+
+                break: op Operation{ .deltaPC = 3, .cycles = 12 };
+            },
+            // LD r16mem, a
+            0x02, 0x12, 0x22, 0x32 => op: {
+                const source: *u8 = &self.registers.r8.A;
+                const destVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const dest: *u8 = self.getFromR16MemVariant(destVar);
+                dest.* = source.*;
+
+                break: op Operation{ .deltaPC =  1, .cycles = 8 };
+            },
+            // Inc r16
+            0x03, 0x13, 0x23, 0x33 => op: {
+                const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u16 = self.getFromR16Variant(sourceVar);
+                source.* +%= 1;
+
+                break: op Operation{ .deltaPC = 1, .cycles = 8 };
+            },
+            // INC r8
+            0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C => op : {
+                const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const result: u8 = source.* +% 1;
+
+                self.registers.r8.F.Flags.zero = result == 0; 
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) +% 1) & 0x10) == 0x10; 
+
+                source.* = result;
+                break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
+            },
+            // DEC r8
+            0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D => op : {
+                const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const result: u8 = source.* -% 1;
+
+                self.registers.r8.F.Flags.zero = result == 0; 
+                self.registers.r8.F.Flags.nBCD = true;
+                self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) -% 1) & 0x10) == 0x10; 
+
+                source.* = result;
+                break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
+            },
+            // LD r8, imm8
+            0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E => op: {
+                const source: *u8 = &self.memory[self.pc + 1];
+                const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
+                const dest: *u8 = self.getFromR8Variant(destVar);
+                dest.* = source.*;
+
+                break: op Operation{ .deltaPC = 2, .cycles = if (destVar == .HL) 12 else 8 };
+            },
+            // RLCA
+            0x07 => op: {
+                const A: *u8 = &self.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
+                A.* <<= 1;
+
+                self.registers.r8.F.Flags.carry = shiftedBit;
+                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false; 
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // LD (imm16),SP
+            0x08 => op: {
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const dest: *align(1) u16 = @ptrCast(&self.memory[source.*]);
+                dest.* = self.sp;
+
+                break: op Operation { .deltaPC = 3, .cycles = 20 };
+            },
+            // LD a, r16mem
+            0x0A, 0x1A, 0x2A, 0x3A => op: {
+                const sourceVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u8 = self.getFromR16MemVariant(sourceVar);
+                const dest: *u8 = &self.registers.r8.A;
+                dest.* = source.*;
+
+                break: op Operation{ .deltaPC =  1, .cycles = 8 };
+            }, 
+            // Dec r16
+            0x0B, 0x1B, 0x2B, 0x3B => op: {
+                const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u16 = self.getFromR16Variant(sourceVar);
+                source.* -%= 1;
+
+                break: op Operation{ .deltaPC = 1, .cycles = 8 };
+            },
+            // ADD HL, R16
+            0x09, 0x19, 0x29, 0x39 => op : {
+                const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u16 = self.getFromR16Variant(sourceVar);
+                // TODO: tuples can be disected by doing: result, overflow = @addWithOverflow();
+                const result = @addWithOverflow(self.registers.r16.HL, source.*);
+
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = (((self.registers.r16.HL & 0xFFF) + (source.* & 0xFFF)) & 0x1000) ==  0x1000;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                self.registers.r16.HL = result.@"0";
+                break: op Operation { .deltaPC = 1, .cycles = 8 };
+            },
+            // RRCA
+            0x0F => op: {
+                const A: *u8 = &self.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
+                A.* >>= 1;
+
+                self.registers.r8.F.Flags.carry = shiftedBit;
+                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // STOP
+            0x10 => op: {
+                self.isStopped = true;
+                break: op Operation { .deltaPC = 2, .cycles = 4};
+            },
+            // RLA
+            0x17 => op: {
+                const A: *u8 = &self.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b1000_0000) == 1;
+                A.* <<= 1;
+
+                const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                A.* = A.* & carry;
+                self.registers.r8.F.Flags.carry = shiftedBit;
+                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // JR r8
+            0x18 => op: {
+                // TODO: Out of memoery?
+                // TODO: All this conversion smells like spaghetti, is there an easier way?
+                const relDest: i8 = @bitCast(self.memory[self.pc + 1]); 
+                var pcCast: i32 = self.pc;
+                pcCast += 2; // size of instruction.
+                pcCast += relDest;
+                self.pc = @intCast(pcCast); 
+
+                break: op Operation { .deltaPC = 0, .cycles =  12 };
+            },
+            // RRA
+            0x1F => op: {
+                const A: *u8 = &self.registers.r8.A;
+                const shiftedBit: bool = (A.* & 0b0000_0001) == 1;
+                A.* >>= 1;
+
+                const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                A.* |= (carry << 7);
+                self.registers.r8.F.Flags.carry = shiftedBit;
+                self.registers.r8.F.Flags.zero = false;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // JR cond imm8
+            0x20, 0x30, 0x28, 0x38 => op: {
+                const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
+                const cond: bool = self.getFromCondVariant(condVar);
+                // TODO: Out of memoery?
+                // TODO: All this conversion smells like spaghetti, is there an easier way?
+                const relDest: i8 = @bitCast(self.memory[self.pc + 1]); 
+                var pcCast: i32 = self.pc;
+                pcCast += 2; // size of instruction.
+                pcCast += if(cond) relDest else 0;
+                self.pc = @intCast(pcCast); 
+
+                break: op Operation { .deltaPC = 0, .cycles =  if (cond) 12 else 8 };
+            },
+            // DAA
+            0x27 => op: {
+                const a: u8 = self.registers.r8.A;
+                const halfBCD = self.registers.r8.F.Flags.halfBCD;
+                const carry = self.registers.r8.F.Flags.carry;
+                const subtract = self.registers.r8.F.Flags.nBCD;
+
+                var offset: u8 = 0;
+                var shouldCarry: bool = false;
+
+                if((!subtract and ((a & 0xF) > 0x09)) or halfBCD) {
+                    offset |= 0x06;
+                }
+
+                if((!subtract and (a > 0x99)) or carry) {
+                    offset |= 0x60;
+                    shouldCarry = true;
+                }
+
+                const result = if (subtract) a -% offset else a +% offset;
+                self.registers.r8.A = result;
+
+                self.registers.r8.F.Flags.carry = shouldCarry;
+                self.registers.r8.F.Flags.zero = result == 0;
+                self.registers.r8.F.Flags.halfBCD = false;
+
+                break: op Operation{ .deltaPC = 1, .cycles = 4 };
+            },
+            // CPL (complement A)
+            0x2F => op: {
+                const A: *u8 = &self.registers.r8.A;
+                A.* = ~A.*;
+
+                self.registers.r8.F.Flags.nBCD = true;
+                self.registers.r8.F.Flags.halfBCD = true;
+
+                break: op Operation{ .deltaPC = 1, .cycles = 4 };
+            },
+            // SCF (Set Carry Flag)
+            0x37 => op: {
+                self.registers.r8.F.Flags.carry = true;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // CCF (Complement Carry Flag)
+            0x3F => op: {
+                self.registers.r8.F.Flags.carry = !self.registers.r8.F.Flags.carry;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+
+                break: op Operation { .deltaPC = 1, .cycles = 4 };
+            },
+            // LD r8, r8
+            0x40...0x7F => op: {
+                // TODO: Break the range, this is not readable honestly!
+                // HALT
+                if(opcode == 0x76) {
+                    // TODO: implement HALT Bug 
+                    self.isHalted = true;
+                    break :op Operation{ .deltaPC = 1, .cycles = 4 };
+                }
+
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
+                const dest: *u8 = self.getFromR8Variant(destVar);
+                dest.* = source.*;
+
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL or destVar == .HL) 8 else 4 };
+            },
+            // ADD a, r8
+            0x80...0x87 => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const A: *u8 = &self.registers.r8.A;
+                const result = @addWithOverflow(A.*, source.*);
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // ADC a, r8
+            0x88...0x8F => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const A: *u8 = &self.registers.r8.A;
+                const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                const sourceCarry = @addWithOverflow(source.*, carry);
+                const result = @addWithOverflow(A.*, sourceCarry.@"0");
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },  
+            // SUB a, r8
+            0x90...0x97 => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const a: *u8 = &self.registers.r8.A;
+                const result = @subWithOverflow(a.*, source.*);
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = true;
+                self.registers.r8.F.Flags.halfBCD = (((a.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                a.* = result.@"0";
+                break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },  
+            // SBC a, r8
+            0x98...0x9F => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const A: *u8 = &self.registers.r8.A;
+                const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                const sourceCarry = @addWithOverflow(source.*, carry);
+                const result = @subWithOverflow(A.*, sourceCarry.@"0");
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = true;
+                const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },  
+            // AND a, r8
+            0xA0...0xA7 => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const A: *u8 = &self.registers.r8.A;
+                A.* &= source.*;
+
+                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = true;
+                self.registers.r8.F.Flags.carry = false;
+
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // XOR a, r8
+            0xA8...0xAF => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const dest: *u8 = &self.registers.r8.A;
+                dest.* ^= source.*;
+
+                self.registers.r8.F.Flags.zero = dest.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+                self.registers.r8.F.Flags.carry = false;
+
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // OR a, r8
+            0xB0...0xB7 => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const dest: *u8 = &self.registers.r8.A;
+                dest.* |= source.*;
+
+                self.registers.r8.F.Flags.zero = dest.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+                self.registers.r8.F.Flags.carry = false;
+
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // CP a, r8
+            0xB8...0xBF => op: {
+                const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                const source: *u8 = self.getFromR8Variant(sourceVar);
+                const A: *u8 = &self.registers.r8.A;
+                const result = @subWithOverflow(A.*, source.*);
+
+                self.registers.r8.F.Flags.zero = A.* == source.*;
+                self.registers.r8.F.Flags.nBCD = true;
+                self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
+            },
+            // RET cond
+            0xC0, 0xC8, 0xD0, 0xD8 => op: {
+                const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
+                const cond: bool = self.getFromCondVariant(condVar);
+
+                if(cond) {
                     const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
                     self.pc = retAddress.*;
                     self.sp += 2;
+                }
 
-                    break: op Operation { .deltaPC = 0, .cycles =  16 };
-                },
-                // PREFIX CB
-                0xCB => op: {
-                    // TODO: Maybe there is solution without nesting this?
-                    opcode = self.memory[self.pc + 1];
-                    break: op switch (opcode) {
-                        // RLC r8
-                        0x00...0x07 => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
-                            source.* <<= 1;
+                break :op Operation{ .deltaPC = if (cond) 0 else 1, .cycles = if(cond) 20 else 8 };
+            },
+            // POP r16stk
+            0xC1, 0xD1, 0xE1, 0xF1 => op: {
+                const destVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const dest: *u16 = self.getFromR16StkVariant(destVar);
 
-                            const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                            source.* = source.* & carry;
-                            self.registers.r8.F.Flags.carry = shiftedBit;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
+                const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                dest.* = stack.*;
+                self.sp += 2;
 
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // RRC r8 
-                        0x08...0x0F => op_pfx : {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: u8 = (source.* & 0b0000_0001);
-                            source.* >>= 1;
+                // If you do a pop on the AF register (0xF1), you need to make sure that the lowest nibble stays 0.
+                if(destVar == .AF) {
+                    dest.* &= 0xFFF0;
+                }
 
-                            source.* |= (shiftedBit << 7);
-                            self.registers.r8.F.Flags.carry = shiftedBit == 1;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
+                break: op Operation{ .deltaPC = 1, .cycles = 12 };
+            },                
+            // JP cond imm16
+            0xC2, 0xD2, 0xCA, 0xDA => op: {
+                const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
+                const cond: bool = self.getFromCondVariant(condVar);
 
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // RL r8
-                        0x10...0x17 => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
-                            source.* <<= 1;
+                // TODO: Out of memoery?
+                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                self.pc = if(cond) target.* else (self.pc + 3);
 
-                            const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                            source.* &= carry;
-                            self.registers.r8.F.Flags.carry = shiftedBit;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
+                break: op Operation { .deltaPC = 0, .cycles =  if (cond) 16 else 12 };
+            },
+            // PUSH r16stk
+            0xC5, 0xD5, 0xE5, 0xF5 => op: {
+                const sourceVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
+                const source: *u16 = self.getFromR16StkVariant(sourceVar);
 
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // RR r8 
-                        0x18...0x1F => op_pfx : {
-                            // TODO: RR and RRA is basically the same?
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
-                            source.* >>= 1;
+                self.sp -= 2;
+                const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                stack.* = source.*;
 
-                            const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                            source.* |= (carry << 7);
-                            self.registers.r8.F.Flags.carry = shiftedBit;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
+                break: op Operation{ .deltaPC = 1, .cycles = 16 };
+            },
+            // JP imm16
+            0xC3 => op : {
+                // TODO: Out of memory? Crashes because if misalignment! => Helper function
+                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                self.pc = target.*;
 
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // SLA r8
-                        0x20...0x27 => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
-                            source.* <<= 1;
+                break: op Operation { .deltaPC = 0, .cycles =  16 };
+            },
+            // CALL cond imm16
+            0xC4, 0xCC, 0xD4, 0xDC => op : {
+                // TODO: It looks like all the variants use the same two bits mostly. Can this be used to make the code better?
+                // TODO: same code as unconditional call, combine the code!
+                const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
+                const cond: bool = self.getFromCondVariant(condVar);
 
-                            self.registers.r8.F.Flags.carry = shiftedBit;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
-
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // SWAP r8
-                        0x30...0x37 => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            source.* = (source.* << 4) | (source.* >> 4);
-
-                            self.registers.r8.F.Flags.carry = false;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
-
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // SRA r8
-                        0x28...0x2F => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
-                            source.* >>= 1;
-
-                            self.registers.r8.F.Flags.carry = shiftedBit;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
-
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // SRL r8
-                        0x38...0x3F => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
-                            source.* >>= 1;
-
-                            self.registers.r8.F.Flags.carry = shiftedBit;
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = false;
-                            self.registers.r8.F.Flags.zero = source.* == 0;
-                            
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
-                        },
-                        // BIT bit,r8
-                        0x40...0x7F => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
-                            const result: u8 = source.* & (@as(u8, 1) << bitIndex);
-
-                            self.registers.r8.F.Flags.nBCD = false;
-                            self.registers.r8.F.Flags.halfBCD = true;
-                            self.registers.r8.F.Flags.zero = result == 0;
-
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
-                        },
-                        // RES bit,r8
-                        0x80...0xBF => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
-                            source.* &= ~(@as(u8, 1) << bitIndex);
-
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
-                        },
-                        // SET bit,r8
-                        0xC0...0xFF => op_pfx: {
-                            const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                            const source: *u8 = self.getFromR8Variant(sourceVar);
-                            const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
-                            source.* |= (@as(u8, 1) << bitIndex);
-
-                            break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
-                        },
-                    };
-                },
-                // CALL imm16
-                0xCD => op : {
-                    // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional call.
-                    // TODO: Can I compbine those? Call and conditional call have the same opcode structure, they only differ by the first bit.
+                if(cond) {
                     // push next address onto stack.
                     self.sp -= 2;
                     const nextInstr: u16 = self.pc + 3;
@@ -889,252 +662,467 @@ pub const CPU = struct {
                     // jump to imm16
                     const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
                     self.pc = target.*;
-
-                    break: op Operation { .deltaPC = 0, .cycles =  24 };
-                },
-                // ADC a, imm8
-                0xCE => op: {
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const A: *u8 = &self.registers.r8.A;
-                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    const sourceCarry = @addWithOverflow(source.*, carry);
-                    const result = @addWithOverflow(A.*, sourceCarry.@"0");
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },  
-                // SUB a, r8
-                0xD6 => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const A: *u8 = &self.registers.r8.A;
-                    const result = @subWithOverflow(A.*, source.*);
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },  
-                // RETI
-                0xD9 => op : {
-                    const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                    self.pc = retAddress.*;
-                    self.sp += 2;
-
-                    // TODO: Also enable interrupts.
-
-                    break: op Operation { .deltaPC = 0, .cycles =  16 };
-                },
-                // SBC a, imm8
-                0xDE => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
-                    const A: *u8 = &self.registers.r8.A;
-                    const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    const sourceCarry = @addWithOverflow(source.*, carry);
-                    const result = @subWithOverflow(A.*, sourceCarry.@"0");
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = true;
-                    const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-                    const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-                    self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
-
-                    A.* = result.@"0";
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },  
-                // LDH [imm8], a
-                0xE0 => op: {
-                    // TODO: Out of memory?
-                    const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.memory[HIGH_PAGE + source.*] = self.registers.r8.A;
-
-                    // TODO: If we create this thing first and you can only do that via a function in the self. 
-                    // then you are able to check if with the requested delta pc you would be able to access out of memory!
-                    break: op Operation { .deltaPC = 2, .cycles = 12 };
-                },
-                // LD [c], a
-                0xE2 => op: {
-                    self.memory[HIGH_PAGE + self.registers.r8.C] = self.registers.r8.A;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 8 };
-                },
-                // LD [imm16], a
-                0xEA => op: {
-                    // TODO: Out of memory?
-                    const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.memory[source.*] = self.registers.r8.A;
-
-                    break: op Operation { .deltaPC = 3, .cycles = 16 };
-                },
-                // AND a, imm8
-                0xE6 => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    // Difference is only if we use an immediate value or not. Can we make this a better re-use?
-                    // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
-                    // So I can change the mask to improve this! Cycle time is the same as HL!
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const A: *u8 = &self.registers.r8.A;
-                    A.* &= source.*;
-
-                    self.registers.r8.F.Flags.zero = A.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = true;
-                    self.registers.r8.F.Flags.carry = false;
-
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },
-                // ADD SP, imm8 (signed)
-                0xE8 => op: {
-                    // TODO: Out of memoery?
-                    // TODO: All this conversion smells like spaghetti, is there an easier way?
-                    const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
-
-                    self.registers.r8.F.Flags.zero = false;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
-                    self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
-                    // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
-                    const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
-                    self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
-
-                    self.sp +%= @as(u16, @bitCast(@as(i16, deltaSP)));
-                    break :op Operation{ .deltaPC = 2, .cycles = 16 };
-                },
-                // JP (HL)
-                0xE9 => op : {
-                    // TODO: This code is basically the same as JP imm16, and JP and JP Cond is basically the same, combine them!
-                    // TODO: Out of memory? Crashes because if misalignment! => Helper function
-                    self.pc = self.registers.r16.HL;
-
-                    break: op Operation { .deltaPC = 0, .cycles =  4 };
-                },
-                // XOR a, imm8
-                0xEE => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const A: *u8 = &self.registers.r8.A;
-                    A.* ^= source.*;
-
-                    self.registers.r8.F.Flags.zero = A.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-                    self.registers.r8.F.Flags.carry = false;
-
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },
-                // LDH a, [imm8]
-                0xF0 => op: {
-                    // TODO: Out of memory?
-                    const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.registers.r8.A = self.memory[HIGH_PAGE + source.*];
-
-                    break: op Operation { .deltaPC = 2, .cycles = 12 };
-                },
-                // LD a, [c]
-                0xF2 => op: {
-                    self.registers.r8.A = self.memory[HIGH_PAGE + self.registers.r8.C];
-
-                    break: op Operation { .deltaPC = 1, .cycles = 8 };
-                },
-                // LD a, [imm16]
-                0xFA => op: {
-                    // TODO: Out of memory?
-                    const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
-                    self.registers.r8.A = self.memory[source.*];
-
-                    break: op Operation { .deltaPC = 3, .cycles = 16 };
-                },
-                // DI (Disable Interrupts)
-                0xF3 => op: {
-                    // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
-                    break: op Operation { .deltaPC = 1, .cycles =  4 };
-                },
-                // OR a, imm8
-                0xF6 => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const dest: *u8 = &self.registers.r8.A;
-                    dest.* |= source.*;
-
-                    self.registers.r8.F.Flags.zero = dest.* == 0;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    self.registers.r8.F.Flags.halfBCD = false;
-                    self.registers.r8.F.Flags.carry = false;
-
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },
-                // LD HL, SP+imm8(signed)
-                0xF8 => op: {
-                    // TODO: Out of memoery?
-                    const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
-
-                    self.registers.r8.F.Flags.zero = false;
-                    self.registers.r8.F.Flags.nBCD = false;
-                    const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
-                    self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
-                    // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
-                    const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
-                    self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
-
-                    self.registers.r16.HL = self.sp +% @as(u16, @bitCast(@as(i16, deltaSP)));
-
-                    break :op Operation{ .deltaPC = 2, .cycles = 12 };
-                },
-                // LD SP, HL
-                0xF9 => op: {
-                    self.sp = self.registers.r16.HL;
-
-                    break: op Operation { .deltaPC = 1, .cycles = 8 };
-                },
-                // EI (Enable Interrupts)
-                0xFB => op: {
-                    // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
-                    break: op Operation { .deltaPC = 1, .cycles =  4 };
-                },
-                // CP a, imm8
-                0xFE => op: {
-                    // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                    // Difference is only if we use an immediate value or not. Can we make this a better re-use?
-                    // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
-                    // So I can change the mask to improve this! Cycle time is the same as HL!
-                    const source: *u8 = &self.memory[self.pc + 1];
-                    const A: *u8 = &self.registers.r8.A;
-                    const result = @subWithOverflow(A.*, source.*);
-
-                    self.registers.r8.F.Flags.zero = result.@"0" == 0;
-                    self.registers.r8.F.Flags.nBCD = true;
-                    self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-                    self.registers.r8.F.Flags.carry = result.@"1" == 1;
-
-                    break :op Operation{ .deltaPC = 2, .cycles = 8 };
-                },
-                else => op: {
-                    std.debug.print("OPERATION_NOT_IMPLEMENTED: {x}\n", .{opcode});
-                    self.isPanicked = true;
-                    break: op CPUError.OPERATION_NOT_IMPLEMENTED;
                 }
-            };
-            const newVal: u8 = self.memory[oldValAddr];
-            if (newVal != oldVal) {
-                var b: u8 = 10;
-                b += 1;
+
+                break: op Operation { .deltaPC = if(cond) 0 else 3, .cycles = if(cond) 24 else 12 };
+            },
+            // ADD a, imm8
+            0xC6 => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                const source: *u8 = &self.memory[self.pc + 1];
+                const A: *u8 = &self.registers.r8.A;
+                const result = @addWithOverflow(A.*, source.*);
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },
+            // RST target
+            0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF => op : {
+                const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
+
+                // push next address onto stack.
+                self.sp -= 2;
+                const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                stack.* = self.pc + 1;
+
+                self.pc = target;
+
+                break: op Operation{ .deltaPC = 0, .cycles = 16 };
+            },
+            // RET
+            0xC9 => op : {
+                // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
+                // TODO: Can I compbine those? return and conditional return have the same opcode structure, they only differ by the first bit.
+                const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                self.pc = retAddress.*;
+                self.sp += 2;
+
+                break: op Operation { .deltaPC = 0, .cycles =  16 };
+            },
+            // PREFIX CB
+            0xCB => op: {
+                // TODO: Maybe there is solution without nesting this?
+                opcode = self.memory[self.pc + 1];
+                break: op switch (opcode) {
+                    // RLC r8
+                    0x00...0x07 => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                        source.* <<= 1;
+
+                        const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                        source.* = source.* & carry;
+                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // RRC r8 
+                    0x08...0x0F => op_pfx : {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: u8 = (source.* & 0b0000_0001);
+                        source.* >>= 1;
+
+                        source.* |= (shiftedBit << 7);
+                        self.registers.r8.F.Flags.carry = shiftedBit == 1;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // RL r8
+                    0x10...0x17 => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                        source.* <<= 1;
+
+                        const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                        source.* &= carry;
+                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // RR r8 
+                    0x18...0x1F => op_pfx : {
+                        // TODO: RR and RRA is basically the same?
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                        source.* >>= 1;
+
+                        const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                        source.* |= (carry << 7);
+                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // SLA r8
+                    0x20...0x27 => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: bool = (source.* & 0b1000_0000) == 1;
+                        source.* <<= 1;
+
+                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // SWAP r8
+                    0x30...0x37 => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        source.* = (source.* << 4) | (source.* >> 4);
+
+                        self.registers.r8.F.Flags.carry = false;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // SRA r8
+                    0x28...0x2F => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                        source.* >>= 1;
+
+                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // SRL r8
+                    0x38...0x3F => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const shiftedBit: bool = (source.* & 0b0000_0001) == 1;
+                        source.* >>= 1;
+
+                        self.registers.r8.F.Flags.carry = shiftedBit;
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = false;
+                        self.registers.r8.F.Flags.zero = source.* == 0;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
+                    },
+                    // BIT bit,r8
+                    0x40...0x7F => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
+                        const result: u8 = source.* & (@as(u8, 1) << bitIndex);
+
+                        self.registers.r8.F.Flags.nBCD = false;
+                        self.registers.r8.F.Flags.halfBCD = true;
+                        self.registers.r8.F.Flags.zero = result == 0;
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
+                    },
+                    // RES bit,r8
+                    0x80...0xBF => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
+                        source.* &= ~(@as(u8, 1) << bitIndex);
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
+                    },
+                    // SET bit,r8
+                    0xC0...0xFF => op_pfx: {
+                        const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
+                        const source: *u8 = self.getFromR8Variant(sourceVar);
+                        const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
+                        source.* |= (@as(u8, 1) << bitIndex);
+
+                        break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
+                    },
+                };
+            },
+            // CALL imm16
+            0xCD => op : {
+                // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional call.
+                // TODO: Can I compbine those? Call and conditional call have the same opcode structure, they only differ by the first bit.
+                // push next address onto stack.
+                self.sp -= 2;
+                const nextInstr: u16 = self.pc + 3;
+                const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                stack.* = nextInstr;
+
+                // TODO: Out of memory?
+                // jump to imm16
+                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                self.pc = target.*;
+
+                break: op Operation { .deltaPC = 0, .cycles =  24 };
+            },
+            // ADC a, imm8
+            0xCE => op: {
+                const source: *u8 = &self.memory[self.pc + 1];
+                const A: *u8 = &self.registers.r8.A;
+                const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                const sourceCarry = @addWithOverflow(source.*, carry);
+                const result = @addWithOverflow(A.*, sourceCarry.@"0");
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },  
+            // SUB a, r8
+            0xD6 => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                const source: *u8 = &self.memory[self.pc + 1];
+                const A: *u8 = &self.registers.r8.A;
+                const result = @subWithOverflow(A.*, source.*);
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = true;
+                self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },  
+            // RETI
+            0xD9 => op : {
+                const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
+                self.pc = retAddress.*;
+                self.sp += 2;
+
+                // TODO: Also enable interrupts.
+
+                break: op Operation { .deltaPC = 0, .cycles =  16 };
+            },
+            // SBC a, imm8
+            0xDE => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                const A: *u8 = &self.registers.r8.A;
+                const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
+                const sourceCarry = @addWithOverflow(source.*, carry);
+                const result = @subWithOverflow(A.*, sourceCarry.@"0");
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = true;
+                const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+                const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
+                self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+
+                A.* = result.@"0";
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },  
+            // LDH [imm8], a
+            0xE0 => op: {
+                // TODO: Out of memory?
+                const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                self.memory[HIGH_PAGE + source.*] = self.registers.r8.A;
+
+                // TODO: If we create this thing first and you can only do that via a function in the self. 
+                // then you are able to check if with the requested delta pc you would be able to access out of memory!
+                break: op Operation { .deltaPC = 2, .cycles = 12 };
+            },
+            // LD [c], a
+            0xE2 => op: {
+                self.memory[HIGH_PAGE + self.registers.r8.C] = self.registers.r8.A;
+
+                break: op Operation { .deltaPC = 1, .cycles = 8 };
+            },
+            // LD [imm16], a
+            0xEA => op: {
+                // TODO: Out of memory?
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                self.memory[source.*] = self.registers.r8.A;
+
+                break: op Operation { .deltaPC = 3, .cycles = 16 };
+            },
+            // AND a, imm8
+            0xE6 => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                // Difference is only if we use an immediate value or not. Can we make this a better re-use?
+                // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
+                // So I can change the mask to improve this! Cycle time is the same as HL!
+                const source: *u8 = &self.memory[self.pc + 1];
+                const A: *u8 = &self.registers.r8.A;
+                A.* &= source.*;
+
+                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = true;
+                self.registers.r8.F.Flags.carry = false;
+
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },
+            // ADD SP, imm8 (signed)
+            0xE8 => op: {
+                // TODO: Out of memoery?
+                // TODO: All this conversion smells like spaghetti, is there an easier way?
+                const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
+
+                self.registers.r8.F.Flags.zero = false;
+                self.registers.r8.F.Flags.nBCD = false;
+                const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
+                self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
+                // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
+                const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
+                self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
+
+                self.sp +%= @as(u16, @bitCast(@as(i16, deltaSP)));
+                break :op Operation{ .deltaPC = 2, .cycles = 16 };
+            },
+            // JP (HL)
+            0xE9 => op : {
+                // TODO: This code is basically the same as JP imm16, and JP and JP Cond is basically the same, combine them!
+                // TODO: Out of memory? Crashes because if misalignment! => Helper function
+                self.pc = self.registers.r16.HL;
+
+                break: op Operation { .deltaPC = 0, .cycles =  4 };
+            },
+            // XOR a, imm8
+            0xEE => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                const source: *u8 = &self.memory[self.pc + 1];
+                const A: *u8 = &self.registers.r8.A;
+                A.* ^= source.*;
+
+                self.registers.r8.F.Flags.zero = A.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+                self.registers.r8.F.Flags.carry = false;
+
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },
+            // LDH a, [imm8]
+            0xF0 => op: {
+                // TODO: Out of memory?
+                const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                self.registers.r8.A = self.memory[HIGH_PAGE + source.*];
+
+                break: op Operation { .deltaPC = 2, .cycles = 12 };
+            },
+            // LD a, [c]
+            0xF2 => op: {
+                self.registers.r8.A = self.memory[HIGH_PAGE + self.registers.r8.C];
+
+                break: op Operation { .deltaPC = 1, .cycles = 8 };
+            },
+            // LD a, [imm16]
+            0xFA => op: {
+                // TODO: Out of memory?
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                self.registers.r8.A = self.memory[source.*];
+
+                break: op Operation { .deltaPC = 3, .cycles = 16 };
+            },
+            // DI (Disable Interrupts)
+            0xF3 => op: {
+                // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
+                break: op Operation { .deltaPC = 1, .cycles =  4 };
+            },
+            // OR a, imm8
+            0xF6 => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                const source: *u8 = &self.memory[self.pc + 1];
+                const dest: *u8 = &self.registers.r8.A;
+                dest.* |= source.*;
+
+                self.registers.r8.F.Flags.zero = dest.* == 0;
+                self.registers.r8.F.Flags.nBCD = false;
+                self.registers.r8.F.Flags.halfBCD = false;
+                self.registers.r8.F.Flags.carry = false;
+
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },
+            // LD HL, SP+imm8(signed)
+            0xF8 => op: {
+                // TODO: Out of memoery?
+                const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
+
+                self.registers.r8.F.Flags.zero = false;
+                self.registers.r8.F.Flags.nBCD = false;
+                const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
+                self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
+                // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
+                const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
+                self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
+
+                self.registers.r16.HL = self.sp +% @as(u16, @bitCast(@as(i16, deltaSP)));
+
+                break :op Operation{ .deltaPC = 2, .cycles = 12 };
+            },
+            // LD SP, HL
+            0xF9 => op: {
+                self.sp = self.registers.r16.HL;
+
+                break: op Operation { .deltaPC = 1, .cycles = 8 };
+            },
+            // EI (Enable Interrupts)
+            0xFB => op: {
+                // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
+                break: op Operation { .deltaPC = 1, .cycles =  4 };
+            },
+            // CP a, imm8
+            0xFE => op: {
+                // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
+                // Difference is only if we use an immediate value or not. Can we make this a better re-use?
+                // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
+                // So I can change the mask to improve this! Cycle time is the same as HL!
+                const source: *u8 = &self.memory[self.pc + 1];
+                const A: *u8 = &self.registers.r8.A;
+                const result = @subWithOverflow(A.*, source.*);
+
+                self.registers.r8.F.Flags.zero = result.@"0" == 0;
+                self.registers.r8.F.Flags.nBCD = true;
+                self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+                self.registers.r8.F.Flags.carry = result.@"1" == 1;
+
+                break :op Operation{ .deltaPC = 2, .cycles = 8 };
+            },
+            else => op: {
+                std.debug.print("OPERATION_NOT_IMPLEMENTED: {x}\n", .{opcode});
+                self.isPanicked = true;
+                break: op CPUError.OPERATION_NOT_IMPLEMENTED;
             }
+        };
 
-            self.pc += operation.deltaPC;
-            self.cycle += operation.cycles;
+        self.pc += operation.deltaPC;
+        self.cycle += operation.cycles;
+    }
 
+    pub fn frame(self: *Self) !void {
+        self.cycle = 0;
+
+        // TODO: implement cycle accuracy (with PPU!).
+        while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
+            try self.step();
         }
     }
 };
