@@ -53,7 +53,7 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/01-special.gb");
+    var cpu = try _cpu.CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb");
     defer cpu.deinit();
 
     var ppu = _ppu.PPU{};
@@ -129,7 +129,12 @@ fn testOutput(cpu: *const _cpu.CPU, testCase: *const TestType) !void {
 }
 
 fn printTestCase(cpuState: *const CPUState) void {
-    std.debug.print("A: {X:0>2} F: {X:0>2} ", .{ cpuState.a, cpuState.f });
+    std.debug.print("A: {X:0>2} F: {s} {s} {s} {s} ", .{ cpuState.a, 
+        if ((cpuState.f & 0x80) == 0x80) "Z" else "_",
+        if ((cpuState.f & 0x40) == 0x40) "N" else "_",
+        if ((cpuState.f & 0x20) == 0x20) "H" else "_",
+        if ((cpuState.f & 0x10) == 0x10) "C" else "_",
+    });
     std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpuState.b, cpuState.c });
     std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpuState.d, cpuState.e });
     std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpuState.h, cpuState.l });
@@ -194,7 +199,12 @@ test {
                 std.debug.print("\n", .{});
 
                 std.debug.print("Got\n", .{});
-                std.debug.print("A: {X:0>2} F: {X:0>2} ", .{ cpu.registers.r8.A, cpu.registers.r8.F.F });
+                std.debug.print("A: {X:0>2} F: {s} {s} {s} {s} ", .{ cpu.registers.r8.A, 
+                    if (cpu.registers.r8.F.Flags.zero) "Z" else "_",
+                    if (cpu.registers.r8.F.Flags.nBCD) "N" else "_",
+                    if (cpu.registers.r8.F.Flags.halfBCD) "H" else "_",
+                    if (cpu.registers.r8.F.Flags.carry) "C" else "_",
+                });
                 std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpu.registers.r8.B, cpu.registers.r8.C });
                 std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpu.registers.r8.D, cpu.registers.r8.E });
                 std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpu.registers.r8.H, cpu.registers.r8.L });

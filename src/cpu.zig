@@ -161,9 +161,9 @@ pub const CPU = struct {
             std.debug.print("SP: {X:0>4} PC: 00:{X:0>4} ", .{ self.sp, self.pc });
             std.debug.print("({X:0>2} {X:0>2} {X:0>2} {X:0>2})", .{
                 self.memory[self.pc], 
-                self.memory[self.pc + 1], 
-                self.memory[self.pc + 2], 
-                self.memory[self.pc + 3], 
+                self.memory[self.pc +% 1], 
+                self.memory[self.pc +% 2], 
+                self.memory[self.pc +% 3], 
             });
             std.debug.print("\n", .{});
         }
@@ -182,9 +182,9 @@ pub const CPU = struct {
             std.debug.print(" H {x:0>2} L {x:0>2}", .{ self.registers.r8.H, self.registers.r8.L });
             std.debug.print(" | {x} {x} {x} {x} | ", .{
                 self.memory[self.pc], 
-                self.memory[self.pc + 1], 
-                self.memory[self.pc + 2], 
-                self.memory[self.pc + 3], 
+                self.memory[self.pc +% 1], 
+                self.memory[self.pc +% 2], 
+                self.memory[self.pc +% 3], 
             });
             std.debug.print("\n", .{});
         }
@@ -204,7 +204,7 @@ pub const CPU = struct {
                 // If you have a 3 Byte instruction at the last byte of memory, this would break.
                 // TODO: I should wrap the ptrCast and alignCast in a function, as I need to do that a lot.
                 // TODO: And I need to do the elignment correctly everyhwere I access memory.
-                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 const destVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
                 const dest: *u16 = self.getFromR16Variant(destVar);
                 dest.* = source.*;
@@ -256,7 +256,7 @@ pub const CPU = struct {
             },
             // LD r8, imm8
             0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E => op: {
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
                 const dest: *u8 = self.getFromR8Variant(destVar);
                 dest.* = source.*;
@@ -278,7 +278,7 @@ pub const CPU = struct {
             },
             // LD (imm16),SP
             0x08 => op: {
-                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 const dest: *align(1) u16 = @ptrCast(&self.memory[source.*]);
                 dest.* = self.sp;
 
@@ -350,9 +350,8 @@ pub const CPU = struct {
             },
             // JR r8
             0x18 => op: {
-                // TODO: Out of memoery?
                 // TODO: All this conversion smells like spaghetti, is there an easier way?
-                const relDest: i8 = @bitCast(self.memory[self.pc + 1]); 
+                const relDest: i8 = @bitCast(self.memory[self.pc +% 1]); 
                 var pcCast: i32 = self.pc;
                 pcCast += 2; // size of instruction.
                 pcCast += relDest;
@@ -379,9 +378,8 @@ pub const CPU = struct {
             0x20, 0x30, 0x28, 0x38 => op: {
                 const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
                 const cond: bool = self.getFromCondVariant(condVar);
-                // TODO: Out of memoery?
                 // TODO: All this conversion smells like spaghetti, is there an easier way?
-                const relDest: i8 = @bitCast(self.memory[self.pc + 1]); 
+                const relDest: i8 = @bitCast(self.memory[self.pc +% 1]); 
                 var pcCast: i32 = self.pc;
                 pcCast += 2; // size of instruction.
                 pcCast += if(cond) relDest else 0;
@@ -619,8 +617,8 @@ pub const CPU = struct {
                 const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
                 const cond: bool = self.getFromCondVariant(condVar);
 
-                // TODO: Out of memoery?
-                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                // TODO: If pc == 0xFFFE, this will read out of memory.
+                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.pc = if(cond) target.* else (self.pc + 3);
 
                 break: op Operation { .deltaPC = 0, .cycles =  if (cond) 16 else 12 };
@@ -638,8 +636,7 @@ pub const CPU = struct {
             },
             // JP imm16
             0xC3 => op : {
-                // TODO: Out of memory? Crashes because if misalignment! => Helper function
-                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.pc = target.*;
 
                 break: op Operation { .deltaPC = 0, .cycles =  16 };
@@ -658,9 +655,8 @@ pub const CPU = struct {
                     const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
                     stack.* = nextInstr;
 
-                    // TODO: Out of memory?
                     // jump to imm16
-                    const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                    const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                     self.pc = target.*;
                 }
 
@@ -669,7 +665,7 @@ pub const CPU = struct {
             // ADD a, imm8
             0xC6 => op: {
                 // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const A: *u8 = &self.registers.r8.A;
                 const result = @addWithOverflow(A.*, source.*);
 
@@ -707,7 +703,8 @@ pub const CPU = struct {
             // PREFIX CB
             0xCB => op: {
                 // TODO: Maybe there is solution without nesting this?
-                opcode = self.memory[self.pc + 1];
+                // TODO: when we access memory like this we need to module it.
+                opcode = self.memory[self.pc +% 1];
                 break: op switch (opcode) {
                     // RLC r8
                     0x00...0x07 => op_pfx: {
@@ -871,16 +868,15 @@ pub const CPU = struct {
                 const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
                 stack.* = nextInstr;
 
-                // TODO: Out of memory?
                 // jump to imm16
-                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.pc = target.*;
 
                 break: op Operation { .deltaPC = 0, .cycles =  24 };
             },
             // ADC a, imm8
             0xCE => op: {
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const A: *u8 = &self.registers.r8.A;
                 const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
                 const sourceCarry = @addWithOverflow(source.*, carry);
@@ -899,7 +895,7 @@ pub const CPU = struct {
             // SUB a, r8
             0xD6 => op: {
                 // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const A: *u8 = &self.registers.r8.A;
                 const result = @subWithOverflow(A.*, source.*);
 
@@ -924,7 +920,7 @@ pub const CPU = struct {
             // SBC a, imm8
             0xDE => op: {
                 // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
                 const A: *u8 = &self.registers.r8.A;
                 const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
                 const sourceCarry = @addWithOverflow(source.*, carry);
@@ -942,8 +938,7 @@ pub const CPU = struct {
             },  
             // LDH [imm8], a
             0xE0 => op: {
-                // TODO: Out of memory?
-                const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.memory[HIGH_PAGE + source.*] = self.registers.r8.A;
 
                 // TODO: If we create this thing first and you can only do that via a function in the self. 
@@ -958,8 +953,7 @@ pub const CPU = struct {
             },
             // LD [imm16], a
             0xEA => op: {
-                // TODO: Out of memory?
-                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.memory[source.*] = self.registers.r8.A;
 
                 break: op Operation { .deltaPC = 3, .cycles = 16 };
@@ -970,7 +964,7 @@ pub const CPU = struct {
                 // Difference is only if we use an immediate value or not. Can we make this a better re-use?
                 // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
                 // So I can change the mask to improve this! Cycle time is the same as HL!
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const A: *u8 = &self.registers.r8.A;
                 A.* &= source.*;
 
@@ -983,9 +977,8 @@ pub const CPU = struct {
             },
             // ADD SP, imm8 (signed)
             0xE8 => op: {
-                // TODO: Out of memoery?
                 // TODO: All this conversion smells like spaghetti, is there an easier way?
-                const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
+                const deltaSP: i8 = @bitCast(self.memory[self.pc +% 1]); 
 
                 self.registers.r8.F.Flags.zero = false;
                 self.registers.r8.F.Flags.nBCD = false;
@@ -1001,7 +994,6 @@ pub const CPU = struct {
             // JP (HL)
             0xE9 => op : {
                 // TODO: This code is basically the same as JP imm16, and JP and JP Cond is basically the same, combine them!
-                // TODO: Out of memory? Crashes because if misalignment! => Helper function
                 self.pc = self.registers.r16.HL;
 
                 break: op Operation { .deltaPC = 0, .cycles =  4 };
@@ -1009,7 +1001,7 @@ pub const CPU = struct {
             // XOR a, imm8
             0xEE => op: {
                 // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const A: *u8 = &self.registers.r8.A;
                 A.* ^= source.*;
 
@@ -1022,8 +1014,7 @@ pub const CPU = struct {
             },
             // LDH a, [imm8]
             0xF0 => op: {
-                // TODO: Out of memory?
-                const source: *u8 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.registers.r8.A = self.memory[HIGH_PAGE + source.*];
 
                 break: op Operation { .deltaPC = 2, .cycles = 12 };
@@ -1036,8 +1027,7 @@ pub const CPU = struct {
             },
             // LD a, [imm16]
             0xFA => op: {
-                // TODO: Out of memory?
-                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc + 1]);
+                const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
                 self.registers.r8.A = self.memory[source.*];
 
                 break: op Operation { .deltaPC = 3, .cycles = 16 };
@@ -1050,7 +1040,7 @@ pub const CPU = struct {
             // OR a, imm8
             0xF6 => op: {
                 // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const dest: *u8 = &self.registers.r8.A;
                 dest.* |= source.*;
 
@@ -1063,8 +1053,7 @@ pub const CPU = struct {
             },
             // LD HL, SP+imm8(signed)
             0xF8 => op: {
-                // TODO: Out of memoery?
-                const deltaSP: i8 = @bitCast(self.memory[self.pc + 1]); 
+                const deltaSP: i8 = @bitCast(self.memory[self.pc +% 1]); 
 
                 self.registers.r8.F.Flags.zero = false;
                 self.registers.r8.F.Flags.nBCD = false;
@@ -1095,7 +1084,7 @@ pub const CPU = struct {
                 // Difference is only if we use an immediate value or not. Can we make this a better re-use?
                 // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
                 // So I can change the mask to improve this! Cycle time is the same as HL!
-                const source: *u8 = &self.memory[self.pc + 1];
+                const source: *u8 = &self.memory[self.pc +% 1];
                 const A: *u8 = &self.registers.r8.A;
                 const result = @subWithOverflow(A.*, source.*);
 
@@ -1113,7 +1102,7 @@ pub const CPU = struct {
             }
         };
 
-        self.pc += operation.deltaPC;
+        self.pc +%= operation.deltaPC;
         self.cycle += operation.cycles;
     }
 
