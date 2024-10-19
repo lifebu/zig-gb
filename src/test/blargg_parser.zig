@@ -1,6 +1,4 @@
 const std = @import("std");
-// TODO: This is strange!
-const _cpu = @import("cpu.zig");
 
 const CHAR_TABLE = [96]u8{
     ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', 
@@ -21,8 +19,7 @@ const TILE_SIZE_BYTE = 16;
 const WHITE_CHAR_BASE_ADDRESS = 0x8200;
 const BLACK_CHAR_BASE_ADDRESS = 0x8A00;
 
-pub fn parseOutput(cpu: *_cpu.CPU, alloc: std.mem.Allocator) !std.ArrayList(u8) {
-    const memory: *const []u8 = &cpu.memory;
+pub fn parseOutput(memory: *const []8, alloc: std.mem.Allocator) !std.ArrayList(u8) {
     std.debug.assert(memory.len == 0x10000);
 
     var string = std.ArrayList(u8).init(alloc);
