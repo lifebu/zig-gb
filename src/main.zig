@@ -10,6 +10,27 @@ const sf = struct {
     usingnamespace sf.graphics;
 };
 
+const InputState = struct{
+    dpad: u4 = 0xF, // 1 means not pressd for gameboy.
+    buttons: u4 = 0xF,
+};
+
+fn getInputStateBytes() InputState {
+    var input = InputState{};
+
+    input.dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.right))) << 0); // Right
+    input.dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.left))) << 1); // Left
+    input.dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.up))) << 2); // Up
+    input.dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.down))) << 3); // Down
+    
+    input.buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.A))) << 0); // A
+    input.buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.D))) << 1); // B
+    input.buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.S))) << 2); // Select
+    input.buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.W))) << 3); // Start
+
+    return input;
+}
+
 pub fn main() !void {
     const WINDOW_WIDTH = 160 * 4;
     const WINDOW_HEIGHT = 144 * 4;
@@ -73,6 +94,18 @@ pub fn main() !void {
                 window.close();
             }
         }
+
+        // updating input bytes
+        const inputState: InputState = getInputStateBytes();
+        const joyp: *u8 = &cpu.memory[0xFF00];
+
+        // TODO: This could probably be implemented better!
+        const selectDpad: bool = (joyp.* & 0x10) != 0x10;
+        const selectButtons: bool = (joyp.* & 0x20) != 0x20;
+        if(selectDpad and selectButtons)  { joyp.* = (joyp.* & 0xF0) | (inputState.dpad & inputState.buttons); }
+        else if(selectDpad) { joyp.* = (joyp.* & 0xF0) & inputState.dpad; }
+        else if(selectButtons) { joyp.* = (joyp.* & 0xF0) & inputState.buttons; }
+        else { joyp.* = (joyp.* & 0xF0) & 0x0F; }
 
         try ppu.updatePixels(&cpu.memory, &pixels);
         try cpuTexture.updateFromPixels(pixels, null);
@@ -149,7 +182,7 @@ fn printTestCase(cpuState: *const CPUState) void {
     std.debug.print("\n", .{});
 }
 
-test {
+test "SingleStepTests" {
     const alloc = std.testing.allocator;
 
     var testDir: std.fs.Dir = try std.fs.cwd().openDir("test_data/SingleStepTests/v1/", .{ .iterate = true });
@@ -225,44 +258,43 @@ test {
             };
         }
     }
-
-
-
-    // const testRoms =  [_][]const u8{
-    //     "test_data/blargg_roms/cpu_instrs/individual/01-special.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/02-interrupts.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/03-op sh,hl.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/04-op r,imm.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/05-op rp.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/07-jr,jp,call.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/08-misc instrs.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/10-bit ops.gb", 
-    //     // "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb", 
-    // }; 
-    //
-    // const alloc = std.testing.allocator;
-    //
-    // for (testRoms, 0..) |testRom, i| {
-    //     std.debug.print("{d}: Testing: {s}\n", .{i, testRom});
-    //     var cpu = try _cpu.CPU.init(alloc, testRom);
-    //     defer cpu.deinit();
-    //
-    //     var lastPC: u16 = 0;
-    //     while (lastPC != cpu.pc) {
-    //         lastPC = cpu.pc;
-    //         try cpu.frame();
-    //     }
-    //
-    //     const output: std.ArrayList(u8) = try blargg.parseOutput(&cpu, alloc);
-    //     defer output.deinit();
-    //
-    //     const passed: bool = blargg.hasPassed(&output);
-    //     if (!passed) {
-    //         std.debug.print("{s}\n", .{output.items});
-    //     }
-    //     try std.testing.expect(passed);
-    // }
-
 }
+
+// test "blargg" {
+//     const testRoms =  [_][]const u8{
+//         "test_data/blargg_roms/cpu_instrs/individual/01-special.gb", 
+//         // "test_data/blargg_roms/cpu_instrs/individual/02-interrupts.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/03-op sh,hl.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/04-op r,imm.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/05-op rp.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/07-jr,jp,call.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/08-misc instrs.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/10-bit ops.gb", 
+//         "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb", 
+//     }; 
+//
+//     const alloc = std.testing.allocator;
+//
+//     for (testRoms, 0..) |testRom, i| {
+//         std.debug.print("{d}: Testing: {s}\n", .{i, testRom});
+//         var cpu = try _cpu.CPU.init(alloc, testRom);
+//         defer cpu.deinit();
+//
+//         var lastPC: u16 = 0;
+//         while (lastPC != cpu.pc) {
+//             lastPC = cpu.pc;
+//             try cpu.frame();
+//         }
+//
+//         const output: std.ArrayList(u8) = try blargg.parseOutput(&cpu, alloc);
+//         defer output.deinit();
+//
+//         const passed: bool = blargg.hasPassed(&output);
+//         if (!passed) {
+//             std.debug.print("{s}\n", .{output.items});
+//         }
+//         try std.testing.expect(passed);
+//     }
+// }

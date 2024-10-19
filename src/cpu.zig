@@ -58,19 +58,33 @@ pub const CPU = struct {
 
         cpu.memory = try alloc.alloc(u8, 0x10000);
         errdefer alloc.free(cpu.memory);
-
         @memset(cpu.memory, 0);
-
         if (gbFile) |file| {
             _ = try std.fs.cwd().readFile(file, cpu.memory);
         }
 
+        // state after DMG Boot rom has run.
+        // https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
         cpu.registers.r16.AF = 0x01B0;
         cpu.registers.r16.BC = 0x0013;
         cpu.registers.r16.DE = 0x00D8;
         cpu.registers.r16.HL = 0x014D;
         cpu.pc = 0x0100;
         cpu.sp = 0xFFFE;
+        // TODO: The addresses for those should not be hardcoded!
+        // https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
+        cpu.memory[0xFF00] = 0xCF;
+        cpu.memory[0xFF01] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
+        cpu.memory[0xFF02] = 0x7E;
+        cpu.memory[0xFF04] = 0xAB;
+        cpu.memory[0xFF07] = 0xF8;
+        cpu.memory[0xFF0F] = 0xE1;
+        // TODO: Audio register are skipped for now.
+        cpu.memory[0xFF40] = 0x91;
+        cpu.memory[0xFF41] = 0x85;
+        cpu.memory[0xFF46] = 0xFF;
+        cpu.memory[0xFF47] = 0xFC;
+
         return cpu;
     }
 

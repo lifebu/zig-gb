@@ -59,8 +59,31 @@ https://gbdev.gg8.se/files/roms/blargg-gb-tests/
 
 
 
-# Current Command Review:
-Correct:
-- All variant encodings.
-- All deltaPC and cycle count.
-- All instructions, variants that can be verified with register checks.
+# MMU/MMIO
+- I need to know which if them must be done on write or can be done at the start of next cycle.
+    - W: On Write
+    - C: Next Cycle
+- I don't like to create a huge switch case that is always called on every write.
+
+0x000-0x4000: MBC: 
+C- Enable RAM.
+C- Set ROM Bank.
+C- Set RAM Bank.
+
+0xFF00-0xFFF: F/O Registers: 
+C- 0xFF00: Joypad: Could be updated at the start of each cycle.
+    - Keep a copy for both lower nibbles in two bytes somewhere.
+    - Depending on what test flag is set apply the lower nibbles to the bit.
+    - Apply it every cycle.
+W- 0xFF04: DIV: Divider:
+    - Writing anything to this, resets the divider to 0x00.
+C- 0xFF05: TIMA: Timer counter  
+C- 0xFF06: TMA: Timer modulo
+C- 0xFF07: TAC: Timer control.
+C- 0xFF0F: Interrupt Flag.
+C- 0xFFFF: Interrupt Enable.
+
+0xFF40-0xFF4B: PPU.
+- The PPU will just read those when it is updated.
+
+- Interrupt Enable.  
