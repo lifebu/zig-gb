@@ -57,6 +57,7 @@ pub fn main() !void {
     defer cpu.deinit();
 
     var ppu = PPU{};
+    var mmio = MMIO{};
 
     var pixels = try alloc.alloc(sf.Color, WINDOW_WIDTH * WINDOW_HEIGHT);
     defer alloc.free(pixels);
@@ -74,11 +75,15 @@ pub fn main() !void {
             }
         }
 
-        MMIO.updateJoypad(&cpu.memory[MMAP.JOYPAD]);
-
         try ppu.updatePixels(&cpu.memory, &pixels);
         try cpuTexture.updateFromPixels(pixels, null);
         try cpu.frame();
+
+        // TODO: This does not work because we need to update those once per cycle. but the cpu only works on frames. 
+        // And the cpu.cycle cannot be used as it is incremented by more then once per cpu tick.
+        mmio.updateJoypad(&cpu.memory[MMAP.JOYPAD]);
+        // TODO: Maybe pass them as a packed struct?
+        mmio.updateTimers(&cpu.memory[MMAP.DIVIDER], &cpu.memory[MMAP.TIMER], cpu.memory[MMAP.TIMER_MOD], cpu.memory[MMAP.TIMER_CONTROL]);
 
         window.clear(sf.Color.Black);
         gpuTexture.updateFromTexture(cpuTexture, null);

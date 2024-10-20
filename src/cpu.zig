@@ -181,7 +181,6 @@ pub fn step(self: *Self) !void {
     // self.debugPrintState();
 
     var opcode: u8 = self.memory[self.pc];
-    // TODO: I need testing for this, that everything is set up correctly. Especially the cycle count can be wrong!
     const operation: Operation = try switch (opcode) {
         // NOOP
         0x00 => Operation{ .deltaPC = 1, .cycles = 4 },

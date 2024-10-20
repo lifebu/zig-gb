@@ -34,6 +34,11 @@ https://github.com/Ryp/gb-emu-zig
 10-bit ops.gb: Passed
 11-op a,(hl).gb: Passed 
 
+## Pipelining the CPU and other systems?
+- Can I create a pipeline of known operations and execute them?
+- So that the cpu has a set of those stages as well as the ppu?
+- THen I have a set of ring-buffers for those operations?
+
 ## Testing PPU
 It would be awesome to have the same trace testing for the ppu.
 
