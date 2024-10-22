@@ -48,6 +48,7 @@ pc: u16 = 0,
 // Stack pointer
 sp: u16 = 0,
 cycle: u32 = 0,
+ime: bool = false,
 // TODO: Maybe state flags?
 isStopped: bool = false,
 isHalted: bool = false,
@@ -895,8 +896,7 @@ pub fn step(self: *Self) !void {
             const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
             self.pc = retAddress.*;
             self.sp += 2;
-
-            // TODO: Also enable interrupts.
+            self.ime = true;
 
             break: op Operation { .deltaPC = 0, .cycles =  16 };
         },
@@ -1017,7 +1017,7 @@ pub fn step(self: *Self) !void {
         },
         // DI (Disable Interrupts)
         0xF3 => op: {
-            // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
+            self.ime = false;
             break: op Operation { .deltaPC = 1, .cycles =  4 };
         },
         // OR a, imm8
@@ -1058,7 +1058,8 @@ pub fn step(self: *Self) !void {
         },
         // EI (Enable Interrupts)
         0xFB => op: {
-            // TODO: Implement interrupts (This requests to disable the interrupt, but this only happens next cycle). 
+            // TODO: The effect of EI is delayed by one instruction. ei followed by di does not allow any interrupts between them.
+            self.ime = true;
             break: op Operation { .deltaPC = 1, .cycles =  4 };
         },
         // CP a, imm8

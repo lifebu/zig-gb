@@ -42,6 +42,9 @@ https://github.com/Ryp/gb-emu-zig
 ## Testing PPU
 It would be awesome to have the same trace testing for the ppu.
 
+## Testing MMIO:
+- Can I adapt the json SingleStepTests to also test timer?
+
 ### Maybe I can automate this process better?
 I can run a generator process that creates the cpu logfiles with each instruction being a particular test-rom.
 Would be awesome if this would work for all .gb files.
