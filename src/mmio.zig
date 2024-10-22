@@ -1,8 +1,6 @@
 const std = @import("std");
-const sf = struct {
-    usingnamespace @import("sfml");
-    usingnamespace sf.graphics;
-};
+
+const Def = @import("def.zig");
 
 const Self = @This();
 
@@ -16,20 +14,19 @@ dividerCounter: u14 = 0,
 // TODO: Testing, remove this!
 interruptFlag: u8 = 0,
 
-pub fn updateJoypad(self: *Self, joyp: *u8) void {
+pub fn updateJoypad(self: *Self, joyp: *u8, inputState: Def.InputState) void {
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 
-    // TODO: Would be good to remove sfml dependency from inside the emulator, fine for now.
-    dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.right))) << 0); // Right
-    dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.left))) << 1); // Left
-    dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.up))) << 2); // Up
-    dpad &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.down))) << 3); // Down
+    dpad &= ~(@as(u4, @intFromBool(inputState.isRightPressed)) << 0);
+    dpad &= ~(@as(u4, @intFromBool(inputState.isLeftPressed)) << 1);
+    dpad &= ~(@as(u4, @intFromBool(inputState.isUpPressed)) << 2);
+    dpad &= ~(@as(u4, @intFromBool(inputState.isDownPressed)) << 3);
     
     var buttons: u4 = 0xF;
-    buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.A))) << 0); // A
-    buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.D))) << 1); // B
-    buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.S))) << 2); // Select
-    buttons &= ~(@as(u4, @intFromBool(sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.W))) << 3); // Start
+    buttons &= ~(@as(u4, @intFromBool(inputState.isAPressed)) << 0);
+    buttons &= ~(@as(u4, @intFromBool(inputState.isBPressed)) << 1);
+    buttons &= ~(@as(u4, @intFromBool(inputState.isSelectPressed)) << 2);
+    buttons &= ~(@as(u4, @intFromBool(inputState.isStartPressed)) << 3);
 
     const selectDpad: bool = (joyp.* & 0x10) != 0x10;
     const selectButtons: bool = (joyp.* & 0x20) != 0x20;

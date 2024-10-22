@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const MMAP = @import("mmap.zig");
+const MemMap = @import("mem_map.zig");
 
 // TODO: It would be nice to split some of this file into multiple files, maybe interrupts, executing opcodes?
 const Self = @This();
@@ -74,17 +74,17 @@ pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
     cpu.sp = 0xFFFE;
     // TODO: The addresses for those should not be hardcoded!
     // https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
-    cpu.memory[MMAP.JOYPAD] = 0xCF;
-    cpu.memory[MMAP.SERIAL_DATA] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
-    cpu.memory[MMAP.SERIAL_CONTROL] = 0x7E;
-    cpu.memory[MMAP.DIVIDER] = 0xAB;
-    cpu.memory[MMAP.TIMER_CONTROL] = 0xF8;
-    cpu.memory[MMAP.INTERRUPT_FLAG] = 0xE1;
+    cpu.memory[MemMap.JOYPAD] = 0xCF;
+    cpu.memory[MemMap.SERIAL_DATA] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
+    cpu.memory[MemMap.SERIAL_CONTROL] = 0x7E;
+    cpu.memory[MemMap.DIVIDER] = 0xAB;
+    cpu.memory[MemMap.TIMER_CONTROL] = 0xF8;
+    cpu.memory[MemMap.INTERRUPT_FLAG] = 0xE1;
     // TODO: Audio register are skipped for now.
-    cpu.memory[MMAP.LCD_CONTROL] = 0x91;
-    cpu.memory[MMAP.LCD_STAT] = 0x85;
-    cpu.memory[MMAP.DMA] = 0xFF;
-    cpu.memory[MMAP.BG_PALETTE] = 0xFC;
+    cpu.memory[MemMap.LCD_CONTROL] = 0x91;
+    cpu.memory[MemMap.LCD_STAT] = 0x85;
+    cpu.memory[MemMap.DMA] = 0xFF;
+    cpu.memory[MemMap.BG_PALETTE] = 0xFC;
 
     return cpu;
 }
@@ -922,7 +922,7 @@ pub fn step(self: *Self) !void {
         // LDH [imm8], a
         0xE0 => op: {
             const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.memory[MMAP.HIGH_PAGE + source.*] = self.registers.r8.A;
+            self.memory[MemMap.HIGH_PAGE + source.*] = self.registers.r8.A;
 
             // TODO: If we create this thing first and you can only do that via a function in the self. 
             // then you are able to check if with the requested delta pc you would be able to access out of memory!
@@ -930,7 +930,7 @@ pub fn step(self: *Self) !void {
         },
         // LD [c], a
         0xE2 => op: {
-            self.memory[MMAP.HIGH_PAGE + self.registers.r8.C] = self.registers.r8.A;
+            self.memory[MemMap.HIGH_PAGE + self.registers.r8.C] = self.registers.r8.A;
 
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
@@ -998,13 +998,13 @@ pub fn step(self: *Self) !void {
         // LDH a, [imm8]
         0xF0 => op: {
             const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.registers.r8.A = self.memory[MMAP.HIGH_PAGE + source.*];
+            self.registers.r8.A = self.memory[MemMap.HIGH_PAGE + source.*];
 
             break: op Operation { .deltaPC = 2, .cycles = 12 };
         },
         // LD a, [c]
         0xF2 => op: {
-            self.registers.r8.A = self.memory[MMAP.HIGH_PAGE + self.registers.r8.C];
+            self.registers.r8.A = self.memory[MemMap.HIGH_PAGE + self.registers.r8.C];
 
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },

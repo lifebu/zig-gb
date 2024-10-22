@@ -1,0 +1,23 @@
+const std = @import("std");
+
+pub const RESOLUTION_WIDTH = 160;
+pub const RESOLUTION_HEIGHT = 144;
+
+pub const Color = packed struct {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8 = 0xFF,
+};
+
+pub const InputState = packed struct {
+    isRightPressed: bool = false,
+    isLeftPressed: bool = false,
+    isUpPressed: bool = false,
+    isDownPressed: bool = false,
+
+    isAPressed: bool = false,
+    isBPressed: bool = false,
+    isSelectPressed: bool = false,
+    isStartPressed: bool = false,
+};
