@@ -1,11 +1,12 @@
 const std = @import("std");
 
-const Def = @import("def.zig");
-const PlatformSFML = @import("platform_sfml.zig");
 const CPU = @import("cpu.zig");
-const MemMap = @import("mem_map.zig");
+const Def = @import("def.zig");
 const MMIO = @import("mmio.zig");
+const MMU = @import("mmu.zig");
+const MemMap = @import("mem_map.zig");
 const PPU = @import("ppu.zig");
+const PlatformSFML = @import("platform_sfml.zig");
 
 pub fn main() !void {
     var allocator = std.heap.GeneralPurposeAllocator(.{}){};
@@ -17,6 +18,9 @@ pub fn main() !void {
 
     var cpu = try CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb");
     defer cpu.deinit();
+
+    var mmu = try MMU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb");
+    defer mmu.deinit();
 
     var ppu = PPU{};
     var mmio = MMIO{};

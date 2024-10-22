@@ -2,7 +2,6 @@ const std = @import("std");
 
 const MemMap = @import("mem_map.zig");
 
-// TODO: It would be nice to split some of this file into multiple files, maybe interrupts, executing opcodes?
 const Self = @This();
 
 const FlagRegister = packed union {
