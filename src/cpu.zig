@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const MemMap = @import("mem_map.zig");
+const MMU = @import("mmu.zig");
 
 const Self = @This();
 
@@ -177,7 +178,7 @@ fn debugPrintState(self: *Self) void {
     std.debug.print("\n", .{});
 }
 
-pub fn step(self: *Self) !void {
+pub fn step(self: *Self, _: *MMU) !void {
     // self.debugPrintState();
 
     var opcode: u8 = self.memory[self.pc];
@@ -1089,11 +1090,11 @@ pub fn step(self: *Self) !void {
     self.cycle += operation.cycles;
 }
 
-pub fn frame(self: *Self) !void {
+pub fn frame(self: *Self, mmu: *MMU) !void {
     self.cycle = 0;
 
     // TODO: implement cycle accuracy (with PPU!).
     while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
-        try self.step();
+        try self.step(mmu);
     }
 }

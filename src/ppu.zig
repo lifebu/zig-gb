@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Def = @import("def.zig");
 const MemMap = @import("mem_map.zig");
+const MMU = @import("mmu.zig");
 
 const Self = @This();
 
@@ -24,7 +25,9 @@ const TILE_MAP_BASE_ADDRESS = 0x9800;
 const TILE_BASE_ADDRESS = 0x8000;
 
 
-pub fn updatePixels(_: *Self, memory: *[]u8, pixels: *[]Def.Color) !void {
+pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
+    const memory: *[]u8 = mmu.getRaw();
+
     const palletteByte: u8 = memory.*[MemMap.BG_PALETTE];
     //https://gbdev.io/pandocs/Palettes.html
     const colorID3: u8 = (palletteByte & (3 << 6)) >> 6;
