@@ -41,8 +41,6 @@ const CYCLES_PER_FRAME: u32 = 70_226;
 
 registers: Registers = .{ .r16 = .{} },
 
-memory: []u8 = undefined,
-allocator: std.mem.Allocator,
 // Program counter
 pc: u16 = 0,
 // Stack pointer
@@ -54,15 +52,8 @@ isStopped: bool = false,
 isHalted: bool = false,
 isPanicked: bool = false,
 
-pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
-    var cpu = Self{ .allocator = alloc };
-
-    cpu.memory = try alloc.alloc(u8, 0x10000);
-    errdefer alloc.free(cpu.memory);
-    @memset(cpu.memory, 0);
-    if (gbFile) |file| {
-        _ = try std.fs.cwd().readFile(file, cpu.memory);
-    }
+pub fn init() !Self {
+    var cpu = Self{};
 
     // state after DMG Boot rom has run.
     // https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
@@ -72,28 +63,15 @@ pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
     cpu.registers.r16.HL = 0x014D;
     cpu.pc = 0x0100;
     cpu.sp = 0xFFFE;
-    // TODO: The addresses for those should not be hardcoded!
-    // https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
-    cpu.memory[MemMap.JOYPAD] = 0xCF;
-    cpu.memory[MemMap.SERIAL_DATA] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
-    cpu.memory[MemMap.SERIAL_CONTROL] = 0x7E;
-    cpu.memory[MemMap.DIVIDER] = 0xAB;
-    cpu.memory[MemMap.TIMER_CONTROL] = 0xF8;
-    cpu.memory[MemMap.INTERRUPT_FLAG] = 0xE1;
-    // TODO: Audio register are skipped for now.
-    cpu.memory[MemMap.LCD_CONTROL] = 0x91;
-    cpu.memory[MemMap.LCD_STAT] = 0x85;
-    cpu.memory[MemMap.DMA] = 0xFF;
-    cpu.memory[MemMap.BG_PALETTE] = 0xFC;
 
     return cpu;
 }
 
-pub fn deinit(self: *Self) void {
-    self.allocator.free(self.memory);
+pub fn deinit(_: *Self) void {
 }
 
 // Instruction Variants (Sets of instructions that do the same, but to different targets/source).
+// TODO: How can I implement this variant with the new mmu model?
 const R8Variant = enum(u8) { B, C, D, E, H, L, HL, A, };
 pub fn getFromR8Variant(self: *Self, variant: R8Variant) *u8 {
     return switch (variant) {
@@ -103,7 +81,7 @@ pub fn getFromR8Variant(self: *Self, variant: R8Variant) *u8 {
         .E => &self.registers.r8.E,
         .H => &self.registers.r8.H,
         .L => &self.registers.r8.L,
-        .HL => &self.memory[self.registers.r16.HL],
+        .HL => unreachable,// &self.memory[self.registers.r16.HL],
         .A => &self.registers.r8.A,
     };
 }
@@ -129,19 +107,19 @@ pub fn getFromR16StkVariant(self: *Self, variant: R16StkVariant) *u16 {
 }
 
 const R16MemVariant = enum(u8) { BC, DE, HLinc, HLdec, };
-pub fn getFromR16MemVariant(self: *Self, variant: R16MemVariant) *u8 {
+pub fn getFromR16MemVariant(self: *Self, variant: R16MemVariant) u16 {
     return switch (variant) {
-        .BC => &self.memory[self.registers.r16.BC],
-        .DE => &self.memory[self.registers.r16.DE],
+        .BC => self.registers.r16.BC,
+        .DE => self.registers.r16.DE,
         .HLinc => blk: {
-            const value: *u8 = &self.memory[self.registers.r16.HL];
+            const addr: u16 = self.registers.r16.HL;
             self.registers.r16.HL += 1;
-            break: blk value;
+            break: blk addr;
         },
         .HLdec => blk: {
-            const value: *u8 = &self.memory[self.registers.r16.HL];
+            const addr: u16 = self.registers.r16.HL;
             self.registers.r16.HL -= 1;
-            break: blk value;
+            break: blk addr;
         },
     };
 }
@@ -165,45 +143,41 @@ const CPUError = error {
     OPERATION_NOT_IMPLEMENTED,
 };
 
-fn debugPrintState(self: *Self) void {
+fn debugPrintState(self: *Self, mmu: *MMU) void {
     std.debug.print("A: {X:0>2} F: {X:0>2} ", .{ self.registers.r8.A, self.registers.r8.F.F });
     std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ self.registers.r8.B, self.registers.r8.C });
     std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ self.registers.r8.D, self.registers.r8.E });
     std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ self.registers.r8.H, self.registers.r8.L });
     std.debug.print("SP: {X:0>4} PC: 00:{X:0>4} ", .{ self.sp, self.pc });
     std.debug.print("({X:0>2} {X:0>2} {X:0>2} {X:0>2})", .{
-        self.memory[self.pc], self.memory[self.pc +% 1], 
-        self.memory[self.pc +% 2], self.memory[self.pc +% 3], 
+        mmu.read8(self.pc), mmu.read8(self.pc +% 1), 
+        mmu.read8(self.pc +% 2), mmu.read8(self.pc +% 3), 
     });
     std.debug.print("\n", .{});
 }
 
-pub fn step(self: *Self, _: *MMU) !void {
-    // self.debugPrintState();
+pub fn step(self: *Self, mmu: *MMU) !void {
+    // self.debugPrintState(mmu);
 
-    var opcode: u8 = self.memory[self.pc];
+    // TODO: Check if we can actually implement most of the instructions without all the pointers?
+    var opcode: u8 = mmu.read8(self.pc);
     const operation: Operation = try switch (opcode) {
         // NOOP
         0x00 => Operation{ .deltaPC = 1, .cycles = 4 },
         // LD r16, imm16
         0x01, 0x11, 0x21, 0x31 => op: {
-            // TODO: Maybe create a function that does a safety check if we access memory wrong? 
-            // If you have a 3 Byte instruction at the last byte of memory, this would break.
-            // TODO: I should wrap the ptrCast and alignCast in a function, as I need to do that a lot.
-            // TODO: And I need to do the elignment correctly everyhwere I access memory.
-            const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
+            const source: u16 = mmu.read16((self.pc +% 1));
             const destVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const dest: *u16 = self.getFromR16Variant(destVar);
-            dest.* = source.*;
+            dest.* = source;
 
             break: op Operation{ .deltaPC = 3, .cycles = 12 };
         },
         // LD r16mem, a
         0x02, 0x12, 0x22, 0x32 => op: {
-            const source: *u8 = &self.registers.r8.A;
             const destVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-            const dest: *u8 = self.getFromR16MemVariant(destVar);
-            dest.* = source.*;
+            const dest: u16 = self.getFromR16MemVariant(destVar);
+            mmu.write8(dest, self.registers.r8.A);
 
             break: op Operation{ .deltaPC =  1, .cycles = 8 };
         },
@@ -243,10 +217,10 @@ pub fn step(self: *Self, _: *MMU) !void {
         },
         // LD r8, imm8
         0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E => op: {
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 =  mmu.read8(self.pc +% 1);
             const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
             const dest: *u8 = self.getFromR8Variant(destVar);
-            dest.* = source.*;
+            dest.* = source;
 
             break: op Operation{ .deltaPC = 2, .cycles = if (destVar == .HL) 12 else 8 };
         },
@@ -266,22 +240,21 @@ pub fn step(self: *Self, _: *MMU) !void {
         },
         // LD (imm16),SP
         0x08 => op: {
-            const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-            const dest: *align(1) u16 = @ptrCast(&self.memory[source.*]);
-            dest.* = self.sp;
+            const source: u16 = mmu.read16(self.pc +% 1);
+            const dest: u16 = mmu.read16(source);
+            mmu.write16(dest, self.sp);
 
             break: op Operation { .deltaPC = 3, .cycles = 20 };
         },
         // LD a, r16mem
         0x0A, 0x1A, 0x2A, 0x3A => op: {
             const sourceVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
-            const source: *u8 = self.getFromR16MemVariant(sourceVar);
-            const dest: *u8 = &self.registers.r8.A;
-            dest.* = source.*;
+            const source: u16 = self.getFromR16MemVariant(sourceVar);
+            self.registers.r8.A = mmu.read8(source);
 
             break: op Operation{ .deltaPC =  1, .cycles = 8 };
         }, 
-        // Dec r16
+        // DEC r16
         0x0B, 0x1B, 0x2B, 0x3B => op: {
             const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const source: *u16 = self.getFromR16Variant(sourceVar);
@@ -293,14 +266,12 @@ pub fn step(self: *Self, _: *MMU) !void {
         0x09, 0x19, 0x29, 0x39 => op : {
             const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const source: *u16 = self.getFromR16Variant(sourceVar);
-            // TODO: tuples can be disected by doing: result, overflow = @addWithOverflow();
-            const result = @addWithOverflow(self.registers.r16.HL, source.*);
+            self.registers.r16.HL, const overflow = @addWithOverflow(self.registers.r16.HL, source.*);
 
             self.registers.r8.F.Flags.nBCD = false;
             self.registers.r8.F.Flags.halfBCD = (((self.registers.r16.HL & 0xFFF) + (source.* & 0xFFF)) & 0x1000) ==  0x1000;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
-            self.registers.r16.HL = result.@"0";
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
         // RRCA
@@ -310,7 +281,7 @@ pub fn step(self: *Self, _: *MMU) !void {
             A.* >>= 1;
 
             A.* |= (shiftedBit << 7);
-            self.registers.r8.F.Flags.carry = shiftedBit == 0x01;
+            self.registers.r8.F.Flags.carry = shiftedBit == 1;
             self.registers.r8.F.Flags.zero = false;
             self.registers.r8.F.Flags.nBCD = false;
             self.registers.r8.F.Flags.halfBCD = false;
@@ -339,7 +310,7 @@ pub fn step(self: *Self, _: *MMU) !void {
         },
         // JR r8
         0x18 => op: {
-            const relDest: i8 = @bitCast(self.memory[self.pc +% 1]); 
+            const relDest: i8 = mmu.readi8(self.pc +% 1);
             self.pc +%= @as(u16, @bitCast(@as(i16, relDest))); 
             self.pc +%= 2; // size of instruction 
 
@@ -365,7 +336,7 @@ pub fn step(self: *Self, _: *MMU) !void {
             const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
             const cond: bool = self.getFromCondVariant(condVar);
 
-            const relDest: i8 = @bitCast(self.memory[self.pc +% 1]); 
+            const relDest: i8 = mmu.readi8(self.pc +% 1);
             self.pc +%= if (cond) @as(u16, @bitCast(@as(i16, relDest))) else 0;
             self.pc +%= 2; // size of instruction 
 
@@ -448,14 +419,14 @@ pub fn step(self: *Self, _: *MMU) !void {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
             const source: *u8 = self.getFromR8Variant(sourceVar);
             const A: *u8 = &self.registers.r8.A;
-            const result = @addWithOverflow(A.*, source.*);
+            const result, const overflow = @addWithOverflow(A.*, source.*);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = false;
             self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
         },
         // ADC a, r8
@@ -464,32 +435,32 @@ pub fn step(self: *Self, _: *MMU) !void {
             const source: *u8 = self.getFromR8Variant(sourceVar);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-            const sourceCarry = @addWithOverflow(source.*, carry);
-            const result = @addWithOverflow(A.*, sourceCarry.@"0");
+            const sourceCarry, const carryOverflow = @addWithOverflow(source.*, carry);
+            const result, const overflow = @addWithOverflow(A.*, sourceCarry);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = false;
             const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-            self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = carryOverflow == 1 or overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
         },  
         // SUB a, r8
         0x90...0x97 => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
             const source: *u8 = self.getFromR8Variant(sourceVar);
-            const a: *u8 = &self.registers.r8.A;
-            const result = @subWithOverflow(a.*, source.*);
+            const A: *u8 = &self.registers.r8.A;
+            const result, const overflow = @subWithOverflow(A.*, source.*);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
-            self.registers.r8.F.Flags.halfBCD = (((a.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
-            a.* = result.@"0";
+            A.* = result;
             break: op Operation { .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
         },  
         // SBC a, r8
@@ -498,17 +469,17 @@ pub fn step(self: *Self, _: *MMU) !void {
             const source: *u8 = self.getFromR8Variant(sourceVar);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-            const sourceCarry = @addWithOverflow(source.*, carry);
-            const result = @subWithOverflow(A.*, sourceCarry.@"0");
+            const sourceCarry, const carryOverflow = @addWithOverflow(source.*, carry);
+            const result, const overflow = @subWithOverflow(A.*, sourceCarry);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
             const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-            self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = carryOverflow == 1 or overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
         },  
         // AND a, r8
@@ -558,12 +529,12 @@ pub fn step(self: *Self, _: *MMU) !void {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
             const source: *u8 = self.getFromR8Variant(sourceVar);
             const A: *u8 = &self.registers.r8.A;
-            const result = @subWithOverflow(A.*, source.*);
+            _, const overflow = @subWithOverflow(A.*, source.*);
 
             self.registers.r8.F.Flags.zero = A.* == source.*;
             self.registers.r8.F.Flags.nBCD = true;
             self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
             break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
         },
@@ -573,8 +544,7 @@ pub fn step(self: *Self, _: *MMU) !void {
             const cond: bool = self.getFromCondVariant(condVar);
 
             if(cond) {
-                const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                self.pc = retAddress.*;
+                self.pc = mmu.read16(self.sp);
                 self.sp += 2;
             }
 
@@ -585,8 +555,8 @@ pub fn step(self: *Self, _: *MMU) !void {
             const destVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const dest: *u16 = self.getFromR16StkVariant(destVar);
 
-            const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-            dest.* = stack.*;
+            const stack: u16 = mmu.read16(self.sp);
+            dest.* = mmu.read16(stack);
             self.sp += 2;
 
             // If you do a pop on the AF register (0xF1), you need to make sure that the lowest nibble stays 0.
@@ -601,9 +571,8 @@ pub fn step(self: *Self, _: *MMU) !void {
             const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
             const cond: bool = self.getFromCondVariant(condVar);
 
-            // TODO: If pc == 0xFFFE, this will read out of memory.
-            const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.pc = if(cond) target.* else (self.pc + 3);
+            const target: u16 = mmu.read16(self.pc +% 1);
+            self.pc = if(cond) target else (self.pc + 3);
 
             break: op Operation { .deltaPC = 0, .cycles =  if (cond) 16 else 12 };
         },
@@ -613,15 +582,13 @@ pub fn step(self: *Self, _: *MMU) !void {
             const source: *u16 = self.getFromR16StkVariant(sourceVar);
 
             self.sp -= 2;
-            const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-            stack.* = source.*;
+            mmu.write16(self.sp, source.*);
 
             break: op Operation{ .deltaPC = 1, .cycles = 16 };
         },
         // JP imm16
         0xC3 => op : {
-            const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.pc = target.*;
+            self.pc = mmu.read16(self.pc +% 1);
 
             break: op Operation { .deltaPC = 0, .cycles =  16 };
         },
@@ -635,13 +602,10 @@ pub fn step(self: *Self, _: *MMU) !void {
             if(cond) {
                 // push next address onto stack.
                 self.sp -= 2;
-                const nextInstr: u16 = self.pc + 3;
-                const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-                stack.* = nextInstr;
+                mmu.write16(self.sp, self.pc +% 3);
 
                 // jump to imm16
-                const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-                self.pc = target.*;
+                self.pc = mmu.read16(self.pc +% 1);
             }
 
             break: op Operation { .deltaPC = if(cond) 0 else 3, .cycles = if(cond) 24 else 12 };
@@ -649,27 +613,25 @@ pub fn step(self: *Self, _: *MMU) !void {
         // ADD a, imm8
         0xC6 => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
-            const result = @addWithOverflow(A.*, source.*);
+            const result, const overflow = @addWithOverflow(A.*, source);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = false;
-            self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source & 0x0F)) > 0x0F;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 2, .cycles = 8 };
         },
         // RST target
         0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF => op : {
-            const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
-
             // push next address onto stack.
             self.sp -= 2;
-            const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-            stack.* = self.pc +% 1;
+            mmu.write16(self.sp, self.pc +% 1);
 
+            const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
             self.pc = target;
 
             break: op Operation{ .deltaPC = 0, .cycles = 16 };
@@ -678,8 +640,7 @@ pub fn step(self: *Self, _: *MMU) !void {
         0xC9 => op : {
             // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
             // TODO: Can I compbine those? return and conditional return have the same opcode structure, they only differ by the first bit.
-            const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-            self.pc = retAddress.*;
+            self.pc = mmu.read16(self.sp);
             self.sp += 2;
 
             break: op Operation { .deltaPC = 0, .cycles =  16 };
@@ -687,7 +648,7 @@ pub fn step(self: *Self, _: *MMU) !void {
         // PREFIX CB
         0xCB => op: {
             // TODO: Maybe there is solution without nesting this?
-            opcode = self.memory[self.pc +% 1];
+            opcode = mmu.read8(self.pc +% 1);
             break: op switch (opcode) {
                 // RLC r8
                 0x00...0x07 => op_pfx: {
@@ -848,53 +809,49 @@ pub fn step(self: *Self, _: *MMU) !void {
             // TODO: Can I compbine those? Call and conditional call have the same opcode structure, they only differ by the first bit.
             // push next address onto stack.
             self.sp -= 2;
-            const nextInstr: u16 = self.pc + 3;
-            const stack: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-            stack.* = nextInstr;
+            mmu.write16(self.sp, self.pc +% 3);
 
             // jump to imm16
-            const target: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.pc = target.*;
+            self.pc = mmu.read16(self.pc +% 1);
 
             break: op Operation { .deltaPC = 0, .cycles =  24 };
         },
         // ADC a, imm8
         0xCE => op: {
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-            const sourceCarry = @addWithOverflow(source.*, carry);
-            const result = @addWithOverflow(A.*, sourceCarry.@"0");
+            const sourceCarry, const carryOverflow = @addWithOverflow(source, carry);
+            const result, const overflow = @addWithOverflow(A.*, sourceCarry);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = false;
-            const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+            const sourceHalfBCD: bool = (((source & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-            self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = carryOverflow == 1 or overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 2, .cycles = 8 };
         },  
         // SUB a, r8
         0xD6 => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
-            const result = @subWithOverflow(A.*, source.*);
+            const result, const overflow = @subWithOverflow(A.*, source);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
-            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source & 0x0F)) & 0x10) == 0x10;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 2, .cycles = 8 };
         },  
         // RETI
         0xD9 => op : {
-            const retAddress: *align(1) u16 = @ptrCast(&self.memory[self.sp]);
-            self.pc = retAddress.*;
+            self.pc = mmu.read16(self.sp);
             self.sp += 2;
             self.ime = true;
 
@@ -903,41 +860,38 @@ pub fn step(self: *Self, _: *MMU) !void {
         // SBC a, imm8
         0xDE => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-            const sourceCarry = @addWithOverflow(source.*, carry);
-            const result = @subWithOverflow(A.*, sourceCarry.@"0");
+            const sourceCarry, const carryOverflow = @addWithOverflow(source, carry);
+            const result, const overflow = @subWithOverflow(A.*, sourceCarry);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
-            const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry.@"0" & 0x0F)) & 0x10) == 0x10;
+            const sourceHalfBCD: bool = (((source & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
-            self.registers.r8.F.Flags.carry = sourceCarry.@"1" == 1 or result.@"1" == 1;
+            self.registers.r8.F.Flags.carry = carryOverflow == 1 or overflow == 1;
 
-            A.* = result.@"0";
+            A.* = result;
             break :op Operation{ .deltaPC = 2, .cycles = 8 };
         },  
         // LDH [imm8], a
         0xE0 => op: {
-            const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.memory[MemMap.HIGH_PAGE + source.*] = self.registers.r8.A;
+            const source: u8 = mmu.read8(self.pc +% 1);
+            mmu.write8(MemMap.HIGH_PAGE + source, self.registers.r8.A);
 
-            // TODO: If we create this thing first and you can only do that via a function in the self. 
-            // then you are able to check if with the requested delta pc you would be able to access out of memory!
             break: op Operation { .deltaPC = 2, .cycles = 12 };
         },
         // LD [c], a
         0xE2 => op: {
-            self.memory[MemMap.HIGH_PAGE + self.registers.r8.C] = self.registers.r8.A;
+            mmu.write8(MemMap.HIGH_PAGE + self.registers.r8.C, self.registers.r8.A);
 
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
         // LD [imm16], a
         0xEA => op: {
-            const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.memory[source.*] = self.registers.r8.A;
+            mmu.write8(self.pc +% 1, self.registers.r8.A);
 
             break: op Operation { .deltaPC = 3, .cycles = 16 };
         },
@@ -947,9 +901,9 @@ pub fn step(self: *Self, _: *MMU) !void {
             // Difference is only if we use an immediate value or not. Can we make this a better re-use?
             // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
             // So I can change the mask to improve this! Cycle time is the same as HL!
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
-            A.* &= source.*;
+            A.* &= source;
 
             self.registers.r8.F.Flags.zero = A.* == 0;
             self.registers.r8.F.Flags.nBCD = false;
@@ -960,16 +914,14 @@ pub fn step(self: *Self, _: *MMU) !void {
         },
         // ADD SP, imm8 (signed)
         0xE8 => op: {
-            // TODO: All this conversion smells like spaghetti, is there an easier way?
-            const deltaSP: i8 = @bitCast(self.memory[self.pc +% 1]); 
+            const deltaSP: i8 = mmu.readi8(self.pc +% 1); 
 
             self.registers.r8.F.Flags.zero = false;
             self.registers.r8.F.Flags.nBCD = false;
-            const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
-            self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
-            // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
-            const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
-            self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
+            _, const halfOverflow = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
+            self.registers.r8.F.Flags.halfBCD = halfOverflow == 1;
+            _, const carryOverflow = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
+            self.registers.r8.F.Flags.carry = carryOverflow == 1;
 
             self.sp +%= @as(u16, @bitCast(@as(i16, deltaSP)));
             break :op Operation{ .deltaPC = 2, .cycles = 16 };
@@ -984,9 +936,9 @@ pub fn step(self: *Self, _: *MMU) !void {
         // XOR a, imm8
         0xEE => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
-            A.* ^= source.*;
+            A.* ^= source;
 
             self.registers.r8.F.Flags.zero = A.* == 0;
             self.registers.r8.F.Flags.nBCD = false;
@@ -997,21 +949,22 @@ pub fn step(self: *Self, _: *MMU) !void {
         },
         // LDH a, [imm8]
         0xF0 => op: {
-            const source: *u8 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.registers.r8.A = self.memory[MemMap.HIGH_PAGE + source.*];
+            const source: u8 = mmu.read8(self.pc +% 1);
+            self.registers.r8.A = mmu.read8(MemMap.HIGH_PAGE + source);
 
             break: op Operation { .deltaPC = 2, .cycles = 12 };
         },
-        // LD a, [c]
+        // LDH a, [c]
         0xF2 => op: {
-            self.registers.r8.A = self.memory[MemMap.HIGH_PAGE + self.registers.r8.C];
+            // TODO: Could we combine some of the high loads/writes with a new high variant? 
+            self.registers.r8.A = mmu.read8(MemMap.HIGH_PAGE + self.registers.r8.C);
 
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
         // LD a, [imm16]
         0xFA => op: {
-            const source: *align(1) u16 = @ptrCast(&self.memory[self.pc +% 1]);
-            self.registers.r8.A = self.memory[source.*];
+            const source: u16 = mmu.read16(self.pc +% 1);
+            self.registers.r8.A = mmu.read8(source);
 
             break: op Operation { .deltaPC = 3, .cycles = 16 };
         },
@@ -1023,9 +976,9 @@ pub fn step(self: *Self, _: *MMU) !void {
         // OR a, imm8
         0xF6 => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const dest: *u8 = &self.registers.r8.A;
-            dest.* |= source.*;
+            dest.* |= source;
 
             self.registers.r8.F.Flags.zero = dest.* == 0;
             self.registers.r8.F.Flags.nBCD = false;
@@ -1036,15 +989,14 @@ pub fn step(self: *Self, _: *MMU) !void {
         },
         // LD HL, SP+imm8(signed)
         0xF8 => op: {
-            const deltaSP: i8 = @bitCast(self.memory[self.pc +% 1]); 
+            const deltaSP: i8 = mmu.readi8(self.pc +% 1); 
 
             self.registers.r8.F.Flags.zero = false;
             self.registers.r8.F.Flags.nBCD = false;
-            const halfBCD = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
-            self.registers.r8.F.Flags.halfBCD = halfBCD.@"1" == 1;
-            // TODO: You can use a, b = @addWithOverflow() to get the value out without the @ syntax!
-            const carryResult = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
-            self.registers.r8.F.Flags.carry = carryResult.@"1" == 1;
+            _, const halfOverflow = @addWithOverflow(@as(u4, @truncate(self.sp)), @as(u4, @intCast(deltaSP & 0xF)));
+            self.registers.r8.F.Flags.halfBCD = halfOverflow == 1;
+            _, const carryOverflow = @addWithOverflow(@as(u8, @truncate(self.sp)), @as(u8, @bitCast(deltaSP)));
+            self.registers.r8.F.Flags.carry = carryOverflow == 1;
 
             self.registers.r16.HL = self.sp +% @as(u16, @bitCast(@as(i16, deltaSP)));
 
@@ -1068,14 +1020,14 @@ pub fn step(self: *Self, _: *MMU) !void {
             // Difference is only if we use an immediate value or not. Can we make this a better re-use?
             // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
             // So I can change the mask to improve this! Cycle time is the same as HL!
-            const source: *u8 = &self.memory[self.pc +% 1];
+            const source: u8 = mmu.read8(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
-            const result = @subWithOverflow(A.*, source.*);
+            const result, const overflow = @subWithOverflow(A.*, source);
 
-            self.registers.r8.F.Flags.zero = result.@"0" == 0;
+            self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
-            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
-            self.registers.r8.F.Flags.carry = result.@"1" == 1;
+            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source & 0x0F)) & 0x10) == 0x10;
+            self.registers.r8.F.Flags.carry = overflow == 1;
 
             break :op Operation{ .deltaPC = 2, .cycles = 8 };
         },

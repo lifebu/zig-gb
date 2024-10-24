@@ -38,15 +38,18 @@ pub fn deinit(self: *Self) void {
     self.allocator.free(self.memory);
 }
 
-// TODO: How can I support the current way the cpu wants to read/write?
-pub fn read8(self: *Self, addr: u16) u8 {
+pub fn read8(self: *const Self, addr: u16) u8 {
    return self.memory[addr];
+}
+
+pub fn readi8(self: *const Self, addr: u16) i8 {
+   return @bitCast(self.memory[addr]);
 }
 
 pub fn write8(self: *Self, addr: u16, val: u8) void {
     switch(addr) {
         MemMap.DIVIDER => {
-            self.memory[addr] = 0; 
+            self.memory[addr] = 0;
         },
         else => {
             self.memory[addr] = val; 
@@ -54,13 +57,16 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
     }
 }
 
-pub fn read16(self: *Self, addr: u16) u16 {
+pub fn read16(self: *const Self, addr: u16) u16 {
+    // TODO: Implement something that allows reads on the memory boundary.
     std.debug.assert(addr <= 0xFFFF);
     const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
     return elem.*;
 }
 
 pub fn write16(self: *Self, addr: u16, val: u16) void {
+    // TODO: Implement something that allows writes on the memory boundary.
+    std.debug.assert(addr <= 0xFFFF);
     const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
     elem.* = val;
 }

@@ -16,7 +16,7 @@ pub fn main() !void {
     var platform = try PlatformSFML.init(alloc);
     defer platform.deinit();
 
-    var cpu = try CPU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb");
+    var cpu = try CPU.init();
     defer cpu.deinit();
 
     var mmu = try MMU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb");

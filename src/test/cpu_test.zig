@@ -1,8 +1,8 @@
 const std = @import("std");
 
+const MMU = @import("../mmu.zig");
 const CPU = @import("../cpu.zig");
 
-// TODO: Move testcode to another zig file.
 const CPUState = struct {
     pc: u16 = 0,
     sp: u16 = 0,
@@ -26,7 +26,7 @@ const TestType = struct {
     // ignoring cycles field in json.
 };
 
-fn testOutput(cpu: *const CPU, testCase: *const TestType) !void {
+fn testOutput(cpu: *const CPU, mmu: *const MMU, testCase: *const TestType) !void {
     try std.testing.expectEqual(cpu.pc, testCase.final.pc);
     try std.testing.expectEqual(cpu.sp, testCase.final.sp);
     try std.testing.expectEqual(cpu.registers.r8.A, testCase.final.a);
@@ -41,7 +41,7 @@ fn testOutput(cpu: *const CPU, testCase: *const TestType) !void {
         std.debug.assert(ramPair.len == 2);
         const address: u16 = ramPair[0];
         const value: u8 = @intCast(ramPair[1]);
-        try std.testing.expectEqual(cpu.memory[address], value);
+        try std.testing.expectEqual(mmu.read8(address), value);
     }
 }
 
@@ -61,7 +61,6 @@ fn printTestCase(cpuState: *const CPUState) void {
         const address: u16 = ramPair[0];
         const value: u8 = @intCast(ramPair[1]);
         std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
-
     }
     std.debug.print("\n", .{});
 }
@@ -85,11 +84,19 @@ pub fn runSingleStepTests() !void {
         const json = try std.json.parseFromSlice([]TestType, alloc, testFile, .{ .ignore_unknown_fields = true });
         defer json.deinit();
 
-        var cpu = try CPU.init(alloc, null);
+        var mmu = try MMU.init(alloc, null);
+        defer mmu.deinit();
+        const memory: *[]u8 = mmu.getRaw();
+
+        var cpu = try CPU.init();
         defer cpu.deinit();
 
         const testConfig: []TestType = json.value;
         for(testConfig) |testCase| {
+            if(std.mem.eql(u8, testCase.name, "CB A1 0015")) {
+                var a: u8 = 0;
+                a += 1;
+            }
 
             cpu.pc = testCase.initial.pc;
             cpu.sp = testCase.initial.sp;
@@ -105,13 +112,13 @@ pub fn runSingleStepTests() !void {
                 std.debug.assert(ramPair.len == 2);
                 const address: u16 = ramPair[0];
                 const value: u8 = @intCast(ramPair[1]);
-                cpu.memory[address] = value;
+                memory.*[address] = value;
             }
 
-            try cpu.step();
+            try cpu.step(&mmu);
 
-            testOutput(&cpu, &testCase) catch |err| {
-                std.debug.print("Test Failed: {s}\n", .{ testCase.name});
+            testOutput(&cpu, &mmu, &testCase) catch |err| {
+                std.debug.print("Test Failed: {s}\n", .{ testCase.name });
                 std.debug.print("Initial\n", .{});
                 printTestCase(&testCase.initial);
                 std.debug.print("Expected\n", .{});
@@ -132,9 +139,8 @@ pub fn runSingleStepTests() !void {
                 for (testCase.final.ram) |ramPair| {
                     std.debug.assert(ramPair.len == 2);
                     const address: u16 = ramPair[0];
-                    const value: u8 = cpu.memory[address];
+                    const value: u8 = mmu.read8(address);
                     std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
-
                 }
                 std.debug.print("\n", .{});
 
