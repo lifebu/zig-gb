@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const Def = @import("def.zig");
+const MMU = @import("mmu.zig");
+const MemMap = @import("mem_map.zig");
 
 const Self = @This();
 
@@ -14,7 +16,7 @@ dividerCounter: u14 = 0,
 // TODO: Testing, remove this!
 interruptFlag: u8 = 0,
 
-pub fn updateJoypad(self: *Self, joyp: *u8, inputState: Def.InputState) void {
+pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 
     dpad &= ~(@as(u4, @intFromBool(inputState.isRightPressed)) << 0);
@@ -28,17 +30,19 @@ pub fn updateJoypad(self: *Self, joyp: *u8, inputState: Def.InputState) void {
     buttons &= ~(@as(u4, @intFromBool(inputState.isSelectPressed)) << 2);
     buttons &= ~(@as(u4, @intFromBool(inputState.isStartPressed)) << 3);
 
-    const selectDpad: bool = (joyp.* & 0x10) != 0x10;
-    const selectButtons: bool = (joyp.* & 0x20) != 0x20;
+    var joyp: u8 = mmu.read8(MemMap.JOYPAD); 
+    const selectDpad: bool = (joyp & 0x10) != 0x10;
+    const selectButtons: bool = (joyp & 0x20) != 0x20;
     if(selectDpad and selectButtons)  { 
-        joyp.* = (joyp.* & 0xF0) | (dpad & buttons); 
+        joyp = (joyp & 0xF0) | (dpad & buttons); 
     } else if(selectDpad) { 
-        joyp.* = (joyp.* & 0xF0) & dpad; 
+        joyp = (joyp & 0xF0) & dpad; 
     } else if(selectButtons) { 
-        joyp.* = (joyp.* & 0xF0) & buttons; 
+        joyp = (joyp & 0xF0) & buttons; 
     } else { 
-        joyp.* = (joyp.* & 0xF0) & 0x0F; 
+        joyp = (joyp & 0xF0) & 0x0F; 
     }
+    mmu.write8(MemMap.JOYPAD, joyp);
 
     // TODO: Can we do this branchless?
     // Interrupts
@@ -52,8 +56,13 @@ pub fn updateJoypad(self: *Self, joyp: *u8, inputState: Def.InputState) void {
 const TIMER_FREQ_TABLE = [4]u10{1023, 16, 64, 256};
 const TIMER_INCR_TABLE = [4]u10{ 1023 / 1023, 1023 / 16, 1023 / 64, 1023 / 256};
 
-// TODO: This can alias, not good for the compiler. Better solution?
-pub fn updateTimers(self: *Self, divider: *u8, timer: *u8, timerMod: u8, timerControl: u8) void {
+pub fn updateTimers(self: *Self, mmu: *MMU) void {
+    const rawMemory: *[]u8 = mmu.getRaw();
+    const divider: *u8 = &rawMemory.*[MemMap.DIVIDER];
+    const timer: *u8 = &rawMemory.*[MemMap.TIMER];
+    const timerMod: u8 = mmu.read8(MemMap.TIMER_MOD); 
+    const timerControl: u8 = mmu.read8(MemMap.TIMER_CONTROL); 
+
     const DIVIDER_FREQ: u14 = 16_383;
     divider.* +%= @intCast(self.dividerCounter / DIVIDER_FREQ);
     self.dividerCounter +%= 1;

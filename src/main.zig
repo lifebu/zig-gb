@@ -31,12 +31,10 @@ pub fn main() !void {
             try cpu.step(&mmu); 
             cycles += cpu.cycles_ahead;
 
-            const rawMemory: *[]u8 = mmu.getRaw();
             for(cpu.cycles_ahead) |_| {
-                // TODO: Maybe pass them as a packed struct?
-                mmio.updateTimers(&rawMemory.*[MemMap.DIVIDER], &rawMemory.*[MemMap.TIMER], rawMemory.*[MemMap.TIMER_MOD], rawMemory.*[MemMap.TIMER_CONTROL]);
+                mmio.updateTimers(&mmu);
             }
-            mmio.updateJoypad(&rawMemory.*[MemMap.JOYPAD], platform.getInputState());
+            mmio.updateJoypad(&mmu, platform.getInputState());
         }
 
         try ppu.updatePixels(&mmu, platform.getRawPixels());
