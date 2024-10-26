@@ -15,6 +15,129 @@
             "label": "build-test",
             "type": "shell",
             "command": "zig test --test-no-exec -femit-bin=zig-out/bin/${fileBasenameNoExtension}-test ${file}",
-        }
+        },
+
+        // Profiling
+		{
+			"type": "process",
+			"label": "CPU Profiling (callgrind)",
+			"command": "valgrind",
+			"args": [
+				"--tool=callgrind",
+				"--callgrind-out-file=zig-out/callgrind.out",
+				"${workspaceFolder}/zig-out/bin/zig-gb",
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "CPU Profile program by using callgrind"
+		},
+		{
+			"type": "process",
+			"label": "Cache Profiling (cachgrind)",
+			"command": "valgrind",
+			"args": [
+				"--tool=cachegrind",
+				"--cachegrind-out-file=zig-out/cachegrind.out",
+				"${workspaceFolder}/zig-out/bin/zig-gb",
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "Cache Profile program by using cachegrind"
+		},
+		{
+			"type": "process",
+			"label": "Memory Profiling (massif)",
+			"command": "valgrind",
+			"args": [
+				"--tool=massif",
+				"--massif-out-file=zig-out/massif.out",
+				"${workspaceFolder}/zig-out/bin/zig-gb",
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "Memory Profile program by using massif"
+		},
+		{
+			"type": "process",
+			"label": "Memory Leak Checking (memcheck)",
+			"command": "valgrind",
+			"args": [
+				"--tool=memcheck",
+				"--leak-check=full",
+				"--show-leak-kinds=all",
+				"${workspaceFolder}/zig-out/bin/zig-gb",
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "Memory error check program by using memcheck"
+		},
+		{
+			"type": "process",
+			"label": "Open CPU profile data (kcachegrind)",
+			"command": "kcachegrind",
+			"args": [
+				"zig-out/callgrind.out"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "Open CPU profile data using kcachegrind"
+		},
+		{
+			"type": "process",
+			"label": "Open cache profile data (kcachegrind)",
+			"command": "kcachegrind",
+			"args": [
+				"zig-out/cachegrind.out"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "Open cache profile data using kcachegrind"
+		},
+		{
+			"type": "process",
+			"label": "Open memory profile data (massif-visualizer)",
+			"command": "massif-visualizer",
+			"args": [
+				"zig-out/massif.out"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "none",
+			"detail": "Open memory profile data using massif-visualizer"
+		},
     ]
 }

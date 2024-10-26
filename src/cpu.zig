@@ -37,20 +37,19 @@ const Registers = packed union {
     },
 };
 
-const CYCLES_PER_FRAME: u32 = 70_226;
-
 registers: Registers = .{ .r16 = .{} },
 
 // Program counter
 pc: u16 = 0,
 // Stack pointer
 sp: u16 = 0,
-cycle: u32 = 0,
+// How many cycles the cpu is now ahead of the rest of the system.
+cycles_ahead: u8 = 0,
 ime: bool = false,
 // TODO: Maybe state flags?
+// TODO: How to handle stopped state of cpu?
 isStopped: bool = false,
 isHalted: bool = false,
-isPanicked: bool = false,
 
 pub fn init() !Self {
     var cpu = Self{};
@@ -173,7 +172,12 @@ fn debugPrintState(self: *Self, mmu: *MMU) void {
 }
 
 pub fn step(self: *Self, mmu: *MMU) !void {
-    // self.debugPrintState(mmu);
+    // TODO: Do this without a super late check?
+    // Maybe I can solve this similar to the interrupt handler living somewhere in memory?
+    if(self.isHalted) {
+        self.cycles_ahead = 4;
+        return;
+    }
 
     // TODO: Check if we can actually implement most of the instructions without all the pointers?
     var opcode: u8 = mmu.read8(self.pc);
@@ -1058,20 +1062,10 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         else => op: {
             std.debug.print("OPERATION_NOT_IMPLEMENTED: {x}\n", .{opcode});
-            self.isPanicked = true;
             break: op CPUError.OPERATION_NOT_IMPLEMENTED;
         }
     };
 
     self.pc +%= operation.deltaPC;
-    self.cycle += operation.cycles;
-}
-
-pub fn frame(self: *Self, mmu: *MMU) !void {
-    self.cycle = 0;
-
-    // TODO: implement cycle accuracy (with PPU!).
-    while (!self.isHalted and !self.isStopped and !self.isPanicked and self.cycle < CYCLES_PER_FRAME) {
-        try self.step(mmu);
-    }
+    self.cycles_ahead = operation.cycles;
 }

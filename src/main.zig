@@ -26,17 +26,20 @@ pub fn main() !void {
     var mmio = MMIO{};
 
     while(platform.update()) {
+        var cycles: u32 = 0;
+        while(cycles < Def.CYCLES_PER_FRAME) {
+            try cpu.step(&mmu); 
+            cycles += cpu.cycles_ahead;
+
+            const rawMemory: *[]u8 = mmu.getRaw();
+            for(cpu.cycles_ahead) |_| {
+                // TODO: Maybe pass them as a packed struct?
+                mmio.updateTimers(&rawMemory.*[MemMap.DIVIDER], &rawMemory.*[MemMap.TIMER], rawMemory.*[MemMap.TIMER_MOD], rawMemory.*[MemMap.TIMER_CONTROL]);
+            }
+            mmio.updateJoypad(&rawMemory.*[MemMap.JOYPAD], platform.getInputState());
+        }
+
         try ppu.updatePixels(&mmu, platform.getRawPixels());
-        try cpu.frame(&mmu);
-
-
-        const rawMemory: *[]u8 = mmu.getRaw();
-        // TODO: This does not work because we need to update those once per cycle. but the cpu only works on frames. 
-        // And the cpu.cycle cannot be used as it is incremented by more then once per cpu tick.
-        mmio.updateJoypad(&rawMemory.*[MemMap.JOYPAD], platform.getInputState());
-        // TODO: Maybe pass them as a packed struct?
-        mmio.updateTimers(&rawMemory.*[MemMap.DIVIDER], &rawMemory.*[MemMap.TIMER], rawMemory.*[MemMap.TIMER_MOD], rawMemory.*[MemMap.TIMER_CONTROL]);
-        
         try platform.render();
     }
 }

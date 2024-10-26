@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const CYCLES_PER_FRAME: u32 = 70_226;
 pub const RESOLUTION_WIDTH = 160;
 pub const RESOLUTION_HEIGHT = 144;
 

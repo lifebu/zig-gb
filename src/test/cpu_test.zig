@@ -114,6 +114,7 @@ pub fn runSingleStepTests() !void {
                 const value: u8 = @intCast(ramPair[1]);
                 memory.*[address] = value;
             }
+            cpu.isHalted = false;
 
             try cpu.step(&mmu);
 

@@ -19,6 +19,7 @@ cpuTexture: sf.Texture = undefined,
 gpuTexture: sf.Texture = undefined,
 gpuSprite: sf.Sprite = undefined,
 pixels: []sf.Color = undefined,
+currInputState: Def.InputState = .{},
 
 pub fn init(alloc: std.mem.Allocator) !Self {
     var self = Self{ .alloc = alloc};
@@ -89,6 +90,8 @@ pub fn update(self: *Self) bool {
         }
     }
 
+    self.updateInputState();
+
     return true;
 } 
 
@@ -96,8 +99,8 @@ pub fn getRawPixels(self: *Self) *[]Def.Color {
     return @ptrCast(&self.pixels);
 } 
 
-pub fn getInputState(_: *Self) Def.InputState {
-    return Def.InputState {
+fn updateInputState(self: *Self) void {
+    self.currInputState = Def.InputState {
         .isRightPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.right),
         .isLeftPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.left),
         .isUpPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.up),
@@ -107,6 +110,10 @@ pub fn getInputState(_: *Self) Def.InputState {
         .isSelectPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.S),
         .isStartPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.W),
     };
+}
+
+pub fn getInputState(self: *Self) Def.InputState {
+    return self.currInputState;
 } 
 
 pub fn render(self: *Self) !void {
