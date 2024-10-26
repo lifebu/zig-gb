@@ -33,11 +33,11 @@ pub fn updateState(self: *Self, mmu: *MMU) void {
     if(self.lyCounter >= LCD_Y_FREQ) {
         var lcdY: u8 = mmu.read8(MemMap.LCD_Y);
         lcdY += 1;
-        if(lcdY == 154) {
-            var a: u32 = 10;
-            a += 1;
-        } 
         lcdY %= 154;
+
+        if(lcdY == 0) {
+            mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);
+        } 
         mmu.write8(MemMap.LCD_Y, lcdY);
         self.lyCounter = 0;
     }

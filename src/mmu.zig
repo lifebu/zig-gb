@@ -107,6 +107,11 @@ pub fn write16(self: *Self, addr: u16, val: u16) void {
     elem.* = val;
 }
 
+pub fn setFlag(self: *const Self, addr: u16, value: u8) void {
+    const flag: *u8 = &self.memory[addr];
+    flag.* |= value;
+}
+
 /// Use this function if you know you can bypass all the mmu side-effects.
 pub fn getRaw(self: *Self) *[]u8 {
     return &self.memory;

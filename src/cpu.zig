@@ -171,7 +171,54 @@ fn debugPrintState(self: *Self, mmu: *MMU) void {
     std.debug.print("\n", .{});
 }
 
+// TODO: Where does the interrupt handler code live?
+    // a) Have a fixed position in memory where I save cpu code that is the interrupt handler. It is saved in unused memory range.
+    // To do that I would have to have two pc. one normal one and one interrupt_pc.
+    // When you detect an interrupt => set the interrupt_pc to the current pc.  
+    // b) Maybe we can "memory map" the interrupt handler to the current programm counter position (using the mmu)?
+    // It overlays the normal code. 
+    // I mean I already require this behaviour for the BootROM? 
+    // The actual routine lives in a range of memory that is usually inacessible by the gameboy (unused or echo ram).
+
+const interruptVector = [_]u16{ 0x40, 0x48, 0x50, 0x58, 0x60 };
+// returns true if we handled an interrupt.
+pub fn tryInterrupt(self: *Self, mmu: *MMU) bool {
+    // TODO: Implement this without conditions!
+    if(!self.ime) {
+        return false;
+    }
+
+    const enable = mmu.read8(MemMap.INTERRUPT_ENABLE);
+    const flag = mmu.read8(MemMap.INTERRUPT_FLAG);
+    var currFlag = MemMap.INTERRUPT_VBLANK;
+    // TODO: Can I calculate this from the current flag?
+    var flagIndex: u8 = 0;
+    while (currFlag > 0) : (currFlag <<= 1) {
+        const hasInterrupt: bool = ((enable & flag) & currFlag) == currFlag;
+        if(!hasInterrupt) {
+            flagIndex += 1;
+            continue;
+        }
+
+        self.ime = false;
+        const mask: u8 = ~currFlag;
+        mmu.write8(MemMap.INTERRUPT_FLAG, flag & mask);
+        self.sp -= 2;
+        mmu.write16(self.sp, self.pc);
+        self.pc = interruptVector[flagIndex];
+        self.cycles_ahead = 20;
+        return true;
+    }
+
+    return false;
+}
+
+
 pub fn step(self: *Self, mmu: *MMU) !void {
+    if(self.tryInterrupt(mmu)) {
+        return;
+    }
+
     // TODO: Do this without a super late check?
     // Maybe I can solve this similar to the interrupt handler living somewhere in memory?
     if(self.isHalted) {

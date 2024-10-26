@@ -13,8 +13,6 @@ lastButtonState: u4 = 0xF,
 timerCounter: u10 = 0,
 // 2^14 = 16.384Hz
 dividerCounter: u14 = 0,
-// TODO: Testing, remove this!
-interruptFlag: u8 = 0,
 
 pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // 0 means pressed for gameboy => 0xF nothing is pressed
@@ -47,7 +45,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // TODO: Can we do this branchless?
     // Interrupts
     if (self.lastDpadState < dpad or self.lastButtonState < buttons) {
-        self.requestInterrupt(.JOYPAD);
+        mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_JOYPAD);
     }
     self.lastDpadState = dpad;
     self.lastButtonState = buttons;
@@ -75,39 +73,10 @@ pub fn updateTimers(self: *Self, mmu: *MMU) void {
         const currentIncrement = TIMER_INCR_TABLE[timerControl & 0x3];
         var overflow: u1 = 0;
         self.timerCounter, overflow = @addWithOverflow(self.timerCounter, currentIncrement);
+
         if(overflow == 1) {
-            self.requestInterrupt(.TIMER);
+            mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER);
             self.timerCounter = timerMod;
         }
     }
-}
-
-// TODO: Interrupt Handler.
-    // Reset IME and corresponding bit in IF.
-    // Wait 8 cycles.
-    // Push PC register onto stack: 8 cycles
-    // Set PC to the address of the handler: 4 Cycle.  
-    //https://gist.github.com/SonoSooS/c0055300670d678b5ae8433e20bea595#user-content-isr-and-nmi
-// TODO: Multiple interrupts: service them in the order of the bits ascending (Vblank first, Joypad last).
-// TODO: Where should interrupts live? They do execute special instructions, so they are like a program the CPU executes.
-    // But I don't like that requesting interrupts requires access to the CPU. It feels better to have this system handled here.
-    // Unless the Interrupt Handler (20 Cycles of work for CPU) and Requester is split (also meh). 
-// TODO: Where does the interrupt handler code live?
-    // It cannot be a set of instructions the cpu executes where we need to jump to it. We need to save the program counter in the interrupt handler.
-    // Maybe we can "memory map" the interrupt handler to the current programm counter position?
-    // If we have an MMU system it would be able to "overlay" the interrupt handler code anywhere, where the cpu currently exists.
-    // I mean I already require this behaviour for the BootROM? 
-    // The actual routine lives in a range of memory that is usually inacessible by the gameboy (unused or echo ram).
-// Interrupts
-pub const InterruptTypes = enum(u5) {
-    VBLANK      = 0x01,
-    LCD         = 0x02,
-    TIMER       = 0x04,
-    SERIAL      = 0x08,
-    JOYPAD      = 0x10,
-};
-// TODO: Given how simple this function is, can I remove it? Requires memory access. Who owns the memory anyway? a MMU?
-pub fn requestInterrupt(self: *Self, interruptType: InterruptTypes) void {
-    // TODO: This requires access to the memory or at least the byte for the Interrupt Flag: (xFF0F):wa
-    self.interruptFlag |= @intFromEnum(interruptType);
 }

@@ -1,8 +1,6 @@
-- Fix rest of TODOs from mmio:
-    - Correct interrupt flag implementation.
-    - Interrupt routine overlay.
 - Add that the ppu fakes the status registers each frame (LY, Modes).
     - Just so that some games can already run with that fake ppu!
+- Extremly simple OAM renderer.
 - Cleanup CPU code!
 
 # Tetris State:

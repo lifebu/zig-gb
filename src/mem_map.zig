@@ -4,6 +4,13 @@ pub const ROM_HIGH: u16         = 0x8000;
 
 pub const HIGH_PAGE: u16        = 0xFF00;
 
+// Interrupts
+pub const INTERRUPT_VBLANK: u8  = 0x01; 
+pub const INTERRUPT_LCD: u8     = 0x02; 
+pub const INTERRUPT_TIMER: u8   = 0x04; 
+pub const INTERRUPT_SERIAL: u8  = 0x08; 
+pub const INTERRUPT_JOYPAD: u8  = 0x10; 
+
 // IO
 pub const JOYPAD: u16           = 0xFF00;
 pub const SERIAL_DATA: u16      = 0xFF01;
