@@ -83,6 +83,10 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
         MemMap.DIVIDER => {
             self.memory[addr] = 0;
         },
+        MemMap.ROM_LOW...MemMap.ROM_HIGH => {
+            // TODO: Missing MBC
+            return;
+        },
         else => {
             self.memory[addr] = val; 
         }

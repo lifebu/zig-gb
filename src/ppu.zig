@@ -24,6 +24,24 @@ const TILE_MAP_SIZE_Y = 32;
 const TILE_MAP_BASE_ADDRESS = 0x9800;
 const TILE_BASE_ADDRESS = 0x8000;
 
+lyCounter: u16 = 0,
+const LCD_Y_FREQ: u16 = 456;
+
+pub fn updateState(self: *Self, mmu: *MMU) void {
+    // TODO: This is just some fake timing.
+    self.lyCounter += 1;
+    if(self.lyCounter >= LCD_Y_FREQ) {
+        var lcdY: u8 = mmu.read8(MemMap.LCD_Y);
+        lcdY += 1;
+        if(lcdY == 154) {
+            var a: u32 = 10;
+            a += 1;
+        } 
+        lcdY %= 154;
+        mmu.write8(MemMap.LCD_Y, lcdY);
+        self.lyCounter = 0;
+    }
+}
 
 pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
     const memory: *[]u8 = mmu.getRaw();
@@ -67,6 +85,4 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
             pixels.*[x + (y * Def.RESOLUTION_WIDTH)] = colorPalette[colorID];
         }
     }
-
-    memory.*[MemMap.LCD_Y] = 144;
 }

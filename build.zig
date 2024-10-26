@@ -3,6 +3,7 @@ const sfml = @import("sfml");
 
 pub fn build(b: *std.Build) void {
     // exe
+    // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 

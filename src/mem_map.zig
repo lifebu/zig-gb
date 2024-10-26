@@ -1,3 +1,7 @@
+pub const ROM_LOW: u16          = 0x0000;
+pub const ROM_HIGH: u16         = 0x8000;
+
+
 pub const HIGH_PAGE: u16        = 0xFF00;
 
 // IO

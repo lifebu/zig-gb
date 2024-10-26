@@ -33,6 +33,7 @@ pub fn main() !void {
 
             for(cpu.cycles_ahead) |_| {
                 mmio.updateTimers(&mmu);
+                ppu.updateState(&mmu);
             }
             mmio.updateJoypad(&mmu, platform.getInputState());
         }
