@@ -17,19 +17,51 @@ pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
         _ = try std.fs.cwd().readFile(file, self.memory);
     }
 
+    // TODO: Consider either emulating DMG, or defining initial states for every possible DMG variant.
     // state after DMG Boot rom has run.
     // https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
     self.memory[MemMap.JOYPAD] = 0xCF;
     self.memory[MemMap.SERIAL_DATA] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
     self.memory[MemMap.SERIAL_CONTROL] = 0x7E;
     self.memory[MemMap.DIVIDER] = 0xAB;
+    self.memory[MemMap.TIMER] = 0x00;
+    self.memory[MemMap.TIMER_MOD] = 0x00;
     self.memory[MemMap.TIMER_CONTROL] = 0xF8;
     self.memory[MemMap.INTERRUPT_FLAG] = 0xE1;
-    // TODO: Audio register are skipped for now.
+    self.memory[MemMap.CH1_SWEEP] = 0x80;
+    self.memory[MemMap.CH1_LENGTH] = 0xBF;
+    self.memory[MemMap.CH1_VOLUME] = 0xF3;
+    self.memory[MemMap.CH1_LOW_PERIOD] = 0xFF;
+    self.memory[MemMap.CH1_HIGH_PERIOD] = 0xBF;
+    self.memory[MemMap.CH2_LENGTH] = 0x3F;
+    self.memory[MemMap.CH2_VOLUME] = 0x00;
+    self.memory[MemMap.CH2_LOW_PERIOD] = 0xFF;
+    self.memory[MemMap.CH2_HIGH_PERIOD] = 0xBF;
+    self.memory[MemMap.CH3_DAC] = 0x7F;
+    self.memory[MemMap.CH3_LENGTH] = 0xFF;
+    self.memory[MemMap.CH3_VOLUME] = 0x9F;
+    self.memory[MemMap.CH3_LOW_PERIOD] = 0xFF;
+    self.memory[MemMap.CH3_HIGH_PERIOD] = 0xBF;
+    self.memory[MemMap.CH4_LENGTH] = 0xFF;
+    self.memory[MemMap.CH4_VOLUME] = 0x00;
+    self.memory[MemMap.CH4_FREQ] = 0x00;
+    self.memory[MemMap.CH4_CONTROL] = 0xBF;
+    self.memory[MemMap.MASTER_VOLUME] = 0x77;
+    self.memory[MemMap.SOUND_PANNING] = 0xF3;
+    self.memory[MemMap.SOUND_TOGGLE] = 0xF1;
     self.memory[MemMap.LCD_CONTROL] = 0x91;
     self.memory[MemMap.LCD_STAT] = 0x85;
+    self.memory[MemMap.SCROLL_Y] = 0x00;
+    self.memory[MemMap.SCROLL_X] = 0x00;
+    self.memory[MemMap.LCD_Y] = 0x00;
+    self.memory[MemMap.LCD_Y_COMPARE] = 0x00;
     self.memory[MemMap.DMA] = 0xFF;
     self.memory[MemMap.BG_PALETTE] = 0xFC;
+    self.memory[MemMap.OBJ_PALETTE_0] = 0xFF;
+    self.memory[MemMap.OBJ_PALETTE_1] = 0xFF;
+    self.memory[MemMap.WINDOW_Y] = 0x00;
+    self.memory[MemMap.WINDOW_X] = 0x00;
+    self.memory[MemMap.INTERRUPT_ENABLE] = 0x00;
 
     return self;
 }

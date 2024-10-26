@@ -1,0 +1,9 @@
+- Implement CPU to work on cycles (Use Lagcycle approach, the cpu runs one instruction ahead, the hardware catches up).
+    - Otherwise timer and joypad don't work.
+    - only do ppu once per frame.
+- Add that the ppu fakes the status registers each frame (LY, Modes).
+    - Just so that some games can already run with that fake ppu!
+- Fix rest of TODOs from mmio:
+    - Correct interrupt flag implementation.
+    - Interrupt routine overlay.
+- Cleanup CPU code!

@@ -54,7 +54,6 @@ const TIMER_INCR_TABLE = [4]u10{ 1023 / 1023, 1023 / 16, 1023 / 64, 1023 / 256};
 
 // TODO: This can alias, not good for the compiler. Better solution?
 pub fn updateTimers(self: *Self, divider: *u8, timer: *u8, timerMod: u8, timerControl: u8) void {
-    // TODO: Writing to the divider register will reset it.
     const DIVIDER_FREQ: u14 = 16_383;
     divider.* +%= @intCast(self.dividerCounter / DIVIDER_FREQ);
     self.dividerCounter +%= 1;
@@ -89,6 +88,7 @@ pub fn updateTimers(self: *Self, divider: *u8, timer: *u8, timerMod: u8, timerCo
     // Maybe we can "memory map" the interrupt handler to the current programm counter position?
     // If we have an MMU system it would be able to "overlay" the interrupt handler code anywhere, where the cpu currently exists.
     // I mean I already require this behaviour for the BootROM? 
+    // The actual routine lives in a range of memory that is usually inacessible by the gameboy (unused or echo ram).
 // Interrupts
 pub const InterruptTypes = enum(u5) {
     VBLANK      = 0x01,
