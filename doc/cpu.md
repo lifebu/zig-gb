@@ -95,3 +95,8 @@ C- 0xFFFF: Interrupt Enable.
 - The PPU will just read those when it is updated.
 
 - Interrupt Enable.  
+
+# MBC Usage Statistics:
+- How often some MBC exists => good for testing!
+https://b13rg.github.io/Gameboy-MBC-Analysis/#usage-statistics
+- Most common MBCs are MBC1 and them MBC5.

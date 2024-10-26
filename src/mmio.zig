@@ -55,6 +55,7 @@ const TIMER_FREQ_TABLE = [4]u10{1023, 16, 64, 256};
 const TIMER_INCR_TABLE = [4]u10{ 1023 / 1023, 1023 / 16, 1023 / 64, 1023 / 256};
 
 pub fn updateTimers(self: *Self, mmu: *MMU) void {
+    // TODO: Accessing these every cycle is expensive. Maybe read it once as a packed struct?
     const rawMemory: *[]u8 = mmu.getRaw();
     const divider: *u8 = &rawMemory.*[MemMap.DIVIDER];
     const timer: *u8 = &rawMemory.*[MemMap.TIMER];
