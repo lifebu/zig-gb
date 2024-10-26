@@ -71,18 +71,34 @@ pub fn deinit(_: *Self) void {
 }
 
 // Instruction Variants (Sets of instructions that do the same, but to different targets/source).
-// TODO: How can I implement this variant with the new mmu model?
 const R8Variant = enum(u8) { B, C, D, E, H, L, HL, A, };
-pub fn getFromR8Variant(self: *Self, variant: R8Variant) *u8 {
+pub fn getFromR8Variant(self: *Self, variant: R8Variant, mmu: *MMU) u8 {
     return switch (variant) {
-        .B => &self.registers.r8.B,
-        .C => &self.registers.r8.C,
-        .D => &self.registers.r8.D,
-        .E => &self.registers.r8.E,
-        .H => &self.registers.r8.H,
-        .L => &self.registers.r8.L,
-        .HL => unreachable,// &self.memory[self.registers.r16.HL],
-        .A => &self.registers.r8.A,
+        .B => self.registers.r8.B,
+        .C => self.registers.r8.C,
+        .D => self.registers.r8.D,
+        .E => self.registers.r8.E,
+        .H => self.registers.r8.H,
+        .L => self.registers.r8.L,
+        .HL => mmu.read8(self.registers.r16.HL),
+        .A => self.registers.r8.A,
+    };
+}
+
+// TODO: I hate that I have to split it this into get and set.
+// A solution would be to put the registers into echo ram. This is a range that the actual emulated system does not actually use.
+// Then it does not matter wheter i access a register or memory location, all of them are addresses into the memory block.
+// So all the Variants can work just like the getFromR16MemVariant() that returns an address of the thing into the memory block.
+pub fn setFromR8Variant(self: *Self, variant: R8Variant, mmu: *MMU, val: u8) void {
+    return switch (variant) {
+        .B => self.registers.r8.B = val,
+        .C => self.registers.r8.C = val,
+        .D => self.registers.r8.D = val,
+        .E => self.registers.r8.E = val,
+        .H => self.registers.r8.H = val,
+        .L => self.registers.r8.L = val,
+        .HL =>  mmu.write8(self.registers.r16.HL, val),
+        .A => self.registers.r8.A = val,
     };
 }
 
@@ -192,35 +208,34 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // INC r8
         0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C => op : {
             const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
-            const result: u8 = source.* +% 1;
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
+            const result: u8 = source +% 1;
 
             self.registers.r8.F.Flags.zero = result == 0; 
             self.registers.r8.F.Flags.nBCD = false;
-            self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) +% 1) & 0x10) == 0x10; 
+            self.registers.r8.F.Flags.halfBCD = (((source & 0x0F) +% 1) & 0x10) == 0x10; 
 
-            source.* = result;
+            self.setFromR8Variant(sourceVar, mmu, result);
             break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
         },
         // DEC r8
         0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D => op : {
             const sourceVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
-            const result: u8 = source.* -% 1;
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
+            const result: u8 = source -% 1;
 
             self.registers.r8.F.Flags.zero = result == 0; 
             self.registers.r8.F.Flags.nBCD = true;
-            self.registers.r8.F.Flags.halfBCD = (((source.* & 0x0F) -% 1) & 0x10) == 0x10; 
+            self.registers.r8.F.Flags.halfBCD = (((source & 0x0F) -% 1) & 0x10) == 0x10; 
 
-            source.* = result;
+            self.setFromR8Variant(sourceVar, mmu, result);
             break: op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 12 else 4 };
         },
         // LD r8, imm8
         0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E => op: {
             const source: u8 =  mmu.read8(self.pc +% 1);
             const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-            const dest: *u8 = self.getFromR8Variant(destVar);
-            dest.* = source;
+            self.setFromR8Variant(destVar, mmu, source);
 
             break: op Operation{ .deltaPC = 2, .cycles = if (destVar == .HL) 12 else 8 };
         },
@@ -241,8 +256,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // LD (imm16),SP
         0x08 => op: {
             const source: u16 = mmu.read16(self.pc +% 1);
-            const dest: u16 = mmu.read16(source);
-            mmu.write16(dest, self.sp);
+            mmu.write16(source, self.sp);
 
             break: op Operation { .deltaPC = 3, .cycles = 20 };
         },
@@ -266,12 +280,13 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         0x09, 0x19, 0x29, 0x39 => op : {
             const sourceVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const source: *u16 = self.getFromR16Variant(sourceVar);
-            self.registers.r16.HL, const overflow = @addWithOverflow(self.registers.r16.HL, source.*);
+            const result, const overflow = @addWithOverflow(self.registers.r16.HL, source.*);
 
             self.registers.r8.F.Flags.nBCD = false;
             self.registers.r8.F.Flags.halfBCD = (((self.registers.r16.HL & 0xFFF) + (source.* & 0xFFF)) & 0x1000) ==  0x1000;
             self.registers.r8.F.Flags.carry = overflow == 1;
 
+            self.registers.r16.HL = result;
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
         // RRCA
@@ -407,23 +422,22 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             }
 
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
-            const dest: *u8 = self.getFromR8Variant(destVar);
-            dest.* = source.*;
+            self.setFromR8Variant(destVar, mmu, source);
 
             break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL or destVar == .HL) 8 else 4 };
         },
         // ADD a, r8
         0x80...0x87 => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const A: *u8 = &self.registers.r8.A;
-            const result, const overflow = @addWithOverflow(A.*, source.*);
+            const result, const overflow = @addWithOverflow(A.*, source);
 
             self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = false;
-            self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source.* & 0x0F)) > 0x0F;
+            self.registers.r8.F.Flags.halfBCD = ((A.* & 0x0F) +% (source & 0x0F)) > 0x0F;
             self.registers.r8.F.Flags.carry = overflow == 1;
 
             A.* = result;
@@ -432,15 +446,15 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // ADC a, r8
         0x88...0x8F => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-            const sourceCarry, const carryOverflow = @addWithOverflow(source.*, carry);
+            const sourceCarry, const carryOverflow = @addWithOverflow(source, carry);
             const result, const overflow = @addWithOverflow(A.*, sourceCarry);
 
             self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = false;
-            const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const sourceHalfBCD: bool = (((source & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
             const sourceCaryHalfBCD: bool = (((A.* & 0x0F) +% (sourceCarry & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
             self.registers.r8.F.Flags.carry = carryOverflow == 1 or overflow == 1;
@@ -451,13 +465,13 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // SUB a, r8
         0x90...0x97 => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const A: *u8 = &self.registers.r8.A;
-            const result, const overflow = @subWithOverflow(A.*, source.*);
+            const result, const overflow = @subWithOverflow(A.*, source);
 
             self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
-            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.carry = overflow == 1;
 
             A.* = result;
@@ -466,15 +480,15 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // SBC a, r8
         0x98...0x9F => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-            const sourceCarry, const carryOverflow = @addWithOverflow(source.*, carry);
+            const sourceCarry, const carryOverflow = @addWithOverflow(source, carry);
             const result, const overflow = @subWithOverflow(A.*, sourceCarry);
 
             self.registers.r8.F.Flags.zero = result == 0;
             self.registers.r8.F.Flags.nBCD = true;
-            const sourceHalfBCD: bool = (((source.* & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const sourceHalfBCD: bool = (((source & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
             const sourceCaryHalfBCD: bool = (((A.* & 0x0F) -% (sourceCarry & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.halfBCD = sourceHalfBCD or sourceCaryHalfBCD;
             self.registers.r8.F.Flags.carry = carryOverflow == 1 or overflow == 1;
@@ -485,9 +499,9 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // AND a, r8
         0xA0...0xA7 => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const A: *u8 = &self.registers.r8.A;
-            A.* &= source.*;
+            A.* &= source;
 
             self.registers.r8.F.Flags.zero = A.* == 0;
             self.registers.r8.F.Flags.nBCD = false;
@@ -499,9 +513,9 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // XOR a, r8
         0xA8...0xAF => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const dest: *u8 = &self.registers.r8.A;
-            dest.* ^= source.*;
+            dest.* ^= source;
 
             self.registers.r8.F.Flags.zero = dest.* == 0;
             self.registers.r8.F.Flags.nBCD = false;
@@ -513,9 +527,9 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // OR a, r8
         0xB0...0xB7 => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const dest: *u8 = &self.registers.r8.A;
-            dest.* |= source.*;
+            dest.* |= source;
 
             self.registers.r8.F.Flags.zero = dest.* == 0;
             self.registers.r8.F.Flags.nBCD = false;
@@ -527,13 +541,13 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // CP a, r8
         0xB8...0xBF => op: {
             const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-            const source: *u8 = self.getFromR8Variant(sourceVar);
+            const source: u8 = self.getFromR8Variant(sourceVar, mmu);
             const A: *u8 = &self.registers.r8.A;
-            _, const overflow = @subWithOverflow(A.*, source.*);
+            _, const overflow = @subWithOverflow(A.*, source);
 
-            self.registers.r8.F.Flags.zero = A.* == source.*;
+            self.registers.r8.F.Flags.zero = A.* == source;
             self.registers.r8.F.Flags.nBCD = true;
-            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source.* & 0x0F)) & 0x10) == 0x10;
+            self.registers.r8.F.Flags.halfBCD = (((A.* & 0x0F) -% (source & 0x0F)) & 0x10) == 0x10;
             self.registers.r8.F.Flags.carry = overflow == 1;
 
             break :op Operation{ .deltaPC = 1, .cycles = if (sourceVar == .HL) 8 else 4 };
@@ -556,7 +570,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             const dest: *u16 = self.getFromR16StkVariant(destVar);
 
             const stack: u16 = mmu.read16(self.sp);
-            dest.* = mmu.read16(stack);
+            dest.* = stack;
             self.sp += 2;
 
             // If you do a pop on the AF register (0xF1), you need to make sure that the lowest nibble stays 0.
@@ -653,13 +667,14 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // RLC r8
                 0x00...0x07 => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: u8 = source.* & 0x80;
-                    source.* <<= 1;
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: u8 = source & 0x80;
+                    source <<= 1;
+                    source |= (shiftedBit >> 7);
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
-                    source.* |= (shiftedBit >> 7);
                     self.registers.r8.F.Flags.carry = shiftedBit == 0x80;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -668,13 +683,14 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // RRC r8 
                 0x08...0x0F => op_pfx : {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: u8 = (source.* & 0x01);
-                    source.* >>= 1;
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: u8 = (source & 0x01);
+                    source >>= 1;
+                    source |= (shiftedBit << 7);
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
-                    source.* |= (shiftedBit << 7);
                     self.registers.r8.F.Flags.carry = shiftedBit == 1;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -683,14 +699,15 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // RL r8
                 0x10...0x17 => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: bool = (source.* & 0x80) == 0x80;
-                    source.* <<= 1;
-
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: bool = (source & 0x80) == 0x80;
+                    source <<= 1;
                     const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    source.* |= carry;
+                    source |= carry;
+                    self.setFromR8Variant(sourceVar, mmu, source);
+
                     self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -700,14 +717,15 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 0x18...0x1F => op_pfx : {
                     // TODO: RR and RRA is basically the same?
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: bool = (source.* & 0x01) == 0x01;
-                    source.* >>= 1;
-
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: bool = (source & 0x01) == 0x01;
+                    source >>= 1;
                     const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
-                    source.* |= (carry << 7);
+                    source |= (carry << 7);
+                    self.setFromR8Variant(sourceVar, mmu, source);
+
                     self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -716,12 +734,13 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // SLA r8
                 0x20...0x27 => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: bool = (source.* & 0x80) == 0x80;
-                    source.* <<= 1;
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: bool = (source & 0x80) == 0x80;
+                    source <<= 1;
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
                     self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -730,11 +749,12 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // SWAP r8
                 0x30...0x37 => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    source.* = (source.* << 4) | (source.* >> 4);
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    source = (source << 4) | (source >> 4);
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
                     self.registers.r8.F.Flags.carry = false;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -743,14 +763,15 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // SRA r8
                 0x28...0x2F => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: bool = (source.* & 0x01) == 0x01;
-                    const msb: u8 = source.* & 0x80;
-                    source.* >>= 1;
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: bool = (source & 0x01) == 0x01;
+                    const msb: u8 = source & 0x80;
+                    source >>= 1;
+                    source |= msb;
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
-                    source.* |= msb;
                     self.registers.r8.F.Flags.carry = shiftedBit;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
 
@@ -759,23 +780,24 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // SRL r8
                 0x38...0x3F => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
-                    const shiftedBit: bool = (source.* & 0x01) == 0x01;
-                    source.* >>= 1;
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
+                    const shiftedBit: bool = (source & 0x01) == 0x01;
+                    source >>= 1;
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
                     self.registers.r8.F.Flags.carry = shiftedBit;
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = false;
-                    self.registers.r8.F.Flags.zero = source.* == 0;
+                    self.registers.r8.F.Flags.zero = source == 0;
 
                     break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8 };
                 },
                 // BIT bit,r8
                 0x40...0x7F => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    const source: u8 = self.getFromR8Variant(sourceVar, mmu);
                     const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
-                    const result: u8 = source.* & (@as(u8, 1) << bitIndex);
+                    const result: u8 = source & (@as(u8, 1) << bitIndex);
 
                     self.registers.r8.F.Flags.nBCD = false;
                     self.registers.r8.F.Flags.halfBCD = true;
@@ -786,18 +808,20 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                 // RES bit,r8
                 0x80...0xBF => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
                     const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
-                    source.* &= ~(@as(u8, 1) << bitIndex);
+                    source &= ~(@as(u8, 1) << bitIndex);
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
                     break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
                 },
                 // SET bit,r8
                 0xC0...0xFF => op_pfx: {
                     const sourceVar: R8Variant = @enumFromInt(opcode & 0b0000_0111);
-                    const source: *u8 = self.getFromR8Variant(sourceVar);
+                    var source: u8 = self.getFromR8Variant(sourceVar, mmu);
                     const bitIndex: u3 = @intCast((opcode & 0b0011_1000) >> 3);
-                    source.* |= (@as(u8, 1) << bitIndex);
+                    source |= (@as(u8, 1) << bitIndex);
+                    self.setFromR8Variant(sourceVar, mmu, source);
 
                     break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
                 },
@@ -891,7 +915,8 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // LD [imm16], a
         0xEA => op: {
-            mmu.write8(self.pc +% 1, self.registers.r8.A);
+            const dest: u16 = mmu.read16(self.pc +% 1);
+            mmu.write8(dest, self.registers.r8.A);
 
             break: op Operation { .deltaPC = 3, .cycles = 16 };
         },

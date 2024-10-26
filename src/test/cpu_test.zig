@@ -93,7 +93,7 @@ pub fn runSingleStepTests() !void {
 
         const testConfig: []TestType = json.value;
         for(testConfig) |testCase| {
-            if(std.mem.eql(u8, testCase.name, "CB A1 0015")) {
+            if(std.mem.eql(u8, testCase.name, "CB 36 038B")) {
                 var a: u8 = 0;
                 a += 1;
             }
