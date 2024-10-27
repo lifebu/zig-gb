@@ -99,4 +99,22 @@ C- 0xFFFF: Interrupt Enable.
 # MBC Usage Statistics:
 - How often some MBC exists => good for testing!
 https://b13rg.github.io/Gameboy-MBC-Analysis/#usage-statistics
+https://gbhwdb.gekkio.fi/cartridges/gb.html
 - Most common MBCs are MBC1 and them MBC5.
+
+- Roms:
+Castlevania: MBC1.
+DKL: MBC1.
+DKL 2: MBC1.
+DKL 3: MBC1.
+DK: MBC1.
+Tetris: None.
+Dr Mario: None.
+DuckTales: MBC1.
+Kirby2: MBC1.
+link_awake: MBC1.
+metroid: MBC1.
+super mario land: MBC1.
+pkmn_blu: MBC5. 
+pkmn_silv: MBC3. 
+

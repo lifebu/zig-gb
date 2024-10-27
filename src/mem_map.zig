@@ -1,5 +1,29 @@
+// Rom
 pub const ROM_LOW: u16          = 0x0000;
 pub const ROM_HIGH: u16         = 0x8000;
+pub const HEADER: u16           = 0x0100;
+pub const CartHeader = packed struct {
+    _: u32, // entry point
+    logo_0: u128,
+    logo_1: u128,
+    logo_2: u128,
+    title_0: u64,
+    title_1: u16,
+    title_2: u8,
+    dev: u32, // manufacturer code.
+    cgb: u8, // cgb support (0x80: cgb enhanced, 0xC0: cgb required)
+    licensee: u16,
+    sgb: u8, // sgb support: (0x03: sgb supported)
+    cart_features: u8, // cartridge features
+    rom_size: u8,
+    ram_size: u8,
+    region: u8, // 0x00: Japan, 0x01: Overseas
+    old_licensee: u8,
+    version: u8,
+    header_checksum: u8,
+    global_checksum: u16,
+};
+
 
 pub const OAM_LOW: u16          = 0xFE00;
 pub const OAM_HIGH: u16         = 0xFE9F;

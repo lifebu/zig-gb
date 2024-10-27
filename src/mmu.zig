@@ -17,6 +17,9 @@ pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     @memset(self.memory, 0);
     if (gbFile) |file| {
         _ = try std.fs.cwd().readFile(file, self.memory);
+
+        const header: *align(1) MemMap.CartHeader = @ptrCast(&self.memory[MemMap.HEADER]);
+        std.debug.print("Cart Features: {X}\n", .{header.cart_features});
     }
 
     // TODO: Consider either emulating DMG, or defining initial states for every possible DMG variant.
