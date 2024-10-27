@@ -1,6 +1,2 @@
-- Fix the implementation for the timer.
-    - And test it with the blargg timing rom!
-- Add that the ppu fakes the status registers each frame (LY, Modes).
-    - Just so that some games can already run with that fake ppu!
 - implement mbcs: 
 - Cleanup CPU code!

@@ -10,7 +10,7 @@ const Self = @This();
 lastDpadState: u4 = 0xF,
 lastButtonState: u4 = 0xF,
 
-timerCounter: u10 = 0,
+timerCounter: u16 = 0,
 // 2^14 = 16.384Hz
 dividerCounter: u14 = 0,
 
@@ -55,8 +55,8 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     self.lastButtonState = buttons;
 }
 
-const TIMER_FREQ_TABLE = [4]u10{1023, 16, 64, 256};
-const TIMER_INCR_TABLE = [4]u10{ 1023 / 1023, 1023 / 16, 1023 / 64, 1023 / 256};
+const TIMER_FREQ_TABLE = [4]u16{ 1024, 16, 64, 256 };
+const TIMER_INCR_TABLE = [4]u8{ 1024 / 1024, 1024 / 16, 1024 / 64, 1024 / 256};
 
 pub fn updateTimers(self: *Self, mmu: *MMU) void {
     // TODO: Accessing these every cycle is expensive. Maybe read it once as a packed struct?
@@ -74,14 +74,15 @@ pub fn updateTimers(self: *Self, mmu: *MMU) void {
     const timerEnabled: bool = (timerControl & 0x4) == 0x4;
     if(timerEnabled) {
         const currentFreq = TIMER_FREQ_TABLE[timerControl & 0x3];
-        timer.* += @intCast(self.timerCounter / currentFreq);
         const currentIncrement = TIMER_INCR_TABLE[timerControl & 0x3];
-        var overflow: u1 = 0;
-        self.timerCounter, overflow = @addWithOverflow(self.timerCounter, currentIncrement);
+        const addToTimer: u1 = @intCast(self.timerCounter / (currentFreq - 1)); 
+        timer.*, const overflow = @addWithOverflow(timer.*, addToTimer * currentIncrement);
+        self.timerCounter += 1;
+        self.timerCounter %= currentFreq;
 
         if(overflow == 1) {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER);
-            self.timerCounter = timerMod;
+            timer.* = timerMod;
         }
     }
 }
