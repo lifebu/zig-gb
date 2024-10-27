@@ -21,8 +21,27 @@ const TILE_LINE_SIZE_BYTE = 2;
 const TILE_MAP_SIZE_X = 32;
 const TILE_MAP_SIZE_Y = 32;
 
+const OBJ_SIZE_BYTE = 4;
+const OBJ_PER_LINE = 10;
+const OAM_SIZE = 40;
+
 const TILE_MAP_BASE_ADDRESS = 0x9800;
 const TILE_BASE_ADDRESS = 0x8000;
+const OAM_BASE_ADDRESS = 0xFE00;
+
+const Object = packed struct {
+    xPosition: u8,
+    yPosition: u8,
+    tileIndex: u8,
+    flags: packed struct {
+        priority: u1,
+        yFlip: u1,
+        xFlip: u1,
+        dmgPalete: u1, // 0 = OBP0, 1 = OBP1
+        bank: u1,
+        cgbPalette: u1,
+    },
+};
 
 lyCounter: u16 = 0,
 const LCD_Y_FREQ: u16 = 456;
@@ -43,20 +62,26 @@ pub fn updateState(self: *Self, mmu: *MMU) void {
     }
 }
 
+fn getPalette(paletteByte: u8) [4]Def.Color {
+    //https://gbdev.io/pandocs/Palettes.html
+    const ColorID3: u8 = (paletteByte & (3 << 6)) >> 6;
+    const ColorID2: u8 = (paletteByte & (3 << 4)) >> 4;
+    const ColorID1: u8 = (paletteByte & (3 << 2)) >> 2;
+    const ColorID0: u8 = (paletteByte & (3 << 0)) >> 0;
+
+    return [4]Def.Color{ 
+        HARDWARE_COLORS[ColorID0], HARDWARE_COLORS[ColorID1], HARDWARE_COLORS[ColorID2], HARDWARE_COLORS[ColorID3]
+    };
+}
+
 pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
     const memory: *[]u8 = mmu.getRaw();
 
-    const palletteByte: u8 = memory.*[MemMap.BG_PALETTE];
-    //https://gbdev.io/pandocs/Palettes.html
-    const colorID3: u8 = (palletteByte & (3 << 6)) >> 6;
-    const colorID2: u8 = (palletteByte & (3 << 4)) >> 4;
-    const colorID1: u8 = (palletteByte & (3 << 2)) >> 2;
-    const colorID0: u8 = (palletteByte & (3 << 0)) >> 0;
+    const bgPalette = getPalette(memory.*[MemMap.BG_PALETTE]);
+    const objPalette0 = getPalette(memory.*[MemMap.OBJ_PALETTE_0]);
+    const objPalette1 = getPalette(memory.*[MemMap.OBJ_PALETTE_1]);
 
-    const colorPalette = [4]Def.Color{ 
-        HARDWARE_COLORS[colorID0], HARDWARE_COLORS[colorID1], HARDWARE_COLORS[colorID2], HARDWARE_COLORS[colorID3]
-    };
-
+    // background
     var y: u16 = 0;
     while (y < Def.RESOLUTION_HEIGHT) : (y += 1) {
         var x: u16 = 0;
@@ -82,7 +107,65 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
             const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
             const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
             const colorID: u8 = firstBit + (secondBit << 1); // LSB first
-            pixels.*[x + (y * Def.RESOLUTION_WIDTH)] = colorPalette[colorID];
+            pixels.*[x + (y * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
         }
     }
+
+    // objects
+    var obj_index: u16 = 0;
+    while(obj_index < OAM_SIZE) : (obj_index += 1) {
+        const objectAddress: u16 = OAM_BASE_ADDRESS + (obj_index * OBJ_SIZE_BYTE);
+        const obj: *align(1) Object = @ptrCast(&memory.*[objectAddress]);
+        const objXPos: u8 = obj.xPosition;
+        const objYPos: u8 = obj.yPosition;
+        const objTileIndex: u8 = obj.tileIndex;
+        if(objXPos == 0 or objYPos == 0 or objTileIndex == 0) {
+
+        }
+
+        var tileY: u16 = 0;
+        while (tileY < TILE_SIZE_Y) : (tileY += 1) {
+            const objY: u16 = obj.yPosition + tileY; 
+            if (objY < 16 or objY > 160) {
+                continue; // line not visible
+            }
+
+            var tileX: u16 = 0;
+            while (tileX < TILE_SIZE_X) : (tileX += 1) {
+                const objX: u16 = obj.xPosition + tileX; 
+                if(objX < 8 or objX > 168) {
+                    continue; // xPos not visible.
+                }
+
+                const tileAddress: u16 = TILE_BASE_ADDRESS + (@as(u16, obj.tileIndex) * TILE_SIZE_BYTE);
+                const tilePixelX: u16 = tileX % TILE_SIZE_X;
+                const tilePixelY: u16 = tileY % TILE_SIZE_Y;
+
+                const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
+                const firstRowByte: u8 = memory.*[tileRowBaseAddress];
+                const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+
+                const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
+
+                const one: u8 = 1;
+                const mask: u8 = one << bitOffset;
+
+                const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
+                const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
+                const colorID: u8 = firstBit + (secondBit << 1); // LSB first
+                if(colorID == 0) {
+                    continue; // transparent
+                }
+                
+                const screenX: u16 = objX - 8;
+                const screenY: u16 = objY - 16;
+                const color: Def.Color = if(obj.flags.dmgPalete == 0) objPalette0[colorID] else objPalette1[colorID];
+
+
+                pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = color;
+            }
+        }       
+
+    }
+
 }
