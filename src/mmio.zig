@@ -14,6 +14,10 @@ timerCounter: u10 = 0,
 // 2^14 = 16.384Hz
 dividerCounter: u14 = 0,
 
+dmaIsRunning: bool = false,
+dmaStartAddr: u16 = 0x0000,
+dmaCurrentOffset: u16 = 0,
+
 pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 
@@ -79,5 +83,29 @@ pub fn updateTimers(self: *Self, mmu: *MMU) void {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER);
             self.timerCounter = timerMod;
         }
+    }
+}
+
+pub fn initiateDMA(self: *Self, offset: u16) void {
+    self.dmaIsRunning = true;
+    self.dmaStartAddr = offset << 8;
+    self.dmaCurrentOffset = 0;
+}
+
+pub fn updateDMA(self: *Self, mmu: *MMU) void {
+    // TODO: Branchless?
+    if (!self.dmaIsRunning) {
+        return;
+    }
+
+    const sourceAddr: u16 = self.dmaStartAddr + self.dmaCurrentOffset;
+    const destAddr: u16 = MemMap.OAM_LOW + self.dmaCurrentOffset;
+    mmu.write8(destAddr, mmu.read8(sourceAddr));
+
+    self.dmaCurrentOffset += 1;
+    self.dmaIsRunning = (destAddr + 1) <= MemMap.OAM_HIGH;
+    if(!self.dmaIsRunning) {
+        var a: u32 = 10;
+        a += 1;
     }
 }

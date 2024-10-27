@@ -19,11 +19,12 @@ pub fn main() !void {
     var cpu = try CPU.init();
     defer cpu.deinit();
 
-    var mmu = try MMU.init(alloc, "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb");
+    var mmio = MMIO{};
+
+    var mmu = try MMU.init(alloc, &mmio, "playground/tetris.gb");
     defer mmu.deinit();
 
     var ppu = PPU{};
-    var mmio = MMIO{};
 
     while(platform.update()) {
         var cycles: u32 = 0;
@@ -33,6 +34,7 @@ pub fn main() !void {
 
             for(cpu.cycles_ahead) |_| {
                 mmio.updateTimers(&mmu);
+                mmio.updateDMA(&mmu);
                 ppu.updateState(&mmu);
             }
             mmio.updateJoypad(&mmu, platform.getInputState());

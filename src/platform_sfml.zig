@@ -15,6 +15,7 @@ const SCALING = 4;
 
 alloc: std.mem.Allocator,
 window: sf.RenderWindow = undefined,
+windowFocused: bool = false,
 cpuTexture: sf.Texture = undefined,
 gpuTexture: sf.Texture = undefined,
 gpuSprite: sf.Sprite = undefined,
@@ -84,6 +85,12 @@ pub fn update(self: *Self) bool {
         if (event == .closed) {
             self.window.close();
         }
+        else if (event == .lost_focus) {
+            self.windowFocused = false;
+        }
+        else if (event == .gained_focus) {
+            self.windowFocused = true;
+        }
         else if (sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.Q) and 
                  sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.l_control)) {
             self.window.close();
@@ -100,16 +107,18 @@ pub fn getRawPixels(self: *Self) *[]Def.Color {
 } 
 
 fn updateInputState(self: *Self) void {
-    self.currInputState = Def.InputState {
-        .isRightPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.right),
-        .isLeftPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.left),
-        .isUpPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.up),
-        .isDownPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.down),
-        .isAPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.A),
-        .isBPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.D),
-        .isSelectPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.S),
-        .isStartPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.W),
-    };
+    self.currInputState = 
+        if(!self.windowFocused) Def.InputState{} 
+        else Def.InputState {
+            .isRightPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.right),
+            .isLeftPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.left),
+            .isUpPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.up),
+            .isDownPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.down),
+            .isAPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.A),
+            .isBPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.D),
+            .isSelectPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.S),
+            .isStartPressed = sf.window.keyboard.isKeyPressed(sf.window.keyboard.KeyCode.W),
+        };
 }
 
 pub fn getInputState(self: *Self) Def.InputState {

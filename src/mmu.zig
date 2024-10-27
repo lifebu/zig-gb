@@ -1,14 +1,16 @@
 const std = @import("std");
 
 const MemMap = @import("mem_map.zig");
+const MMIO = @import("mmio.zig");
 
 const Self = @This();
 
 memory: []u8 = undefined,
 allocator: std.mem.Allocator,
+mmio: *MMIO,
 
-pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
-    var self = Self{ .allocator = alloc };
+pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
+    var self = Self{ .allocator = alloc, .mmio = mmio };
 
     self.memory = try alloc.alloc(u8, 0x10000);
     errdefer alloc.free(self.memory);
@@ -88,7 +90,8 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
             self.memory[addr] = 0;
         },
         MemMap.DMA => {
-            // TODO: Implement OAM DMA.
+            // TODO: Disallow access to almost all memory, when a dma is running.
+            self.mmio.initiateDMA(val);
             return;
         },
         else => {

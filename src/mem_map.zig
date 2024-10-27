@@ -1,6 +1,8 @@
 pub const ROM_LOW: u16          = 0x0000;
 pub const ROM_HIGH: u16         = 0x8000;
 
+pub const OAM_LOW: u16          = 0xFE00;
+pub const OAM_HIGH: u16         = 0xFE9F;
 
 pub const HIGH_PAGE: u16        = 0xFF00;
 
