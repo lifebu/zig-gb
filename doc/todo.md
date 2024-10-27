@@ -1,2 +1,11 @@
 - implement mbcs: 
+    - MBC1, MBC3, MBC5
+- implement more ppu features:
+    - objects: double height,
+    - tile addressing modes (base addresses and signed indexing).
+    - tiles: xFlip, yFlip
+    - window
+    - ldc control: enable, window enable, obj enable, bg/window enable.
+    - lcd stat: interrupt, LYC, ppu modes.
+    - scrolling: window and background.
 - Cleanup CPU code!
