@@ -30,8 +30,8 @@ const TILE_BASE_ADDRESS = 0x8000;
 const OAM_BASE_ADDRESS = 0xFE00;
 
 const Object = packed struct {
-    xPosition: u8,
     yPosition: u8,
+    xPosition: u8,
     tileIndex: u8,
     flags: packed struct {
         priority: u1,

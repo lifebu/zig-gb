@@ -38,11 +38,11 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     if(selectDpad and selectButtons)  { 
         joyp = (joyp & 0xF0) | (dpad & buttons); 
     } else if(selectDpad) { 
-        joyp = (joyp & 0xF0) & dpad; 
+        joyp = (joyp & 0xF0) | dpad; 
     } else if(selectButtons) { 
-        joyp = (joyp & 0xF0) & buttons; 
+        joyp = (joyp & 0xF0) | buttons; 
     } else { 
-        joyp = (joyp & 0xF0) & 0x0F; 
+        joyp = (joyp & 0xF0) | 0x0F; 
     }
     mmu.write8(MemMap.JOYPAD, joyp);
 
