@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const MMIO = @import("../mmio.zig");
 const MMU = @import("../mmu.zig");
 const CPU = @import("../cpu.zig");
 
@@ -84,7 +85,9 @@ pub fn runSingleStepTests() !void {
         const json = try std.json.parseFromSlice([]TestType, alloc, testFile, .{ .ignore_unknown_fields = true });
         defer json.deinit();
 
-        var mmu = try MMU.init(alloc, null);
+        var mmio = MMIO{};
+
+        var mmu = try MMU.init(alloc, &mmio, null);
         defer mmu.deinit();
         const memory: *[]u8 = mmu.getRaw();
 

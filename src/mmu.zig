@@ -1,12 +1,14 @@
 const std = @import("std");
 
+const Cart = @import("cart.zig");
 const MemMap = @import("mem_map.zig");
 const MMIO = @import("mmio.zig");
 
 const Self = @This();
 
-memory: []u8 = undefined,
 allocator: std.mem.Allocator,
+cart: Cart = undefined,
+memory: []u8 = undefined,
 mmio: *MMIO,
 
 pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
@@ -15,12 +17,13 @@ pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     self.memory = try alloc.alloc(u8, 0x10000);
     errdefer alloc.free(self.memory);
     @memset(self.memory, 0);
-    if (gbFile) |file| {
-        _ = try std.fs.cwd().readFile(file, self.memory);
 
-        const header: *align(1) MemMap.CartHeader = @ptrCast(&self.memory[MemMap.HEADER]);
-        std.debug.print("Cart Features: {X}\n", .{header.cart_features});
-    }
+    self.cart = try Cart.init(alloc, gbFile);
+    errdefer self.cart.deinit();
+
+    // TODO: This is more of a workaround until you can actually map the cart.
+    const cart: *[]u8 = self.cart.getCart();
+    std.mem.copyForwards(u8, self.memory, cart.*);
 
     // TODO: Consider either emulating DMG, or defining initial states for every possible DMG variant.
     // state after DMG Boot rom has run.
@@ -73,6 +76,7 @@ pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
 
 pub fn deinit(self: *Self) void {
     self.allocator.free(self.memory);
+    self.cart.deinit();
 }
 
 pub fn read8(self: *const Self, addr: u16) u8 {
