@@ -2,6 +2,7 @@
 
 // Memory
 pub const ROM_LOW: u16          = 0x0000;
+pub const ROM_MIDDLE: u16       = 0x4000;
 pub const ROM_HIGH: u16         = 0x8000;
 
 pub const VRAM_LOW: u16         = 0x8000;

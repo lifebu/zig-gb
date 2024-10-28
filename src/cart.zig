@@ -27,6 +27,12 @@ pub const CartHeader = packed struct {
     global_checksum: u16,
 };
 pub const ROM_BANK_SIZE_BYTE: u32 = 16 * 1024;
+pub const ROM_SIZE_BYTE = [_]u32 {
+    2 * ROM_BANK_SIZE_BYTE, 4 * ROM_BANK_SIZE_BYTE, 8 * ROM_BANK_SIZE_BYTE, 
+    16 * ROM_BANK_SIZE_BYTE, 32 * ROM_BANK_SIZE_BYTE, 64 * ROM_BANK_SIZE_BYTE, 
+    128 * ROM_BANK_SIZE_BYTE, 256 * ROM_BANK_SIZE_BYTE, 512 * ROM_BANK_SIZE_BYTE
+};
+
 pub const RAM_BANK_SIZE_BYTE: u32 = 8 * 1024;
 pub const RAM_SIZE_BYTE = [_]u32 {
     0 * RAM_BANK_SIZE_BYTE, 0 * RAM_BANK_SIZE_BYTE, // Unused and only found in unofficial docs.
@@ -56,7 +62,7 @@ zero_ram_bank: []u8 = undefined,
 mbc: MBC = .NO_MBC,
 mbc_registers: MBCRegisters = undefined,
 
-pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
+pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self {
     var self = Self{ .allocator = alloc };
 
     if (gbFile) |filePath| {
@@ -65,6 +71,9 @@ pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
 
         self.rom = try file.readToEndAlloc(alloc, std.math.maxInt(u32));
         errdefer alloc.free(self.rom);
+
+        // Initial copy of the first banks.
+        std.mem.copyForwards(u8, memory.*[MemMap.ROM_LOW..MemMap.ROM_HIGH], self.rom[0..2 * ROM_BANK_SIZE_BYTE]);
 
         const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
         self.mbc = try getMBC(header);
@@ -103,7 +112,11 @@ fn getMBC(header: *align(1) CartHeader) !MBC {
     // TODO: Don't just use the header to get the MBC type, also get the feature set. This includes ram support, battery, 
     return switch(header.cart_features) {
         0x00 => .NO_MBC,
-        0x01...0x03 => .MBC_1,
+        0x01...0x03 => blk: {
+            // This Cartridge uses MBC1 with the alternative wiring. This is not supported yet!
+            std.debug.assert(ROM_SIZE_BYTE[header.rom_size] <= 512 * 1024);
+            break: blk .MBC_1;
+        },
         else => blk: {
             std.debug.print("MBC NOT SUPPORTED: {x}\n", .{header.cart_features});
             break: blk MBCError.MBC_NOT_SUPPORTED;
@@ -121,16 +134,22 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
         return;
     }
 
+    var ramChanged: bool = false;
+    var romChanged: bool = false;
+
    switch(addr) {
         // TODO: Do this ranges work for all MBCs? I assume not. okay for now.
         0x0000...0x1FFF => {
             self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+            ramChanged = true;
         },
         0x2000...0x3FFF => {
             self.mbc_registers.rom_bank = @truncate(@max(1, val));
+            romChanged = true;
         },
         0x4000...0x5FFF => {
             self.mbc_registers.ram_bank = @truncate(val);
+            ramChanged = true;
         },
         0x6000...0x7FFF => {
             self.mbc_registers.bank_mode = @truncate(val);
@@ -143,19 +162,21 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
     // And that it is cheaper to just copy 16kByte into the memory region then to 
     // reroute all reads into ROM and Cartridge RAM regions into the seperate piece of memory of the cartridge. 
     // But this needs to be tested!
-
-    if(self.ram) |ram| {
-        if(self.mbc_registers.ram_enable) {
-            const ramStart: u32 = self.mbc_registers.ram_bank * RAM_BANK_SIZE_BYTE;
-            const ramEnd: u32 = ramStart + RAM_BANK_SIZE_BYTE;
-            std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], ram[ramStart..ramEnd]);
-        } else {
-            std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], self.zero_ram_bank);
+    if(ramChanged) {
+        if(self.ram) |ram| {
+            if(self.mbc_registers.ram_enable) {
+                const ramStart: u32 = self.mbc_registers.ram_bank * RAM_BANK_SIZE_BYTE;
+                const ramEnd: u32 = ramStart + RAM_BANK_SIZE_BYTE;
+                std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], ram[ramStart..ramEnd]);
+            } else {
+                std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], self.zero_ram_bank);
+            }
         }
     }
 
-
-
-    // apply changes to memory.
-    //std.mem.copyForwards(u8, self.memory, cart.*);
+    if(romChanged) {
+        const romStart: u32 = self.mbc_registers.rom_bank * ROM_BANK_SIZE_BYTE;
+        const romEnd: u32 = romStart + ROM_BANK_SIZE_BYTE;
+        std.mem.copyForwards(u8, memory.*[MemMap.ROM_MIDDLE..MemMap.ROM_HIGH], self.rom[romStart..romEnd]);
+    }
 }

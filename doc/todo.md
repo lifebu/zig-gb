@@ -1,5 +1,3 @@
-- implement mbcs: 
-    - MBC1, MBC3, MBC5
 - implement more ppu features:
     - objects: double height,
     - tile addressing modes (base addresses and signed indexing).

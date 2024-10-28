@@ -18,12 +18,8 @@ pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     errdefer alloc.free(self.memory);
     @memset(self.memory, 0);
 
-    self.cart = try Cart.init(alloc, gbFile);
+    self.cart = try Cart.init(alloc, &self.memory, gbFile);
     errdefer self.cart.deinit();
-
-    // TODO: This is more of a workaround until you can actually map the cart.
-    const cart: *[]u8 = self.cart.getCart();
-    std.mem.copyForwards(u8, self.memory, cart.*);
 
     // TODO: Consider either emulating DMG, or defining initial states for every possible DMG variant.
     // state after DMG Boot rom has run.
