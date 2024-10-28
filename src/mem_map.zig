@@ -1,18 +1,31 @@
-// Rom
+/// Ranges are: [LOW, HIGH) (high excluding!). 
+
+// Memory
 pub const ROM_LOW: u16          = 0x0000;
 pub const ROM_HIGH: u16         = 0x8000;
 
+pub const VRAM_LOW: u16         = 0x8000;
+pub const VRAM_HIGH: u16        = 0xA000;
+
+pub const CART_RAM_LOW: u16     = 0xA000;
+pub const CART_RAM_HIGH: u16    = 0xC000;
+
+pub const WRAM_LOW: u16         = 0xC000;
+pub const WRAM_HIGH: u16        = 0xE000;
+
+pub const ECHO_LOW: u16         = 0xE000;
+pub const ECHO_HIGH: u16        = 0xFE00;
+
 pub const OAM_LOW: u16          = 0xFE00;
-pub const OAM_HIGH: u16         = 0xFE9F;
+pub const OAM_HIGH: u16         = 0xFEA0;
+
+pub const UNUSED_LOW: u16       = 0xFEA0;
+pub const UNUSED_HIGH: u16      = 0xFF00;
 
 pub const HIGH_PAGE: u16        = 0xFF00;
 
-// Interrupts
-pub const INTERRUPT_VBLANK: u8  = 0x01; 
-pub const INTERRUPT_LCD: u8     = 0x02; 
-pub const INTERRUPT_TIMER: u8   = 0x04; 
-pub const INTERRUPT_SERIAL: u8  = 0x08; 
-pub const INTERRUPT_JOYPAD: u8  = 0x10; 
+pub const HRAM_LOW: u16         = 0xFF80;
+pub const HRAM_HIGH: u16        = 0xFFFF;
 
 // IO
 pub const JOYPAD: u16           = 0xFF00;
@@ -58,3 +71,10 @@ pub const OBJ_PALETTE_1: u16    = 0xFF49;
 pub const WINDOW_Y: u16         = 0xFF4A;
 pub const WINDOW_X: u16         = 0xFF4B;
 pub const INTERRUPT_ENABLE: u16 = 0xFFFF;
+
+// Interrupts
+pub const INTERRUPT_VBLANK: u8  = 0x01; 
+pub const INTERRUPT_LCD: u8     = 0x02; 
+pub const INTERRUPT_TIMER: u8   = 0x04; 
+pub const INTERRUPT_SERIAL: u8  = 0x08; 
+pub const INTERRUPT_JOYPAD: u8  = 0x10; 

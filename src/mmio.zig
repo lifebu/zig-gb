@@ -104,7 +104,7 @@ pub fn updateDMA(self: *Self, mmu: *MMU) void {
     mmu.write8(destAddr, mmu.read8(sourceAddr));
 
     self.dmaCurrentOffset += 1;
-    self.dmaIsRunning = (destAddr + 1) <= MemMap.OAM_HIGH;
+    self.dmaIsRunning = (destAddr + 1) < MemMap.OAM_HIGH;
     if(!self.dmaIsRunning) {
         var a: u32 = 10;
         a += 1;

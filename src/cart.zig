@@ -26,6 +26,13 @@ pub const CartHeader = packed struct {
     header_checksum: u8,
     global_checksum: u16,
 };
+pub const ROM_BANK_SIZE_BYTE: u32 = 16 * 1024;
+pub const RAM_BANK_SIZE_BYTE: u32 = 8 * 1024;
+pub const RAM_SIZE_BYTE = [_]u32 {
+    0 * RAM_BANK_SIZE_BYTE, 0 * RAM_BANK_SIZE_BYTE, // Unused and only found in unofficial docs.
+    1 * RAM_BANK_SIZE_BYTE, 4 * RAM_BANK_SIZE_BYTE,
+    16 * RAM_BANK_SIZE_BYTE, 8 * RAM_BANK_SIZE_BYTE,
+};
 
 const MBC = enum {
     NO_MBC,
@@ -43,6 +50,9 @@ const MBCRegisters = struct {
 
 allocator: std.mem.Allocator,
 rom: []u8 = undefined,
+ram: ?[]u8 = null,
+// TODO: Honestly not great, but works for now.
+zero_ram_bank: []u8 = undefined,
 mbc: MBC = .NO_MBC,
 mbc_registers: MBCRegisters = undefined,
 
@@ -58,6 +68,18 @@ pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
 
         const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
         self.mbc = try getMBC(header);
+
+        // TODO: Check if the cart_features even support ram and don't just use the ram size.
+        // TODO: Also check that the RAM size as the MBC would be able to support it.
+        const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
+        if(ramSizeByte != 0) {
+            self.ram = try alloc.alloc(u8, ramSizeByte); 
+            errdefer alloc.free(self.ram.?);
+        }
+
+        self.zero_ram_bank = try alloc.alloc(u8, RAM_BANK_SIZE_BYTE);
+        errdefer alloc.free(self.zero_ram_bank);
+
     } else {
         // Allocate an empty cartridge.
         self.rom = try alloc.alloc(u8, 0x8000);
@@ -71,6 +93,10 @@ pub fn init(alloc: std.mem.Allocator, gbFile: ?[]const u8) !Self {
 
 pub fn deinit(self: *Self) void {
     self.allocator.free(self.rom);
+    if(self.ram) |ram| {
+        self.allocator.free(ram);
+    }
+    self.allocator.free(self.zero_ram_bank);
 }
 
 fn getMBC(header: *align(1) CartHeader) !MBC {
@@ -89,7 +115,7 @@ pub fn getCart(self: *Self) *[]u8 {
     return &self.rom;
 }
 
-pub fn onWrite(self: *Self, _: *[]u8, addr: u16, val: u8) void {
+pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
     // TODO: I don't know if this code can be adapted well to other mbcs.
     if(self.mbc == .NO_MBC) {
         return;
@@ -117,6 +143,18 @@ pub fn onWrite(self: *Self, _: *[]u8, addr: u16, val: u8) void {
     // And that it is cheaper to just copy 16kByte into the memory region then to 
     // reroute all reads into ROM and Cartridge RAM regions into the seperate piece of memory of the cartridge. 
     // But this needs to be tested!
+
+    if(self.ram) |ram| {
+        if(self.mbc_registers.ram_enable) {
+            const ramStart: u32 = self.mbc_registers.ram_bank * RAM_BANK_SIZE_BYTE;
+            const ramEnd: u32 = ramStart + RAM_BANK_SIZE_BYTE;
+            std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], ram[ramStart..ramEnd]);
+        } else {
+            std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], self.zero_ram_bank);
+        }
+    }
+
+
 
     // apply changes to memory.
     //std.mem.copyForwards(u8, self.memory, cart.*);
