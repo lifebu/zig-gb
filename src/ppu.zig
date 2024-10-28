@@ -43,6 +43,29 @@ const Object = packed struct {
     },
 };
 
+const LCDC = packed struct {
+    bg_window_enable: bool,
+    obj_enable: bool,
+    obj_size: enum(u1) {
+        SINGLE_HEIGHT,
+        DOUBLE_HEIGHT,
+    },
+    bg_map_area: enum(u1) {
+        BG_MAP_9800,
+        BG_MAP_9C00,
+    },
+    bg_window_tile_data: enum(u1) {
+        TILE_8800,
+        TILE_8000,
+    },
+    window_enable: bool,
+    window_map_area: enum(u1) {
+        WINDOW_MAP_9800,
+        WINDOW_MAP_9C00,
+    },
+    lcd_enable: bool,
+};
+
 lyCounter: u16 = 0,
 const LCD_Y_FREQ: u16 = 456;
 
@@ -76,6 +99,10 @@ fn getPalette(paletteByte: u8) [4]Def.Color {
 
 pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
     const memory: *[]u8 = mmu.getRaw();
+    const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
+    if(!lcdc.lcd_enable) {
+        return;
+    }
 
     const bgPalette = getPalette(memory.*[MemMap.BG_PALETTE]);
     const objPalette0 = getPalette(memory.*[MemMap.OBJ_PALETTE_0]);
@@ -89,6 +116,10 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
             const tileMapIndexX: u16 = (x / TILE_SIZE_X) % TILE_MAP_SIZE_X;
             const tileMapIndexY: u16 = (y / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
             const tileMapAddress: u16 = TILE_MAP_BASE_ADDRESS + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
+            if(tileMapAddress == 0x9803) {
+                var a: u32 = 0;
+                a += 1;
+            }
             const tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
 
             const tileAddress: u16 = TILE_BASE_ADDRESS + (tileAddressOffset * TILE_SIZE_BYTE);
@@ -112,16 +143,14 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
     }
 
     // objects
+    if(!lcdc.obj_enable) {
+        return;
+    }
+
     var obj_index: u16 = 0;
     while(obj_index < OAM_SIZE) : (obj_index += 1) {
         const objectAddress: u16 = OAM_BASE_ADDRESS + (obj_index * OBJ_SIZE_BYTE);
         const obj: *align(1) Object = @ptrCast(&memory.*[objectAddress]);
-        const objXPos: u8 = obj.xPosition;
-        const objYPos: u8 = obj.yPosition;
-        const objTileIndex: u8 = obj.tileIndex;
-        if(objXPos == 0 or objYPos == 0 or objTileIndex == 0) {
-
-        }
 
         var tileY: u16 = 0;
         while (tileY < TILE_SIZE_Y) : (tileY += 1) {
@@ -157,8 +186,8 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                     continue; // transparent
                 }
                 
-                const screenX: u16 = objX - 8;
-                const screenY: u16 = objY - 16;
+                const screenX: u16 = if(obj.flags.xFlip == 1) ((TILE_SIZE_X - 1) - (objX - 8)) else objX - 8;
+                const screenY: u16 = if(obj.flags.yFlip == 1) ((TILE_SIZE_Y - 1) - (objY - 16)) else objY - 16;
                 const color: Def.Color = if(obj.flags.dmgPalete == 0) objPalette0[colorID] else objPalette1[colorID];
 
 
