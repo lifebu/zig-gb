@@ -90,7 +90,7 @@ pub fn readi8(self: *const Self, addr: u16) i8 {
 pub fn write8(self: *Self, addr: u16, val: u8) void {
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH => {
-            // TODO: Missing MBC
+            self.cart.onWrite(self.getRaw(), addr, val);
             return;
         },
         MemMap.DIVIDER => {
