@@ -3,6 +3,5 @@
     - tile addressing modes (base addresses and signed indexing).
     - window
     - ldc control: window enable, bg/window enable.
-    - lcd stat: interrupt, LYC, ppu modes.
     - scrolling: window and background.
 - Cleanup CPU code!

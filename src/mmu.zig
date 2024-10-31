@@ -54,7 +54,7 @@ pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     self.memory[MemMap.SOUND_PANNING] = 0xF3;
     self.memory[MemMap.SOUND_TOGGLE] = 0xF1;
     self.memory[MemMap.LCD_CONTROL] = 0x91;
-    self.memory[MemMap.LCD_STAT] = 0x85;
+    self.memory[MemMap.LCD_STAT] = 0x80; // TODO: Should be 85, using 80 for now so that my ppu fake timings work
     self.memory[MemMap.SCROLL_Y] = 0x00;
     self.memory[MemMap.SCROLL_X] = 0x00;
     self.memory[MemMap.LCD_Y] = 0x00;

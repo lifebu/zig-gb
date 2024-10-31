@@ -66,22 +66,75 @@ const LCDC = packed struct {
     lcd_enable: bool,
 };
 
+const LCDStat = packed struct {
+    ppu_mode: enum(u2) {
+        H_BLANK,
+        V_BLANK,
+        OAM_SCAN,
+        DRAW,
+    },
+    ly_is_lyc: bool,
+    mode_0_select: bool,
+    mode_1_select: bool,
+    mode_2_select: bool,
+    lyc_select: bool,
+    _: u1,
+};
+
 lyCounter: u16 = 0,
 const LCD_Y_FREQ: u16 = 456;
 
+// TODO: This is just some fake timing.
 pub fn updateState(self: *Self, mmu: *MMU) void {
-    // TODO: This is just some fake timing.
+    const memory: *[]u8 = mmu.getRaw();
+    const lcd_stat: *align(1) LCDStat = @ptrCast(&memory.*[MemMap.LCD_STAT]);
+    var lcdY: u8 = mmu.read8(MemMap.LCD_Y);
+
+    var hasStatInterrupt: bool = false;
+
+    // Line counting
     self.lyCounter += 1;
     if(self.lyCounter >= LCD_Y_FREQ) {
-        var lcdY: u8 = mmu.read8(MemMap.LCD_Y);
+        self.lyCounter = 0;
+
         lcdY += 1;
         lcdY %= 154;
+        mmu.write8(MemMap.LCD_Y, lcdY);
 
-        if(lcdY == 0) {
+        if(lcdY == 144) {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);
         } 
-        mmu.write8(MemMap.LCD_Y, lcdY);
-        self.lyCounter = 0;
+
+        const lyCompare = mmu.read8(MemMap.LCD_Y_COMPARE);
+        lcd_stat.ly_is_lyc = lyCompare == lcdY;
+        if(lcd_stat.lyc_select and lcd_stat.ly_is_lyc) {
+            hasStatInterrupt = true;
+        }
+    }
+
+    // Mode setting
+    const oldMode = lcd_stat.ppu_mode;
+    if(lcdY > 143) {
+        lcd_stat.ppu_mode = .V_BLANK;
+        if(lcd_stat.mode_1_select and oldMode != lcd_stat.ppu_mode) {
+            hasStatInterrupt = true;
+        }
+    } else if (self.lyCounter <= 80) {
+        lcd_stat.ppu_mode = .OAM_SCAN;
+        if(lcd_stat.mode_2_select and oldMode != lcd_stat.ppu_mode) {
+            hasStatInterrupt = true;
+        }
+    } else if (self.lyCounter > 80 and self.lyCounter <= 252) {
+        lcd_stat.ppu_mode = .DRAW;
+    } else if (self.lyCounter > 252) {
+        lcd_stat.ppu_mode = .H_BLANK;
+        if(lcd_stat.mode_0_select and oldMode != lcd_stat.ppu_mode) {
+            hasStatInterrupt = true;
+        }
+    }
+    
+    if(hasStatInterrupt) {
+        mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_LCD);
     }
 }
 
@@ -194,7 +247,6 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                 pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = color;
             }
         }       
-
     }
 
 }
