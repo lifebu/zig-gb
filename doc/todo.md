@@ -3,5 +3,5 @@
     - tile addressing modes (base addresses and signed indexing).
     - window
     - ldc control: window enable, bg/window enable.
-    - scrolling: window and background.
+    - scrolling: window
 - Cleanup CPU code!

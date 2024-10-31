@@ -34,12 +34,12 @@ const Object = packed struct {
     xPosition: u8,
     tileIndex: u8,
     flags: packed struct {
-        priority: u1,
-        yFlip: u1,
-        xFlip: u1,
-        dmgPalete: u1, // 0 = OBP0, 1 = OBP1
+        cgbPalette: u3,
         bank: u1,
-        cgbPalette: u1,
+        dmgPalete: u1, // 0 = OBP0, 1 = OBP1
+        xFlip: u1,
+        yFlip: u1,
+        priority: u1,
     },
 };
 
@@ -162,22 +162,23 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
     const objPalette1 = getPalette(memory.*[MemMap.OBJ_PALETTE_1]);
 
     // background
+    const bgScrollX: u8 = memory.*[MemMap.SCROLL_X];
+    const bgScrollY: u8 = memory.*[MemMap.SCROLL_Y];
     var y: u16 = 0;
     while (y < Def.RESOLUTION_HEIGHT) : (y += 1) {
         var x: u16 = 0;
         while (x < Def.RESOLUTION_WIDTH) : (x += 1) {
-            const tileMapIndexX: u16 = (x / TILE_SIZE_X) % TILE_MAP_SIZE_X;
-            const tileMapIndexY: u16 = (y / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
+            const tileMapX: u16 = (x + bgScrollX); 
+            const tileMapY: u16 = (y + bgScrollY);
+
+            const tileMapIndexX: u16 = (tileMapX / TILE_SIZE_X) % TILE_MAP_SIZE_X;
+            const tileMapIndexY: u16 = (tileMapY / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
             const tileMapAddress: u16 = TILE_MAP_BASE_ADDRESS + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
-            if(tileMapAddress == 0x9803) {
-                var a: u32 = 0;
-                a += 1;
-            }
             const tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
 
             const tileAddress: u16 = TILE_BASE_ADDRESS + (tileAddressOffset * TILE_SIZE_BYTE);
-            const tilePixelX: u16 = x % TILE_SIZE_X;
-            const tilePixelY: u16 = y % TILE_SIZE_Y;
+            const tilePixelX: u16 = tileMapX % TILE_SIZE_X;
+            const tilePixelY: u16 = tileMapY % TILE_SIZE_Y;
 
             const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
             const firstRowByte: u8 = memory.*[tileRowBaseAddress];
@@ -237,6 +238,11 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                 const colorID: u8 = firstBit + (secondBit << 1); // LSB first
                 if(colorID == 0) {
                     continue; // transparent
+                }
+
+                if(obj.flags.xFlip == 1) {
+                    var a: u32 = 0;
+                    a += 1;
                 }
                 
                 const screenX: u16 = if(obj.flags.xFlip == 1) ((TILE_SIZE_X - 1) - (objX - 8)) else objX - 8;
