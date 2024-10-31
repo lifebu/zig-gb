@@ -240,16 +240,10 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                     continue; // transparent
                 }
 
-                if(obj.flags.xFlip == 1) {
-                    var a: u32 = 0;
-                    a += 1;
-                }
-                
-                const screenX: u16 = if(obj.flags.xFlip == 1) ((TILE_SIZE_X - 1) - (objX - 8)) else objX - 8;
-                const screenY: u16 = if(obj.flags.yFlip == 1) ((TILE_SIZE_Y - 1) - (objY - 16)) else objY - 16;
+                const screenX: u16 = if(obj.flags.xFlip == 1) (obj.xPosition - 8) + (TILE_SIZE_X - tileX) else objX - 8;
+                const screenY: u16 = if(obj.flags.yFlip == 1) (obj.yPosition - 16) + (TILE_SIZE_Y - tileY) else objY - 16;
+
                 const color: Def.Color = if(obj.flags.dmgPalete == 0) objPalette0[colorID] else objPalette1[colorID];
-
-
                 pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = color;
             }
         }       
