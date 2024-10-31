@@ -1,7 +1,5 @@
 - implement more ppu features:
     - objects: double height,
-    - tile addressing modes (base addresses and signed indexing).
-    - window
-    - ldc control: window enable, bg/window enable.
-    - scrolling: window
+    - tile signed addressing mode.
+    - ldc control: bg/window enable.
 - Cleanup CPU code!
