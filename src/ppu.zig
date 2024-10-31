@@ -28,7 +28,9 @@ const OAM_SIZE = 40;
 const FIRST_TILE_MAP_ADDRESS = 0x9800;
 const SECOND_TILE_MAP_ADDRESS = 0x9C00;
 
-const TILE_BASE_ADDRESS = 0x8000;
+const FIRST_TILE_ADDRESS = 0x8000;
+const SECOND_TILE_ADDRESS = 0x8800;
+
 const OAM_BASE_ADDRESS = 0xFE00;
 
 const Object = packed struct {
@@ -57,8 +59,8 @@ const LCDC = packed struct {
         SECOND_MAP,
     },
     bg_window_tile_data: enum(u1) {
-        TILE_8800,
-        TILE_8000,
+        SECOND_TILE_DATA,
+        FIRST_TILE_DATA,
     },
     window_enable: bool,
     window_map_area: enum(u1) {
@@ -161,6 +163,8 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
 
     const bgMapBaseAddress: u16 = if(lcdc.bg_map_area == .FIRST_MAP) FIRST_TILE_MAP_ADDRESS else SECOND_TILE_MAP_ADDRESS;
     const windowMapBaseAddress: u16 = if(lcdc.window_map_area == .FIRST_MAP) FIRST_TILE_MAP_ADDRESS else SECOND_TILE_MAP_ADDRESS;
+    const bgWindowTileBaseAddress: u16 = if(lcdc.bg_window_tile_data == .SECOND_TILE_DATA) SECOND_TILE_ADDRESS else FIRST_TILE_ADDRESS;
+    const objTileBaseAddress: u16 = FIRST_TILE_ADDRESS; 
 
     const bgPalette = getPalette(memory.*[MemMap.BG_PALETTE]);
     const objPalette0 = getPalette(memory.*[MemMap.OBJ_PALETTE_0]);
@@ -181,7 +185,7 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
             const tileMapAddress: u16 = bgMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
             const tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
 
-            const tileAddress: u16 = TILE_BASE_ADDRESS + (tileAddressOffset * TILE_SIZE_BYTE);
+            const tileAddress: u16 = bgWindowTileBaseAddress + (tileAddressOffset * TILE_SIZE_BYTE);
             const tilePixelX: u16 = tileMapX % TILE_SIZE_X;
             const tilePixelY: u16 = tileMapY % TILE_SIZE_Y;
 
@@ -225,7 +229,7 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                     continue; // xPos not visible.
                 }
 
-                const tileAddress: u16 = TILE_BASE_ADDRESS + (@as(u16, obj.tileIndex) * TILE_SIZE_BYTE);
+                const tileAddress: u16 = objTileBaseAddress + (@as(u16, obj.tileIndex) * TILE_SIZE_BYTE);
                 const tilePixelX: u16 = tileX % TILE_SIZE_X;
                 const tilePixelY: u16 = tileY % TILE_SIZE_Y;
 
@@ -270,7 +274,7 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
             const tileMapAddress: u16 = windowMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
             const tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
 
-            const tileAddress: u16 = TILE_BASE_ADDRESS + (tileAddressOffset * TILE_SIZE_BYTE);
+            const tileAddress: u16 = bgWindowTileBaseAddress + (tileAddressOffset * TILE_SIZE_BYTE);
             const tilePixelX: u16 = winX % TILE_SIZE_X;
             const tilePixelY: u16 = winY % TILE_SIZE_Y;
 
@@ -287,7 +291,7 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
             const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
             const colorID: u8 = firstBit + (secondBit << 1); // LSB first
 
-            const screenX: u16 = winX + winPosX - 7;
+            const screenX: u16 = winX + 7 - winPosX;
             const screenY: u16 = winY + winPosY;
             if(screenX < 0 or screenX > Def.RESOLUTION_WIDTH or screenY < 0 or screenY > Def.RESOLUTION_HEIGHT) {
                 continue; // outside of screen!
