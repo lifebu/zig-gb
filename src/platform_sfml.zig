@@ -63,7 +63,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 
     self.pixels = try alloc.alloc(sf.Color, WINDOW_WIDTH * WINDOW_HEIGHT);
     errdefer alloc.free(self.pixels);
-    @memset(self.pixels, sf.Color.Magenta);
+    @memset(self.pixels, sf.Color.Black);
 
     return self;
 }
