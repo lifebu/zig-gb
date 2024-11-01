@@ -147,8 +147,8 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
         0x2000...0x3FFF => {
             const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
             const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
-            const numBanks: u5 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
-            const mask: u5 = numBanks - 1;
+            const numBanks: u6 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
+            const mask: u5 = @intCast(numBanks - 1);
             self.mbc_registers.rom_bank = @as(u5, @truncate(@max(1, val))) & mask;
             romChanged = true;
         },

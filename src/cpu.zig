@@ -200,6 +200,7 @@ pub fn tryInterrupt(self: *Self, mmu: *MMU) bool {
             continue;
         }
 
+        self.isHalted = false;
         self.ime = false;
         const mask: u8 = ~currFlag;
         mmu.write8(MemMap.INTERRUPT_FLAG, flag & mask);
