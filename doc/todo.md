@@ -1,5 +1,4 @@
 - implement more ppu features:
     - objects: double height,
-    - tile signed addressing mode.
-    - ldc control: bg/window enable.
 - Cleanup CPU code!
+- Create testing for the different other systems (PPU, Interrupts, Timings).
