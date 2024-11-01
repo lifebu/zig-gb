@@ -221,50 +221,56 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
         while(obj_index < OAM_SIZE) : (obj_index += 1) {
             const objectAddress: u16 = OAM_BASE_ADDRESS + (obj_index * OBJ_SIZE_BYTE);
             const obj: *align(1) Object = @ptrCast(&memory.*[objectAddress]);
+            
+            const objSize: u2 = if (lcdc.obj_size == .DOUBLE_HEIGHT) 2 else 1;
+            var tileOffset: u8 = 0;
+            while(tileOffset < objSize) : (tileOffset += 1) {
+                const tileAddress: u16 = objTileBaseAddress + (@as(u16, obj.tileIndex + tileOffset) * TILE_SIZE_BYTE);
 
-            var tileY: u16 = 0;
-            while (tileY < TILE_SIZE_Y) : (tileY += 1) {
-                const objY: u16 = obj.yPosition + tileY; 
-                if (objY < 16 or objY > 160) {
-                    continue; // line not visible
-                }
-
-                var tileX: u16 = 0;
-                while (tileX < TILE_SIZE_X) : (tileX += 1) {
-                    const objX: u16 = obj.xPosition + tileX; 
-                    if(objX < 8 or objX > 168) {
-                        continue; // xPos not visible.
+                var tileY: u16 = 0;
+                while (tileY < TILE_SIZE_Y) : (tileY += 1) {
+                    const objY: u16 = obj.yPosition + tileY; 
+                    if (objY < 16 or objY > 160) {
+                        continue; // line not visible
                     }
 
-                    const tileAddress: u16 = objTileBaseAddress + (@as(u16, obj.tileIndex) * TILE_SIZE_BYTE);
-                    const tilePixelX: u16 = tileX % TILE_SIZE_X;
-                    const tilePixelY: u16 = tileY % TILE_SIZE_Y;
+                    var tileX: u16 = 0;
+                    while (tileX < TILE_SIZE_X) : (tileX += 1) {
+                        const objX: u16 = obj.xPosition + tileX; 
+                        if(objX < 8 or objX > 168) {
+                            continue; // xPos not visible.
+                        }
 
-                    const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
-                    const firstRowByte: u8 = memory.*[tileRowBaseAddress];
-                    const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+                        const tilePixelX: u16 = tileX % TILE_SIZE_X;
+                        const tilePixelY: u16 = tileY % TILE_SIZE_Y;
 
-                    const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
+                        const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
+                        const firstRowByte: u8 = memory.*[tileRowBaseAddress];
+                        const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
 
-                    const one: u8 = 1;
-                    const mask: u8 = one << bitOffset;
+                        const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
 
-                    const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
-                    const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
-                    const colorID: u8 = firstBit + (secondBit << 1); // LSB first
-                    if(colorID == 0) {
-                        continue; // transparent
+                        const one: u8 = 1;
+                        const mask: u8 = one << bitOffset;
+
+                        const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
+                        const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
+                        const colorID: u8 = firstBit + (secondBit << 1); // LSB first
+                        if(colorID == 0) {
+                            continue; // transparent
+                        }
+
+                        const screenX: u16 = if(obj.flags.xFlip == 1) (obj.xPosition - 8) + (TILE_SIZE_X - tileX) else objX - 8;
+                        var screenY: u16 = if(obj.flags.yFlip == 1) (obj.yPosition - 16) + (TILE_SIZE_Y - tileY) else objY - 16;
+                        screenY += tileOffset * TILE_SIZE_Y;
+
+                        const color: Def.Color = if(obj.flags.dmgPalete == 0) objPalette0[colorID] else objPalette1[colorID];
+                        pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = color;
                     }
-
-                    const screenX: u16 = if(obj.flags.xFlip == 1) (obj.xPosition - 8) + (TILE_SIZE_X - tileX) else objX - 8;
-                    const screenY: u16 = if(obj.flags.yFlip == 1) (obj.yPosition - 16) + (TILE_SIZE_Y - tileY) else objY - 16;
-
-                    const color: Def.Color = if(obj.flags.dmgPalete == 0) objPalette0[colorID] else objPalette1[colorID];
-                    pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = color;
-                }
-            }       
+                }       
+            } 
         }
-}
+    }
 
     // window
     if(lcdc.window_enable and lcdc.bg_window_enable)

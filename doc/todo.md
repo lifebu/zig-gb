@@ -1,4 +1,2 @@
-- implement more ppu features:
-    - objects: double height,
 - Cleanup CPU code!
 - Create testing for the different other systems (PPU, Interrupts, Timings).
