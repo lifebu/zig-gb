@@ -97,6 +97,7 @@ pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self 
         @memset(self.rom, 0);
     }
 
+
     return self;
 }
 
@@ -144,7 +145,11 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
             ramChanged = true;
         },
         0x2000...0x3FFF => {
-            self.mbc_registers.rom_bank = @truncate(@max(1, val));
+            const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
+            const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
+            const numBanks: u5 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
+            const mask: u5 = numBanks - 1;
+            self.mbc_registers.rom_bank = @as(u5, @truncate(@max(1, val))) & mask;
             romChanged = true;
         },
         0x4000...0x5FFF => {
