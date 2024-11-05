@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 
 const MemMap = @import("mem_map.zig");
 
@@ -43,14 +44,15 @@ pub const RAM_SIZE_BYTE = [_]u32 {
 const MBC = enum {
     NO_MBC,
     MBC_1,
+    MBC_5,
 };
 const MBCError = error {
     MBC_NOT_SUPPORTED,
 };
 const MBCRegisters = struct {
     ram_enable: bool = false,
-    rom_bank: u5 = 0x00,
-    ram_bank: u2 = 0x0,
+    rom_bank: u9 = 0x00,
+    ram_bank: u4 = 0x0,
     bank_mode: u1 = 0x0,
 };
 
@@ -118,6 +120,9 @@ fn getMBC(header: *align(1) CartHeader) !MBC {
             std.debug.assert(ROM_SIZE_BYTE[header.rom_size] <= 512 * 1024);
             break: blk .MBC_1;
         },
+        0x19...0x1E => blk: {
+            break: blk .MBC_5;
+        },
         else => blk: {
             std.debug.print("MBC NOT SUPPORTED: {x}\n", .{header.cart_features});
             break: blk MBCError.MBC_NOT_SUPPORTED;
@@ -131,48 +136,73 @@ pub fn getCart(self: *Self) *[]u8 {
 
 pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
     // TODO: I don't know if this code can be adapted well to other mbcs.
-    if(self.mbc == .NO_MBC) {
-        return;
-    }
-
+    const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
     var ramChanged: bool = false;
     var romChanged: bool = false;
 
-   switch(addr) {
-        // TODO: Do this ranges work for all MBCs? I assume not. okay for now.
-        0x0000...0x1FFF => {
-            self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
-            ramChanged = true;
+    // TODO: horrible double switch.
+    switch(self.mbc) {
+        .NO_MBC => {
+            return;
         },
-        0x2000...0x3FFF => {
-            const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
-            const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
-            const numBanks: u6 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
-            const mask: u5 = @intCast(numBanks - 1);
-            self.mbc_registers.rom_bank = @as(u5, @truncate(@max(1, val))) & mask;
-            romChanged = true;
-        },
-        0x4000...0x5FFF => {
-            // TODO: Truncate this to the actual bits we can have (ram size).
-            // TODO: Also on MBC this does nothing if you only have 8KByte RAM!
+        .MBC_1 => {
+            switch(addr) {
+                0x0000...0x1FFF => {
+                    self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+                    ramChanged = true;
+                },
+                0x2000...0x3FFF => {
+                    const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
+                    const numBanks: u9 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
+                    const mask: u9 = @intCast(numBanks - 1);
+                    self.mbc_registers.rom_bank = @truncate(@max(1, val) & mask);
+                    romChanged = true;
+                },
+                0x4000...0x5FFF => {
+                    // TODO: Truncate this to the actual bits we can have (ram size).
+                    // TODO: Also on MBC this does nothing if you only have 8KByte RAM!
 
-            const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
-            const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
-            const numBanks: u6 = @truncate(ramSizeByte / RAM_BANK_SIZE_BYTE);
-            if(numBanks == 1) {
-                return; // Nothing to switch on 
+                    const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
+                    const numBanks: u6 = @truncate(ramSizeByte / RAM_BANK_SIZE_BYTE);
+                    if(numBanks == 1) {
+                        return; // Nothing to switch on 
+                    }
+
+                    self.mbc_registers.ram_bank = @as(u2, @truncate(val));
+                    ramChanged = true;
+                },
+                0x6000...0x7FFF => {
+                    self.mbc_registers.bank_mode = @truncate(val);
+                },
+                // TODO: Error?, Always test the MBC on all write?
+                else => {},
             }
-
-            self.mbc_registers.ram_bank = @truncate(val);
-            ramChanged = true;
         },
-        0x6000...0x7FFF => {
-            self.mbc_registers.bank_mode = @truncate(val);
+        .MBC_5 => {
+            switch(addr) {
+                0x0000...0x1FFF => {
+                    self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+                    ramChanged = true;
+                },
+                0x2000...0x2FFF => {
+                    // TODO: first 8 bits of rom bank.
+                    const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
+                    const numBanks: u9 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
+                    const mask: u9 = @intCast(numBanks - 1);
+                    self.mbc_registers.rom_bank = @truncate(@max(1, val) & mask);
+                    romChanged = true;
+                },
+                0x3000...0x3FFF => {
+                    // TODO: highest 1 bit of rom bank.
+                    std.debug.print("Highest ROM bit not supported! \n", .{});
+                    assert(false);
+                },
+                // TODO: Error?, Always test the MBC on all write?
+                else => {},
+            }
         },
-        // TODO: Error?, Always test the MBC on all write?
-        else => {},
     }
-
+    
     // TODO: I am assuming that bank switches don't happen all the time.
     // And that it is cheaper to just copy 16kByte into the memory region then to 
     // reroute all reads into ROM and Cartridge RAM regions into the seperate piece of memory of the cartridge. 

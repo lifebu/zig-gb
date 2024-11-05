@@ -39,4 +39,6 @@ fn runBGB(self: *Self, alloc: std.mem.Allocator) !void {
     const argv = [_][]const u8{ "bgb", self.gbFile }; 
     self.bgbProc = std.process.Child.init(&argv, alloc);
     try self.bgbProc.?.spawn();
+    // Some delay so that we and bgb "sync up".
+    std.time.sleep(500_000_000);
 } 
