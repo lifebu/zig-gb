@@ -35,6 +35,7 @@ pub fn main() !void {
             for(cpu.cycles_ahead) |_| {
                 mmio.updateTimers(&mmu);
                 mmio.updateDMA(&mmu);
+                //ppu.step(&mmu, platform.getRawPixels());
                 ppu.updateState(&mmu);
             }
             mmio.updateJoypad(&mmu, platform.getInputState());

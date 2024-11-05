@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 
 const Def = @import("def.zig");
 const MemMap = @import("mem_map.zig");
@@ -85,8 +86,152 @@ const LCDStat = packed struct {
     _: u1,
 };
 
+linePixelWait: u8 = 0, // Wait 12 cycles before starting to draw.
+currPixelX: u16 = 0,
+objectsInCurrLine: u4 = 0,
 lyCounter: u16 = 0,
 const LCD_Y_FREQ: u16 = 456;
+
+// TODO: For a PPU that works on dots we need:
+// - Use updateState above to set the state and based on the state call different functions.
+// - OAM_SCAN: Do nothing. For each line keep track of the unique objects we drew (save their indices). Once we reach 10 in a line => discard.
+// - V_BLANK and H_BLANK: Do nothing.
+// - DRAW: 
+    // For the first twelve cycles you do nothing (the FIFO is being filled with two tiles).
+    // then we need to put in one pixel per cycle (so x, y are set).
+    // 
+// Scrolling mid frame: 
+    // scroll registers (SCX, SCY, WX, WY) are re-read on each tile fetch. 
+    // But lower 3 bits of SCX only once per scanline.
+    // 
+pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
+    const memory: *[]u8 = mmu.getRaw();
+    const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
+    if(!lcdc.lcd_enable) {
+        return;
+    }
+
+    self.updateState(mmu);
+
+    const lcd_stat: *align(1) LCDStat = @ptrCast(&memory.*[MemMap.LCD_STAT]);
+    switch (lcd_stat.ppu_mode) {
+        .OAM_SCAN => {},
+        .DRAW => {
+            if(self.linePixelWait < 12) {
+                self.linePixelWait += 1;
+                return;
+            }
+
+            assert(self.currPixelX <= 160);
+            const lcdY: u8 = mmu.read8(MemMap.LCD_Y);
+            self.drawPixel(memory, self.currPixelX, lcdY, pixels);
+            self.currPixelX += 1;
+        },
+        .H_BLANK => {},
+        .V_BLANK => {},
+    }
+}
+
+fn drawPixel(_: *Self, memory: *[]u8, pixelX: u16, pixelY: u16, pixels: *[]Def.Color) void {
+    const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
+
+    const bgMapBaseAddress: u16 = if(lcdc.bg_map_area == .FIRST_MAP) FIRST_TILE_MAP_ADDRESS else SECOND_TILE_MAP_ADDRESS;
+    const windowMapBaseAddress: u16 = if(lcdc.window_map_area == .FIRST_MAP) FIRST_TILE_MAP_ADDRESS else SECOND_TILE_MAP_ADDRESS;
+    const bgWindowTileBaseAddress: u16 = if(lcdc.bg_window_tile_data == .SECOND_TILE_DATA) SECOND_TILE_ADDRESS else FIRST_TILE_ADDRESS;
+    const signedAdressing: bool = bgWindowTileBaseAddress == SECOND_TILE_ADDRESS;
+
+    const bgPalette = getPalette(memory.*[MemMap.BG_PALETTE]);
+
+    // background
+    if(lcdc.bg_window_enable) {
+        const bgScrollX: u8 = memory.*[MemMap.SCROLL_X];
+        const bgScrollY: u8 = memory.*[MemMap.SCROLL_Y];
+        const tileMapX: u16 = (pixelX + bgScrollX); 
+        const tileMapY: u16 = (pixelY + bgScrollY);
+
+        const tileMapIndexX: u16 = (tileMapX / TILE_SIZE_X) % TILE_MAP_SIZE_X;
+        const tileMapIndexY: u16 = (tileMapY / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
+        const tileMapAddress: u16 = bgMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
+        var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
+        if(signedAdressing) {
+            if(tileAddressOffset < 128) {
+                tileAddressOffset += 128;
+            } else {
+                tileAddressOffset -= 128;
+            }
+        }
+
+        const tileAddress: u16 = bgWindowTileBaseAddress + tileAddressOffset * TILE_SIZE_BYTE;
+        const tilePixelX: u16 = tileMapX % TILE_SIZE_X;
+        const tilePixelY: u16 = tileMapY % TILE_SIZE_Y;
+
+        const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
+        const firstRowByte: u8 = memory.*[tileRowBaseAddress];
+        const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+
+        const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
+
+        const one: u8 = 1;
+        const mask: u8 = one << bitOffset;
+
+        const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
+        const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
+        const colorID: u8 = firstBit + (secondBit << 1); // LSB first
+        pixels.*[pixelX + (pixelY * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
+    }
+
+    // objects (missing).
+    
+    // window
+    if(lcdc.window_enable and lcdc.bg_window_enable)
+    {
+        const winPosX: u16 = memory.*[MemMap.WINDOW_X];
+        const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
+        const tileMapIndexX: u16 = (pixelX / TILE_SIZE_X) % TILE_MAP_SIZE_X;
+        const tileMapIndexY: u16 = (pixelY / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
+        const tileMapAddress: u16 = windowMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
+        var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
+        if(signedAdressing) {
+            if(tileAddressOffset < 128) {
+                tileAddressOffset += 128;
+            } else {
+                tileAddressOffset -= 128;
+            }
+        }
+
+        const tileAddress: u16 = bgWindowTileBaseAddress + tileAddressOffset * TILE_SIZE_BYTE;
+        const tilePixelX: u16 = pixelX % TILE_SIZE_X;
+        const tilePixelY: u16 = pixelY % TILE_SIZE_Y;
+
+        const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
+        const firstRowByte: u8 = memory.*[tileRowBaseAddress];
+        const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+
+        const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
+
+        const one: u8 = 1;
+        const mask: u8 = one << bitOffset;
+
+        const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
+        const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
+        const colorID: u8 = firstBit + (secondBit << 1); // LSB first
+
+        // TODO: This can underflow por overflow, how to solve this? 
+        const screenX: i32 = pixelX + winPosX - 7;
+        const screenY: i32 = pixelY + winPosY;
+        if(screenX > 0 or screenX > Def.RESOLUTION_WIDTH or screenY < 0 or screenY > Def.RESOLUTION_HEIGHT) {
+            // outside of screen!
+        }
+        // TODO: This is not good, invert the condition later!
+        else {
+            const screenXCast: u16 = @intCast(screenX);
+            const screenYCast: u16 = @intCast(screenY);
+
+            pixels.*[screenXCast + (screenYCast * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
+        }
+    }
+}
+
 
 // TODO: This is just some fake timing.
 pub fn updateState(self: *Self, mmu: *MMU) void {
@@ -107,6 +252,7 @@ pub fn updateState(self: *Self, mmu: *MMU) void {
 
         if(lcdY == 144) {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);
+
         } 
 
         const lyCompare = mmu.read8(MemMap.LCD_Y_COMPARE);
@@ -132,8 +278,13 @@ pub fn updateState(self: *Self, mmu: *MMU) void {
         lcd_stat.ppu_mode = .DRAW;
     } else if (self.lyCounter > 252) {
         lcd_stat.ppu_mode = .H_BLANK;
-        if(lcd_stat.mode_0_select and oldMode != lcd_stat.ppu_mode) {
-            hasStatInterrupt = true;
+        if(oldMode != lcd_stat.ppu_mode) {
+            self.objectsInCurrLine = 0;
+            self.currPixelX = 0;
+            self.linePixelWait = 0;
+            if(lcd_stat.mode_0_select) {
+                hasStatInterrupt = true;
+            }
         }
     }
     
@@ -141,6 +292,8 @@ pub fn updateState(self: *Self, mmu: *MMU) void {
         mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_LCD);
     }
 }
+
+
 
 fn getPalette(paletteByte: u8) [4]Def.Color {
     //https://gbdev.io/pandocs/Palettes.html
@@ -233,12 +386,18 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                     if (objY < 16 or objY > 160) {
                         continue; // line not visible
                     }
+                    if(obj.flags.yFlip == 1 and (obj.yPosition < 16)) {
+                        continue; // not visible
+                    }
 
                     var tileX: u16 = 0;
                     while (tileX < TILE_SIZE_X) : (tileX += 1) {
                         const objX: u16 = obj.xPosition + tileX; 
                         if(objX < 8 or objX > 168) {
                             continue; // xPos not visible.
+                        }
+                        if(obj.flags.xFlip == 1 and (obj.xPosition < 8)) {
+                            continue; // not visible
                         }
 
                         const tilePixelX: u16 = tileX % TILE_SIZE_X;
@@ -310,13 +469,17 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
                 const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
                 const colorID: u8 = firstBit + (secondBit << 1); // LSB first
 
-                const screenX: u16 = winX + 7 - winPosX;
-                const screenY: u16 = winY + winPosY;
+                // TODO: This can underflow por overflow, how to solve this? 
+                const screenX: i32 = winX + winPosX - 7;
+                const screenY: i32 = winY + winPosY;
                 if(screenX < 0 or screenX > Def.RESOLUTION_WIDTH or screenY < 0 or screenY > Def.RESOLUTION_HEIGHT) {
                     continue; // outside of screen!
                 }
 
-                pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
+                const screenXCast: u16 = @intCast(screenX);
+                const screenYCast: u16 = @intCast(screenY);
+
+                pixels.*[screenXCast + (screenYCast * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
             }
         }
     }

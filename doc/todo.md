@@ -1,2 +1,29 @@
+- Run bgb and my emulator side by side, bgb is focused and my emulator still reads input while unfocused (parameter?)
+    - use a custom bgb.ini file for positioning bgb?
+    - position my emulator differently? (position as parameter?).
+    - Needs which rom to load as parameter to my code.
+    - My own config.json?
+- Make the PPU run on cycle? How much work would that be?
+    - Doing this before testing would be neat to have a system that is proven good before the rework.
 - Cleanup CPU code!
-- Create testing for the different other systems (PPU, Interrupts, Timings).
+- Support MBC5 (pokemon_blu)
+- Testing:
+    - CPU: 
+        - Use SingleStepTests Cycles (in the json) length + 1 to test if my instructions have the right timing.
+        - Disable MMU checks for tests (runtime check for now).
+        - SingleStepTests are generated from raddad772/jsmoo (misc/code_generation/sm83_tests/generation.js).
+    - Joypad: Test different InputState combinations and the resulting bit with test flags?
+    - Timer & Divider:
+    - Interrupts:
+    - PPU:
+        - 1st: MemoryDump + Picture => Compare them.
+        - 2nd: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
+            - Compare each written pixel?
+            - MemoryDump: When VBlank starts?
+            - CPUWriteList: Not each Write to PPU accessible memory.
+    - TestRoms:
+        - Blargg (CPU)
+        - MealyBug (PPU)
+        - Mooneye (All)
+        - Acid2 (PPU)
+        - SameSuite (All)
