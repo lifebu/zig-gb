@@ -4,6 +4,7 @@ const sf = struct {
     usingnamespace sf.graphics;
 };
 
+const Conf = @import("conf.zig");
 const Def = @import("def.zig");
 
 const MemMap = @import("mem_map.zig");
@@ -14,16 +15,17 @@ const BACKGROUND = "data/background.png";
 const SCALING = 4;
 
 alloc: std.mem.Allocator,
-window: sf.RenderWindow = undefined,
-windowFocused: bool = false,
+conf: Conf,
 cpuTexture: sf.Texture = undefined,
-gpuTexture: sf.Texture = undefined,
-gpuSprite: sf.Sprite = undefined,
-pixels: []sf.Color = undefined,
 currInputState: Def.InputState = .{},
+gpuSprite: sf.Sprite = undefined,
+gpuTexture: sf.Texture = undefined,
+pixels: []sf.Color = undefined,
+window: sf.RenderWindow = undefined,
+windowFocused: bool = true,
 
-pub fn init(alloc: std.mem.Allocator) !Self {
-    var self = Self{ .alloc = alloc};
+pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
+    var self = Self{ .alloc = alloc, .conf = conf.* };
 
     const WINDOW_WIDTH = Def.RESOLUTION_WIDTH * SCALING;
     const WINDOW_HEIGHT = Def.RESOLUTION_HEIGHT * SCALING;
@@ -34,7 +36,9 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 
     // Position window in the middle of the screen.
     const resolution: sf.c.sfVideoMode = sf.c.sfVideoMode_getDesktopMode();
-    self.window.setPosition(.{ .x = @intCast(resolution.width / 2 - WINDOW_WIDTH / 2), .y = @intCast(resolution.height / 2 - WINDOW_HEIGHT / 2) });
+    // We want to have both windows side-by-side in bgb mode.
+    const xOffset: u32 = if(conf.bgbMode) WINDOW_WIDTH else WINDOW_WIDTH / 2;
+    self.window.setPosition(.{ .x = @intCast(resolution.width / 2 - xOffset), .y = @intCast(resolution.height / 2 - WINDOW_HEIGHT / 2) });
     self.window.setFramerateLimit(60);
 
     // textures
@@ -85,7 +89,7 @@ pub fn update(self: *Self) bool {
         if (event == .closed) {
             self.window.close();
         }
-        else if (event == .lost_focus) {
+        else if (event == .lost_focus and !self.conf.bgbMode) {
             self.windowFocused = false;
         }
         else if (event == .gained_focus) {

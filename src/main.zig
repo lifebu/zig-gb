@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const CONF = @import("conf.zig");
 const CPU = @import("cpu.zig");
 const Def = @import("def.zig");
 const MMIO = @import("mmio.zig");
@@ -13,7 +14,10 @@ pub fn main() !void {
     const alloc = allocator.allocator();
     defer _ = allocator.deinit();
 
-    var platform = try PlatformSFML.init(alloc);
+    var conf = try CONF.init(alloc);
+    defer conf.deinit() catch unreachable;
+
+    var platform = try PlatformSFML.init(alloc, &conf);
     defer platform.deinit();
 
     var cpu = try CPU.init();
@@ -21,7 +25,7 @@ pub fn main() !void {
 
     var mmio = MMIO{};
 
-    var mmu = try MMU.init(alloc, &mmio, "playground/tetris.gb");
+    var mmu = try MMU.init(alloc, &mmio, conf.gbFile);
     defer mmu.deinit();
 
     var ppu = PPU{};

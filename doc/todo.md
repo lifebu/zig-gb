@@ -4,7 +4,7 @@
     - Needs which rom to load as parameter to my code.
     - My own config.json?
 - Make the PPU run on cycle? How much work would that be?
-    - Doing this before testing would be neat to have a system that is proven good before the rework.
+- Doing this before testing would be neat to have a system that is proven good before the rework.
 - Cleanup CPU code!
 - Support MBC5 (pokemon_blu)
 - Testing:
