@@ -84,8 +84,20 @@ pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self 
         // TODO: Also check that the RAM size as the MBC would be able to support it.
         const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
         if(ramSizeByte != 0) {
-            self.ram = try alloc.alloc(u8, ramSizeByte); 
-            errdefer alloc.free(self.ram.?);
+            const saveFilePath = self.getSaveFilename(filePath);
+            defer alloc.free(saveFilePath);
+
+            const saveFile: ?std.fs.File = std.fs.cwd().openFile(saveFilePath, .{}) catch null;
+            if(saveFile != null) {
+                // Read a savegame.
+                self.ram = try saveFile.?.readToEndAlloc(alloc, ramSizeByte);
+                errdefer alloc.free(self.ram.?);
+            }
+            else {
+                self.ram = try alloc.alloc(u8, ramSizeByte); 
+                @memset(self.ram.?, 0);
+                errdefer alloc.free(self.ram.?);
+            }
         }
 
         self.zero_ram_bank = try alloc.alloc(u8, RAM_BANK_SIZE_BYTE);
@@ -109,6 +121,17 @@ pub fn deinit(self: *Self) void {
         self.allocator.free(ram);
     }
     self.allocator.free(self.zero_ram_bank);
+}
+
+fn getSaveFilename(self: *Self, gbFile: []const u8) []const u8 {
+    var saveFilePath = std.ArrayList(u8).init(self.allocator);
+    defer saveFilePath.deinit();
+
+    var iter = std.mem.splitScalar(u8, gbFile, '.');
+    saveFilePath.appendSlice(iter.first()) catch return "";
+    saveFilePath.appendSlice(".sav") catch return "";
+    const path = saveFilePath.toOwnedSlice() catch return "";
+    return path;
 }
 
 fn getMBC(header: *align(1) CartHeader) !MBC {
