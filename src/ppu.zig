@@ -108,7 +108,8 @@ pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
     const memory: *[]u8 = mmu.getRaw();
     const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
     if(!lcdc.lcd_enable) {
-        return;
+        // TODO: Doing this breaks rendering. 
+        //return;
     }
 
     self.updateState(mmu);
@@ -216,17 +217,13 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u16, pixelY: u16, pixels: *[]Def.C
         const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
         const colorID: u8 = firstBit + (secondBit << 1); // LSB first
 
-        // TODO: This can underflow por overflow, how to solve this? 
+        // TODO: This can underflow or overflow, how to solve this? 
         const screenX: i32 = pixelX + winPosX - 7;
         const screenY: i32 = pixelY + winPosY;
-        if(screenX > 0 or screenX > Def.RESOLUTION_WIDTH or screenY < 0 or screenY > Def.RESOLUTION_HEIGHT) {
-            // outside of screen!
-        }
-        // TODO: This is not good, invert the condition later!
-        else {
+        
+        if(!(screenX < 0 or screenX > Def.RESOLUTION_WIDTH or screenY < 0 or screenY > Def.RESOLUTION_HEIGHT)) {
             const screenXCast: u16 = @intCast(screenX);
             const screenYCast: u16 = @intCast(screenY);
-
             pixels.*[screenXCast + (screenYCast * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
         }
     }
@@ -432,7 +429,7 @@ pub fn updatePixels(_: *Self, mmu: *MMU, pixels: *[]Def.Color) !void {
     }
 
     // window
-    if(lcdc.window_enable and lcdc.bg_window_enable)
+    if(lcdc.window_enable and lcdc.bg_window_enable and false)
     {
         const winPosX: u16 = memory.*[MemMap.WINDOW_X];
         const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
