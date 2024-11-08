@@ -13,6 +13,7 @@ const Self = @This();
 
 const BACKGROUND = "data/background.png";
 const SCALING = 4;
+const TARGET_FPS = 60.0;
 
 alloc: std.mem.Allocator,
 conf: Conf,
@@ -23,6 +24,10 @@ gpuTexture: sf.Texture = undefined,
 pixels: []sf.Color = undefined,
 window: sf.RenderWindow = undefined,
 windowFocused: bool = true,
+clock: sf.system.Clock = undefined,
+deltaMS: f32 = 0,
+targetDeltaMS: f32 = 0,
+fps: f32 = 0,
 
 pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     var self = Self{ .alloc = alloc, .conf = conf.* };
@@ -39,7 +44,6 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     // We want to have both windows side-by-side in bgb mode.
     const xOffset: u32 = if(conf.bgbMode) WINDOW_WIDTH else WINDOW_WIDTH / 2;
     self.window.setPosition(.{ .x = @intCast(resolution.width / 2 - xOffset), .y = @intCast(resolution.height / 2 - WINDOW_HEIGHT / 2) });
-    self.window.setFramerateLimit(60);
 
     // textures
     self.cpuTexture = try sf.Texture.createFromFile(BACKGROUND);
@@ -69,6 +73,9 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     errdefer alloc.free(self.pixels);
     @memset(self.pixels, sf.Color.Black);
 
+    self.clock = try sf.system.Clock.create();
+    self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
+
     return self;
 }
 
@@ -77,6 +84,7 @@ pub fn deinit(self: *Self) void {
     self.cpuTexture.destroy();
     self.gpuTexture.destroy();
     self.gpuSprite.destroy();
+    self.clock.destroy();
     self.alloc.free(self.pixels);
 }
 
@@ -102,6 +110,8 @@ pub fn update(self: *Self) bool {
     }
 
     self.updateInputState();
+    self.deltaMS = @as(f32, @floatFromInt(self.clock.restart().asMicroseconds())) / 1_000.0;
+    self.fps = 1.0 / (self.deltaMS / 1_000);
 
     return true;
 } 

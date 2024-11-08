@@ -31,8 +31,10 @@ pub fn main() !void {
     var ppu = PPU{};
 
     while(platform.update()) {
+        const cyclesPerFrame: u32 = @intFromFloat(platform.targetDeltaMS * Def.CYCLES_PER_MS); 
+
         var cycles: u32 = 0;
-        while(cycles < Def.CYCLES_PER_FRAME) {
+        while(cycles < cyclesPerFrame) {
             try cpu.step(&mmu); 
             cycles += cpu.cycles_ahead;
 

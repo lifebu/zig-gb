@@ -1,6 +1,8 @@
 const std = @import("std");
 
-pub const CYCLES_PER_FRAME: u32 = 70_226;
+pub const SYSTEM_FREQ: u32 = 4 * 1_024 * 1_024;
+pub const CYCLES_PER_MS: f32 = @as(f32, @floatFromInt(SYSTEM_FREQ)) / 1_000.0;
+
 pub const RESOLUTION_WIDTH = 160;
 pub const RESOLUTION_HEIGHT = 144;
 
