@@ -4,7 +4,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "zig build",
+            "command": "zig build -Dcpu=x86_64",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -26,6 +26,7 @@
 				"--tool=callgrind",
 				"--callgrind-out-file=zig-out/callgrind.out",
 				"${workspaceFolder}/zig-out/bin/zig-gb",
+                "playground/super_mario_land.gb",
 			],
 			"options": {
 				"cwd": "${workspaceFolder}"

@@ -39,13 +39,11 @@ pub fn main() !void {
             for(cpu.cycles_ahead) |_| {
                 mmio.updateTimers(&mmu);
                 mmio.updateDMA(&mmu);
-                //ppu.step(&mmu, platform.getRawPixels());
-                ppu.updateState(&mmu);
+                ppu.step(&mmu, platform.getRawPixels());
             }
             mmio.updateJoypad(&mmu, platform.getInputState());
         }
 
-        try ppu.updatePixels(&mmu, platform.getRawPixels());
         try platform.render();
     }
 }

@@ -1,5 +1,7 @@
-- Make the PPU run on cycle? How much work would that be?
-- Doing this before testing would be neat to have a system that is proven good before the rework.
+- let the simulation run independet of the window framerate.
+    - use delta time and calculate how many cycles to do.
+- PPU:
+    - Object Priority
 - Cleanup CPU code!
 - Testing:
     - CPU: 

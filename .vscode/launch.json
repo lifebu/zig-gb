@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/zig-gb",
             "args": [
-                "playground/tetris.gb",
+                "playground/link_awake.gb",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
