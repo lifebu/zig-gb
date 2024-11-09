@@ -18,8 +18,6 @@
 - Cleanup CPU code!
 - Testing:
     - CPU: 
-        - Use SingleStepTests Cycles (in the json) length + 1 to test if my instructions have the right timing.
-        - Disable MMU checks for tests (runtime check for now).
         - SingleStepTests are generated from raddad772/jsmoo (misc/code_generation/sm83_tests/generation.js).
     - Joypad: Test different InputState combinations and the resulting bit with test flags?
     - Timer & Divider:

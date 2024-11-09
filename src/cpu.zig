@@ -855,7 +855,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
                     self.registers.r8.F.Flags.halfBCD = true;
                     self.registers.r8.F.Flags.zero = result == 0;
 
-                    break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 16 else 8};
+                    break: op_pfx Operation { .deltaPC = 2, .cycles = if (sourceVar == .HL) 12 else 8};
                 },
                 // RES bit,r8
                 0x80...0xBF => op_pfx: {

@@ -24,7 +24,7 @@ const TestType = struct {
     name: []u8,
     initial: CPUState,
     final: CPUState,
-    // ignoring cycles field in json.
+    cycles: [][]std.json.Value,
 };
 
 fn testOutput(cpu: *const CPU, mmu: *const MMU, testCase: *const TestType) !void {
@@ -44,6 +44,12 @@ fn testOutput(cpu: *const CPU, mmu: *const MMU, testCase: *const TestType) !void
         const value: u8 = @intCast(ramPair[1]);
         try std.testing.expectEqual(mmu.read8(address), value);
     }
+
+    const opcodeName: []u8 = testCase.name[0..2];
+    if(std.mem.eql(u8, opcodeName, "76") or std.mem.eql(u8, opcodeName, "10")) {
+        return; // Those tests have wrong cycle counts and divert from the actual documentation.
+    }
+    try std.testing.expectEqual(cpu.cycles_ahead, testCase.cycles.len * 4);
 }
 
 fn printTestCase(cpuState: *const CPUState) void {
@@ -97,11 +103,6 @@ pub fn runSingleStepTests() !void {
 
         const testConfig: []TestType = json.value;
         for(testConfig) |testCase| {
-            if(std.mem.eql(u8, testCase.name, "CB 36 038B")) {
-                var a: u8 = 0;
-                a += 1;
-            }
-
             cpu.pc = testCase.initial.pc;
             cpu.sp = testCase.initial.sp;
             cpu.registers.r8.A = testCase.initial.a;
@@ -128,6 +129,7 @@ pub fn runSingleStepTests() !void {
                 printTestCase(&testCase.initial);
                 std.debug.print("Expected\n", .{});
                 printTestCase(&testCase.final);
+                std.debug.print("Cycles: {d}\n", .{testCase.cycles.len * 4});
                 std.debug.print("\n", .{});
 
                 std.debug.print("Got\n", .{});
@@ -148,6 +150,7 @@ pub fn runSingleStepTests() !void {
                     std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
                 }
                 std.debug.print("\n", .{});
+                std.debug.print("Cycles: {d}\n", .{cpu.cycles_ahead});
 
                 return err;
             };
