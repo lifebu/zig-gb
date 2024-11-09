@@ -3,7 +3,6 @@
         - Selection Priority.
         - 10 Objects per Line.
         - Object-Object Priority.
-        - Object-BG/Window Priority.
         - Object Performance.
     - Window:
         - One pixel is missing.

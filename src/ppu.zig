@@ -207,6 +207,8 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
     const objPalette0 = getPalette(memory.*[MemMap.OBJ_PALETTE_0]);
     const objPalette1 = getPalette(memory.*[MemMap.OBJ_PALETTE_1]);
 
+    var pixelColorID: u8 = 0;
+
     // background
     if(lcdc.bg_window_enable) {
         const bgScrollX: u8 = memory.*[MemMap.SCROLL_X];
@@ -243,6 +245,7 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
         const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
         const colorID: u8 = firstBit + (secondBit << 1); // LSB first
         pixels.*[@as(u16, pixelX) + (@as(u16, pixelY) * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
+        pixelColorID = colorID;
     }
     
     // window
@@ -252,7 +255,7 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const winPosX: u16 = memory.*[MemMap.WINDOW_X];
             const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
             if(pixelX + winPosX < 7) {
-                break: window; // outside of screen.
+                return; // outside of screen.
             }
             const screenX: u16 = pixelX + winPosX - 7;
             const screenY: u16 = pixelY + winPosY;
@@ -289,6 +292,7 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
             const colorID: u8 = firstBit + (secondBit << 1); // LSB first
             pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
+            pixelColorID = colorID;
         } 
     }
 
@@ -326,6 +330,9 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const colorID: u8 = firstBit + (secondBit << 1); // LSB first
             if(colorID == 0) {
                 continue; // transparent
+            }
+            if(obj.flags.priority == 1 and pixelColorID != 0) {
+                continue; // can only draw over color 0.
             }
 
             const color: Def.Color = if(obj.flags.dmgPalete == .OBP0) objPalette0[colorID] else objPalette1[colorID];
