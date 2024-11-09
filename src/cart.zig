@@ -182,16 +182,14 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
                     romChanged = true;
                 },
                 0x4000...0x5FFF => {
-                    // TODO: Truncate this to the actual bits we can have (ram size).
-                    // TODO: Also on MBC this does nothing if you only have 8KByte RAM!
-
                     const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
                     const numBanks: u6 = @truncate(ramSizeByte / RAM_BANK_SIZE_BYTE);
                     if(numBanks == 1) {
                         return; // Nothing to switch on 
                     }
 
-                    self.mbc_registers.ram_bank = @as(u2, @truncate(val));
+                    const mask: u9 = @intCast(numBanks - 1);
+                    self.mbc_registers.ram_bank = @truncate(val & mask);
                     ramChanged = true;
                 },
                 0x6000...0x7FFF => {
@@ -219,6 +217,17 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
                     // TODO: highest 1 bit of rom bank.
                     std.debug.print("Highest ROM bit not supported! \n", .{});
                     assert(false);
+                },
+                0x4000...0x5FFF => {
+                    const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
+                    const numBanks: u6 = @truncate(ramSizeByte / RAM_BANK_SIZE_BYTE);
+                    if(numBanks == 1) {
+                        return; // Nothing to switch on 
+                    }
+
+                    const mask: u9 = @intCast(numBanks - 1);
+                    self.mbc_registers.ram_bank = @truncate(val & mask);
+                    ramChanged = true;
                 },
                 // TODO: Error?, Always test the MBC on all write?
                 else => {},

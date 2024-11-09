@@ -244,6 +244,53 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
         const colorID: u8 = firstBit + (secondBit << 1); // LSB first
         pixels.*[@as(u16, pixelX) + (@as(u16, pixelY) * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
     }
+    
+    // window
+    if(lcdc.window_enable and lcdc.bg_window_enable)
+    {
+        window: {
+            const winPosX: u16 = memory.*[MemMap.WINDOW_X];
+            const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
+            if(pixelX + winPosX < 7) {
+                break: window; // outside of screen.
+            }
+            const screenX: u16 = pixelX + winPosX - 7;
+            const screenY: u16 = pixelY + winPosY;
+            if(screenX >= Def.RESOLUTION_WIDTH or screenY >= Def.RESOLUTION_HEIGHT) {
+                break: window; // outside of screen.
+            }
+
+            const tileMapIndexX: u16 = (pixelX / TILE_SIZE_X);
+            const tileMapIndexY: u16 = (pixelY / TILE_SIZE_Y);
+            const tileMapAddress: u16 = windowMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
+            var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
+            if(signedAdressing) {
+                if(tileAddressOffset < 128) {
+                    tileAddressOffset += 128;
+                } else {
+                    tileAddressOffset -= 128;
+                }
+            }
+
+            const tileAddress: u16 = bgWindowTileBaseAddress + tileAddressOffset * TILE_SIZE_BYTE;
+            const tilePixelX: u16 = pixelX % TILE_SIZE_X;
+            const tilePixelY: u16 = pixelY % TILE_SIZE_Y;
+
+            const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
+            const firstRowByte: u8 = memory.*[tileRowBaseAddress];
+            const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+
+            const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
+
+            const one: u8 = 1;
+            const mask: u8 = one << bitOffset;
+
+            const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
+            const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
+            const colorID: u8 = firstBit + (secondBit << 1); // LSB first
+            pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
+        } 
+    }
 
     // objects
     if(lcdc.obj_enable) {
@@ -284,51 +331,6 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const color: Def.Color = if(obj.flags.dmgPalete == .OBP0) objPalette0[colorID] else objPalette1[colorID];
             pixels.*[@as(u16, pixelX) + (@as(u16, pixelY) * Def.RESOLUTION_WIDTH)] = color;
         }
-    }
-    
-    // window
-    if(lcdc.window_enable and lcdc.bg_window_enable)
-    {
-        const winPosX: u16 = memory.*[MemMap.WINDOW_X];
-        const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
-        if(pixelX + winPosX < 7) {
-            return; // outside of screen.
-        }
-        const screenX: u16 = pixelX + winPosX - 7;
-        const screenY: u16 = pixelY + winPosY;
-        if(screenX >= Def.RESOLUTION_WIDTH or screenY >= Def.RESOLUTION_HEIGHT) {
-            return; // outside of screen.
-        }
-
-        const tileMapIndexX: u16 = (pixelX / TILE_SIZE_X);
-        const tileMapIndexY: u16 = (pixelY / TILE_SIZE_Y);
-        const tileMapAddress: u16 = windowMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
-        var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
-        if(signedAdressing) {
-            if(tileAddressOffset < 128) {
-                tileAddressOffset += 128;
-            } else {
-                tileAddressOffset -= 128;
-            }
-        }
-
-        const tileAddress: u16 = bgWindowTileBaseAddress + tileAddressOffset * TILE_SIZE_BYTE;
-        const tilePixelX: u16 = pixelX % TILE_SIZE_X;
-        const tilePixelY: u16 = pixelY % TILE_SIZE_Y;
-
-        const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
-        const firstRowByte: u8 = memory.*[tileRowBaseAddress];
-        const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
-
-        const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
-
-        const one: u8 = 1;
-        const mask: u8 = one << bitOffset;
-
-        const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
-        const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
-        const colorID: u8 = firstBit + (secondBit << 1); // LSB first
-        pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
     }
 }
 

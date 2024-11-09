@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/zig-gb",
             "args": [
-                "playground/link_awake.gb",
+                "playground/pkmn_blu.gb",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
