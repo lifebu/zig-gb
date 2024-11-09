@@ -21,10 +21,11 @@ dmaCurrentOffset: u16 = 0,
 pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 
-    dpad &= ~(@as(u4, @intFromBool(inputState.isRightPressed)) << 0);
-    dpad &= ~(@as(u4, @intFromBool(inputState.isLeftPressed)) << 1);
-    dpad &= ~(@as(u4, @intFromBool(inputState.isUpPressed)) << 2);
-    dpad &= ~(@as(u4, @intFromBool(inputState.isDownPressed)) << 3);
+    // disable phsysically impossible inputs: Left and Right, Up and Down
+    dpad &= ~(@as(u4, @intFromBool(inputState.isRightPressed and !inputState.isLeftPressed)) << 0);
+    dpad &= ~(@as(u4, @intFromBool(inputState.isLeftPressed and !inputState.isRightPressed)) << 1);
+    dpad &= ~(@as(u4, @intFromBool(inputState.isUpPressed and !inputState.isDownPressed)) << 2);
+    dpad &= ~(@as(u4, @intFromBool(inputState.isDownPressed and !inputState.isUpPressed)) << 3);
     
     var buttons: u4 = 0xF;
     buttons &= ~(@as(u4, @intFromBool(inputState.isAPressed)) << 0);

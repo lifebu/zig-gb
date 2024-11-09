@@ -15,8 +15,6 @@
         - The PPU Mode needs to be 0.
         - I set the initial mode for the PPU to 0x80, but it should be 0x85!
         https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
-- Inputs:
-    - Disable impossible inputs (pressing left and right at the same time!)
 - Cleanup CPU code!
 - Testing:
     - CPU: 
