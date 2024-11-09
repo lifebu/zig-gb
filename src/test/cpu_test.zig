@@ -89,6 +89,7 @@ pub fn runSingleStepTests() !void {
 
         var mmu = try MMU.init(alloc, &mmio, null);
         defer mmu.deinit();
+        mmu.disableChecks = true;
         const memory: *[]u8 = mmu.getRaw();
 
         var cpu = try CPU.init();

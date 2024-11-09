@@ -10,6 +10,8 @@ allocator: std.mem.Allocator,
 cart: Cart = undefined,
 memory: []u8 = undefined,
 mmio: *MMIO,
+// TODO: Would be nice if this could be known at compile time.
+disableChecks: bool = false,
 
 pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     var self = Self{ .allocator = alloc, .mmio = mmio };
@@ -84,6 +86,10 @@ pub fn readi8(self: *const Self, addr: u16) i8 {
 }
 
 pub fn write8(self: *Self, addr: u16, val: u8) void {
+    if(self.disableChecks) {
+        self.memory[addr] = val;
+    }
+
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH => {
             self.cart.onWrite(self.getRaw(), addr, val);

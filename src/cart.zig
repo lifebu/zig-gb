@@ -102,19 +102,16 @@ pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self 
                 errdefer alloc.free(self.ram.?);
             }
         }
-
-        self.zero_ram_bank = try alloc.alloc(u8, RAM_BANK_SIZE_BYTE);
-        @memset(self.zero_ram_bank, 0xFF);
-        errdefer alloc.free(self.zero_ram_bank);
-
     } else {
         // Allocate an empty cartridge.
         self.rom = try alloc.alloc(u8, 0x8000);
         errdefer alloc.free(self.rom);
-
         @memset(self.rom, 0);
     }
 
+    self.zero_ram_bank = try alloc.alloc(u8, RAM_BANK_SIZE_BYTE);
+    @memset(self.zero_ram_bank, 0xFF);
+    errdefer alloc.free(self.zero_ram_bank);
 
     return self;
 }
