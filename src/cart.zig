@@ -44,6 +44,7 @@ pub const RAM_SIZE_BYTE = [_]u32 {
 const MBC = enum {
     NO_MBC,
     MBC_1,
+    MBC_3,
     MBC_5,
 };
 const MBCError = error {
@@ -147,6 +148,9 @@ fn getMBC(header: *align(1) CartHeader) !MBC {
             std.debug.assert(ROM_SIZE_BYTE[header.rom_size] <= 512 * 1024);
             break: blk .MBC_1;
         },
+        0x0F...0x13 => blk: {
+            break: blk .MBC_3;
+        },
         0x19...0x1E => blk: {
             break: blk .MBC_5;
         },
@@ -198,6 +202,43 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
                 },
                 0x6000...0x7FFF => {
                     self.mbc_registers.bank_mode = @truncate(val);
+                },
+                // TODO: Error?, Always test the MBC on all write?
+                else => {},
+            }
+        },
+        .MBC_3 => {
+            switch(addr) {
+                // TODO: Implement RTC
+                0x0000...0x1FFF => {
+                    // TODO: This also enables access to the RTC registers.
+                    self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+                    ramChanged = true;
+                },
+                0x2000...0x3FFF => {
+                    const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
+                    const numBanks: u9 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
+                    const mask: u9 = @intCast(numBanks - 1);
+                    self.mbc_registers.rom_bank = @truncate(@max(1, val) & mask);
+                    romChanged = true;
+                },
+                0x4000...0x5FFF => {
+                    // TODO: Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
+                    // Depending on what you write you can access different registers.
+                    const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
+                    const numBanks: u6 = @truncate(ramSizeByte / RAM_BANK_SIZE_BYTE);
+                    if(numBanks == 1) {
+                        return; // Nothing to switch on 
+                    }
+
+                    const mask: u9 = @intCast(numBanks - 1);
+                    self.mbc_registers.ram_bank = @truncate(val & mask);
+                    ramChanged = true;
+                },
+                0x6000...0x7FFF => {
+                    // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
+                    // That "latched" data will not change until you do it again by repeating this pattern.
+                    // This way you can read the RTC registers while the clocks keeps ticking.
                 },
                 // TODO: Error?, Always test the MBC on all write?
                 else => {},
