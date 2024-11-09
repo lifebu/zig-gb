@@ -5,6 +5,7 @@ pub const CYCLES_PER_MS: f32 = @as(f32, @floatFromInt(SYSTEM_FREQ)) / 1_000.0;
 
 pub const RESOLUTION_WIDTH = 160;
 pub const RESOLUTION_HEIGHT = 144;
+pub const CLEAR_PIXELS_EACH_FRAME = false;
 
 pub const Color = packed struct {
     r: u8,

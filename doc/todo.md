@@ -1,7 +1,16 @@
-- let the simulation run independet of the window framerate.
-    - use delta time and calculate how many cycles to do.
 - PPU:
-    - Object Priority
+    - Objects:
+        - Selection Priority.
+        - 10 Objects per Line.
+        - Object-Object Priority.
+        - Object-BG/Window Priority.
+        - Object Performance.
+    - Window:
+        - One pixel is missing.
+    - Midframe Behaviour.
+        - When certain scroll registers are fetched!
+    - Timing:
+        - Correct Mode 3 length (penalties).
 - Cleanup CPU code!
 - Testing:
     - CPU: 

@@ -287,12 +287,21 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
     }
     
     // window
-    if(lcdc.window_enable and lcdc.bg_window_enable and false)
+    if(lcdc.window_enable and lcdc.bg_window_enable)
     {
         const winPosX: u16 = memory.*[MemMap.WINDOW_X];
         const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
-        const tileMapIndexX: u16 = (pixelX / TILE_SIZE_X) % TILE_MAP_SIZE_X;
-        const tileMapIndexY: u16 = (pixelY / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
+        if(pixelX + winPosX < 7) {
+            return; // outside of screen.
+        }
+        const screenX: u16 = pixelX + winPosX - 7;
+        const screenY: u16 = pixelY + winPosY;
+        if(screenX >= Def.RESOLUTION_WIDTH or screenY >= Def.RESOLUTION_HEIGHT) {
+            return; // outside of screen.
+        }
+
+        const tileMapIndexX: u16 = (pixelX / TILE_SIZE_X);
+        const tileMapIndexY: u16 = (pixelY / TILE_SIZE_Y);
         const tileMapAddress: u16 = windowMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
         var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
         if(signedAdressing) {
@@ -319,16 +328,7 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
         const firstBit: u8 = (firstRowByte & mask) >> bitOffset;
         const secondBit: u8 = (secondRowByte & mask) >> bitOffset;
         const colorID: u8 = firstBit + (secondBit << 1); // LSB first
-
-        // TODO: This can underflow or overflow, how to solve this? 
-        const screenX: i32 = pixelX + winPosX - 7;
-        const screenY: i32 = pixelY + winPosY;
-        
-        if(!(screenX < 0 or screenX > Def.RESOLUTION_WIDTH or screenY < 0 or screenY > Def.RESOLUTION_HEIGHT)) {
-            const screenXCast: u16 = @intCast(screenX);
-            const screenYCast: u16 = @intCast(screenY);
-            pixels.*[screenXCast + (screenYCast * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
-        }
+        pixels.*[screenX + (screenY * Def.RESOLUTION_WIDTH)] = bgPalette[colorID];
     }
 }
 
