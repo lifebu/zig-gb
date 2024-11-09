@@ -10,7 +10,6 @@
         - When certain scroll registers are fetched!
     - Timing:
         - Correct Mode 3 length (penalties).
-- dump .sav files to disk for savegames!
 - Cleanup CPU code!
 - Testing:
     - CPU: 

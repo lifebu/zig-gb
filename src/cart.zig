@@ -59,6 +59,8 @@ const MBCRegisters = struct {
 allocator: std.mem.Allocator,
 rom: []u8 = undefined,
 ram: ?[]u8 = null,
+saveFilePath: []const u8 = undefined,
+
 // TODO: Honestly not great, but works for now.
 zero_ram_bank: []u8 = undefined,
 mbc: MBC = .NO_MBC,
@@ -84,10 +86,10 @@ pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self 
         // TODO: Also check that the RAM size as the MBC would be able to support it.
         const ramSizeByte = RAM_SIZE_BYTE[header.ram_size];
         if(ramSizeByte != 0) {
-            const saveFilePath = self.getSaveFilename(filePath);
-            defer alloc.free(saveFilePath);
+            self.saveFilePath = self.getSaveFilename(filePath);
+            errdefer alloc.free(self.saveFilePath);
 
-            const saveFile: ?std.fs.File = std.fs.cwd().openFile(saveFilePath, .{}) catch null;
+            const saveFile: ?std.fs.File = std.fs.cwd().openFile(self.saveFilePath, .{}) catch null;
             if(saveFile != null) {
                 // Read a savegame.
                 self.ram = try saveFile.?.readToEndAlloc(alloc, ramSizeByte);
@@ -101,6 +103,7 @@ pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self 
         }
 
         self.zero_ram_bank = try alloc.alloc(u8, RAM_BANK_SIZE_BYTE);
+        @memset(self.zero_ram_bank, 0xFF);
         errdefer alloc.free(self.zero_ram_bank);
 
     } else {
@@ -119,6 +122,7 @@ pub fn deinit(self: *Self) void {
     self.allocator.free(self.rom);
     if(self.ram) |ram| {
         self.allocator.free(ram);
+        self.allocator.free(self.saveFilePath);
     }
     self.allocator.free(self.zero_ram_bank);
 }
@@ -255,5 +259,13 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
         const romStart: u32 = self.mbc_registers.rom_bank * ROM_BANK_SIZE_BYTE;
         const romEnd: u32 = romStart + ROM_BANK_SIZE_BYTE;
         std.mem.copyForwards(u8, memory.*[MemMap.ROM_MIDDLE..MemMap.ROM_HIGH], self.rom[romStart..romEnd]);
+    }
+
+    if(ramChanged and !self.mbc_registers.ram_enable) {
+        if(self.ram) |_| {
+            //const createFlags = std.fs.File.CreateFlags{ .exclusive = false };
+            //const writeFlags = std.fs.Dir.WriteFileOptions{ .sub_path = self.saveFilePath, .data = self.ram.?, .flags = createFlags };
+            //std.fs.cwd().writeFile(writeFlags) catch unreachable;
+        }
     }
 }
