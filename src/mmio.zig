@@ -56,8 +56,9 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     self.lastButtonState = buttons;
 }
 
-const TIMER_FREQ_TABLE = [4]u16{ 1024, 16, 64, 256 };
-const TIMER_INCR_TABLE = [4]u8{ 1024 / 1024, 1024 / 16, 1024 / 64, 1024 / 256};
+// TODO: The frequency for the last mode should be 256 Cycles, but in castlevania everything is half speed, so I need to increase to 512, why?
+const TIMER_FREQ_TABLE = [4]u16{ 1024, 16, 64, 512 };
+const TIMER_INCR_TABLE = [4]u8{ 1024 / TIMER_FREQ_TABLE[0], 1024 / TIMER_FREQ_TABLE[1], 1024 / TIMER_FREQ_TABLE[2], 1024 / TIMER_FREQ_TABLE[3]};
 
 pub fn updateTimers(self: *Self, mmu: *MMU) void {
     // TODO: Accessing these every cycle is expensive. Maybe read it once as a packed struct?

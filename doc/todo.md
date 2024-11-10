@@ -1,4 +1,6 @@
 - PPU:
+    - YFlip:
+        - IF you have double height object the y-Flip applies to the entire object.
     - Objects:
         - Selection Priority.
         - 10 Objects per Line.
