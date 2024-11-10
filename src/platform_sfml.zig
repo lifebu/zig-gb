@@ -39,7 +39,7 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     const WINDOW_WIDTH = Def.RESOLUTION_WIDTH * SCALING;
     const WINDOW_HEIGHT = Def.RESOLUTION_HEIGHT * SCALING;
 
-    self.window = try sf.RenderWindow.create(.{ .x = WINDOW_WIDTH, .y = WINDOW_HEIGHT}, 32, "Zig GB Emulator", 
+    self.window = try sf.RenderWindow.create(.{ .x = WINDOW_WIDTH, .y = WINDOW_HEIGHT}, 32, "Zig GB Emulator.", 
         sf.window.Style.titlebar | sf.window.Style.resize | sf.window.Style.close, null);
     errdefer self.window.destroy();
 
@@ -93,7 +93,7 @@ pub fn deinit(self: *Self) void {
     self.alloc.free(self.pixels);
 }
 
-pub fn update(self: *Self) bool {
+pub fn update(self: *Self) !bool {
     if (!self.window.isOpen()) {
         return false;
     }
@@ -117,6 +117,9 @@ pub fn update(self: *Self) bool {
     self.updateInputState();
     self.deltaMS = @as(f32, @floatFromInt(self.clock.restart().asMicroseconds())) / 1_000.0;
     self.fps = 1.0 / (self.deltaMS / 1_000);
+    const title = try std.fmt.allocPrintZ(self.alloc, "Zig GB Emulator. FPS: {d:.2}", .{self.fps});
+    self.window.setTitle(title);
+    self.alloc.free(title);
 
     if(Def.CLEAR_PIXELS_EACH_FRAME) {
         @memset(self.pixels, sf.Color.Black);

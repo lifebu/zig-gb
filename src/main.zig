@@ -30,7 +30,7 @@ pub fn main() !void {
 
     var ppu = PPU{};
 
-    while(platform.update()) {
+    while(try platform.update()) {
         var cyclesPerFrame: u32 = @intFromFloat(platform.targetDeltaMS * Def.CYCLES_PER_MS); 
         // TODO: Dynamic cycles per frame do not work. The window wants to show ~60FPS but the gameboy has ~59.7FPS. This discrepency lead to uggly lines crossing the screen.
         cyclesPerFrame = 70224;
