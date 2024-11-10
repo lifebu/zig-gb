@@ -310,8 +310,10 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
                 continue; // pixel not inside of object
             }
 
+            // In double height mode you are allowed to use either an even tileindex or the next tileindex and draw the same object.
+            const objTileIndex = if(lcdc.obj_size == .DOUBLE_HEIGHT) obj.tileIndex - (obj.tileIndex % 2) else obj.tileIndex;
             const tileOffset: u2 = if(objPixelY >= TILE_SIZE_Y) 1 else 0;
-            const tileAddress: u16 = objTileBaseAddress + (@as(u16, obj.tileIndex + tileOffset) * TILE_SIZE_BYTE);
+            const tileAddress: u16 = objTileBaseAddress + (@as(u16, objTileIndex + tileOffset) * TILE_SIZE_BYTE);
 
             const tilePixelX: u8 = @as(u8, @intCast(if(obj.flags.xFlip == 1) TILE_SIZE_X - 1 - objPixelX else objPixelX)) % TILE_SIZE_X;
             const tilePixelY: u8 = @as(u8, @intCast(if(obj.flags.yFlip == 1) objHeight - 1 - objPixelY  else objPixelY)) % TILE_SIZE_Y;
