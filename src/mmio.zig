@@ -11,8 +11,8 @@ lastDpadState: u4 = 0xF,
 lastButtonState: u4 = 0xF,
 
 timerCounter: u16 = 0,
-// 2^14 = 16.384Hz
-dividerCounter: u14 = 0,
+// 256 cycles
+dividerCounter: u8 = 0,
 
 dmaIsRunning: bool = false,
 dmaStartAddr: u16 = 0x0000,
@@ -68,8 +68,7 @@ pub fn updateTimers(self: *Self, mmu: *MMU) void {
     const timerMod: u8 = mmu.read8(MemMap.TIMER_MOD); 
     const timerControl: u8 = mmu.read8(MemMap.TIMER_CONTROL); 
 
-    const DIVIDER_FREQ: u14 = 16_383;
-    divider.* +%= @intCast(self.dividerCounter / DIVIDER_FREQ);
+    divider.* +%= @intCast(self.dividerCounter / 255);
     self.dividerCounter +%= 1;
 
     // TODO: Can this be done branchless?
