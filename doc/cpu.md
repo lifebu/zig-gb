@@ -10,6 +10,8 @@
 - This means, that I can decode the actual message on screen. 
 - And this means the test can run headless.
 
+- SingleStepTests are generated from raddad772/jsmoo (misc/code_generation/sm83_tests/generation.js).
+
 ## Testing with logs:
 Them:
 zig build run -- 01-special.gb > cpu_log_good.txt 2>&1

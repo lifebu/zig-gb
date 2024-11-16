@@ -17,19 +17,27 @@
         - The PPU Mode needs to be 0.
         - I set the initial mode for the PPU to 0x80, but it should be 0x85!
         https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
+- "Defensive Programming":
+    - Add a lot of asserts to different functions/systems to clearly define requirements.
+    - Example: MMU: What a game is allowed to access when (like the VRAM).
 - Cleanup CPU code!
 - Testing:
     - CPU: 
-        - SingleStepTests are generated from raddad772/jsmoo (misc/code_generation/sm83_tests/generation.js).
-    - Joypad: Test different InputState combinations and the resulting bit with test flags?
-    - Timer & Divider:
-    - Interrupts:
+        - Stop, Halt
+        - EI Delay, DI
+    - MMIO:
+        - Joypad: 
+            - Test different InputState combinations and the resulting bit with test flags?
+        - Timer & Divider:
+        - DMA:
+        - Interrupts:
     - PPU:
-        - 1st: MemoryDump + Picture => Compare them.
-        - 2nd: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
+        - Static: MemoryDump + Picture => Compare them.
+        - Dynamic: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
             - Compare each written pixel?
             - MemoryDump: When VBlank starts?
             - CPUWriteList: Not each Write to PPU accessible memory.
+    - Cart (MBC): 
     - TestRoms:
         - Blargg (CPU)
         - MealyBug (PPU)
