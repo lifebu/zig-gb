@@ -130,6 +130,11 @@ pub fn setFlag(self: *const Self, addr: u16, value: u8) void {
     flag.* |= value;
 }
 
+pub fn testFlag(self: *const Self, addr: u16, value: u8) bool {
+    const flag: *u8 = &self.memory[addr];
+    return flag.* & value == value;
+}
+
 /// Use this function if you know you can bypass all the mmu side-effects.
 pub fn getRaw(self: *Self) *[]u8 {
     return &self.memory;

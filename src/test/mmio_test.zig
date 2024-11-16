@@ -38,11 +38,14 @@ pub fn runTimerTest() !void {
     var mmu = try MMU.init(alloc, &mmio, null);
     defer mmu.deinit();
 
+    // TODO: Can I reduce the amount of code here?
+
     mmu.write8(MemMap.TIMER, 0x00);
     mmio.dividerCounter = 0;
-    mmu.write8(MemMap.TIMER_MOD, 0x00);
+    mmu.write8(MemMap.TIMER_MOD, 0x05);
 
     // 1024 cycles / increment
+    mmio.dividerCounter = 0;
     mmu.write8(MemMap.TIMER_CONTROL, 0b0000_0100);
     for(0..1024) |_| {
         mmio.updateTimers(&mmu);
@@ -50,6 +53,7 @@ pub fn runTimerTest() !void {
     try std.testing.expectEqual(0x01, mmu.read8(MemMap.TIMER));
 
     // 16 cycles / increment
+    mmio.dividerCounter = 0;
     mmu.write8(MemMap.TIMER_CONTROL, 0b0000_0101);
     for(0..16) |_| {
         mmio.updateTimers(&mmu);
@@ -57,6 +61,7 @@ pub fn runTimerTest() !void {
     try std.testing.expectEqual(0x02, mmu.read8(MemMap.TIMER));
 
     // 64 cycles / increment
+    mmio.dividerCounter = 0;
     mmu.write8(MemMap.TIMER_CONTROL, 0b0000_0110);
     for(0..64) |_| {
         mmio.updateTimers(&mmu);
@@ -64,6 +69,7 @@ pub fn runTimerTest() !void {
     try std.testing.expectEqual(0x03, mmu.read8(MemMap.TIMER));
 
     // 256 cycles / increment
+    mmio.dividerCounter = 0;
     mmu.write8(MemMap.TIMER_CONTROL, 0b0000_0111);
     for(0..256) |_| {
         mmio.updateTimers(&mmu);
@@ -71,11 +77,66 @@ pub fn runTimerTest() !void {
     try std.testing.expectEqual(0x04, mmu.read8(MemMap.TIMER));
 
     // overflow
+    mmio.dividerCounter = 0;
+    mmu.write8(MemMap.TIMER_MOD, 0x05);
     mmu.write8(MemMap.TIMER, 0xFF);
+    mmu.write8(MemMap.INTERRUPT_FLAG, 0x00);
     for(0..256) |_| {
         mmio.updateTimers(&mmu);
     }
+    // TIMA value is applied 4 cycles later.
     try std.testing.expectEqual(0x00, mmu.read8(MemMap.TIMER));
+    try std.testing.expectEqual(false, mmu.testFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER));
+    for(0..4) |_| {
+        mmio.updateTimers(&mmu);
+    }
+    try std.testing.expectEqual(0x05, mmu.read8(MemMap.TIMER));
+    try std.testing.expectEqual(true, mmu.testFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER));
 
-    // TODO: Test timing of overflow (overflow happens over multiple cycles!).
+    // disable can increment timer.
+    mmio.dividerCounter = 0xFFFD;
+    mmio.updateTimers(&mmu);
+    try std.testing.expectEqual(0x05, mmu.read8(MemMap.TIMER));
+    mmu.write8(MemMap.TIMER_CONTROL, 0b0000_0011);
+    mmio.updateTimers(&mmu);
+    try std.testing.expectEqual(0x06, mmu.read8(MemMap.TIMER));
+
+    // overflow: cpu writes abort timer_mod
+    mmio.dividerCounter = 0;
+    mmu.write8(MemMap.TIMER_MOD, 0x05);
+    mmu.write8(MemMap.TIMER, 0xFF);
+    mmu.write8(MemMap.INTERRUPT_FLAG, 0x00);
+    for(0..256) |_| {
+        mmio.updateTimers(&mmu);
+    }
+    mmu.write8(MemMap.TIMER, 0x10);
+    for(0..4) |_| {
+        mmio.updateTimers(&mmu);
+    }
+    try std.testing.expectEqual(0x10, mmu.read8(MemMap.TIMER));
+    try std.testing.expectEqual(false, mmu.testFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER));
+
+    // overflow: cpu write TIMA on 4th cycle => write is ignored
+    mmio.dividerCounter = 0;
+    mmu.write8(MemMap.TIMER_MOD, 0x05);
+    mmu.write8(MemMap.TIMER, 0xFF);
+    mmu.write8(MemMap.INTERRUPT_FLAG, 0x00);
+    for(0..(256 + 3)) |_| {
+        mmio.updateTimers(&mmu);
+    }
+    mmu.write8(MemMap.TIMER, 0x33);
+    mmio.updateTimers(&mmu);
+    try std.testing.expectEqual(0x05, mmu.read8(MemMap.TIMER));
+
+    // overflow: cpu write TMA on 4th cycle => new TMA value is used.
+    mmio.dividerCounter = 0;
+    mmu.write8(MemMap.TIMER_MOD, 0x05);
+    mmu.write8(MemMap.TIMER, 0xFF);
+    mmu.write8(MemMap.INTERRUPT_FLAG, 0x00);
+    for(0..(256 + 3)) |_| {
+        mmio.updateTimers(&mmu);
+    }
+    mmu.write8(MemMap.TIMER_MOD, 0x22);
+    mmio.updateTimers(&mmu);
+    try std.testing.expectEqual(0x22, mmu.read8(MemMap.TIMER));
 }
