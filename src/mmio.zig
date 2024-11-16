@@ -10,9 +10,8 @@ const Self = @This();
 lastDpadState: u4 = 0xF,
 lastButtonState: u4 = 0xF,
 
+divider: u16 = 0,
 timerCounter: u16 = 0,
-// 256 cycles
-dividerCounter: u8 = 0,
 
 dmaIsRunning: bool = false,
 dmaStartAddr: u16 = 0x0000,
@@ -63,13 +62,13 @@ const TIMER_INCR_TABLE = [4]u8{ 1024 / TIMER_FREQ_TABLE[0], 1024 / TIMER_FREQ_TA
 pub fn updateTimers(self: *Self, mmu: *MMU) void {
     // TODO: Accessing these every cycle is expensive. Maybe read it once as a packed struct?
     const rawMemory: *[]u8 = mmu.getRaw();
-    const divider: *u8 = &rawMemory.*[MemMap.DIVIDER];
     const timer: *u8 = &rawMemory.*[MemMap.TIMER];
     const timerMod: u8 = mmu.read8(MemMap.TIMER_MOD); 
     const timerControl: u8 = mmu.read8(MemMap.TIMER_CONTROL); 
 
-    divider.* +%= @intCast(self.dividerCounter / 255);
-    self.dividerCounter +%= 1;
+    // GB only sees high 8 bit => divider increments every 256 cycles. 
+    self.divider +%= 1;
+    rawMemory.*[MemMap.DIVIDER] = @intCast((self.divider & 0xFF00) >> 8);
 
     // TODO: Can this be done branchless?
     const timerEnabled: bool = (timerControl & 0x4) == 0x4;
