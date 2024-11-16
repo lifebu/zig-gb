@@ -10,8 +10,9 @@ const Self = @This();
 lastDpadState: u4 = 0xF,
 lastButtonState: u4 = 0xF,
 
-divider: u16 = 0,
-timerCounter: u16 = 0,
+// last bit we tested for timer (used to detect falling edge).
+timerLastBit: bool = false,
+dividerCounter: u16 = 0,
 
 dmaIsRunning: bool = false,
 dmaStartAddr: u16 = 0x0000,
@@ -55,36 +56,39 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     self.lastButtonState = buttons;
 }
 
-// TODO: The frequency for the last mode should be 256 Cycles, but in castlevania everything is half speed, so I need to increase to 512, why?
-const TIMER_FREQ_TABLE = [4]u16{ 1024, 16, 64, 512 };
-const TIMER_INCR_TABLE = [4]u8{ 1024 / TIMER_FREQ_TABLE[0], 1024 / TIMER_FREQ_TABLE[1], 1024 / TIMER_FREQ_TABLE[2], 1024 / TIMER_FREQ_TABLE[3]};
+const TIMER_MASK_TABLE = [4]u10{ 1024 / 2, 16 / 2, 64 / 2, 256 / 2 };
+const TimerControl = packed struct(u8) {
+    clock: u2,
+    enable: bool,
+    _: u5,
+};
 
 pub fn updateTimers(self: *Self, mmu: *MMU) void {
-    // TODO: Accessing these every cycle is expensive. Maybe read it once as a packed struct?
     const rawMemory: *[]u8 = mmu.getRaw();
     const timer: *u8 = &rawMemory.*[MemMap.TIMER];
-    const timerMod: u8 = mmu.read8(MemMap.TIMER_MOD); 
-    const timerControl: u8 = mmu.read8(MemMap.TIMER_CONTROL); 
+    const timerControl: *TimerControl = @ptrCast(&rawMemory.*[MemMap.TIMER_CONTROL]);
 
+    self.dividerCounter +%= 1;
     // GB only sees high 8 bit => divider increments every 256 cycles. 
-    self.divider +%= 1;
-    rawMemory.*[MemMap.DIVIDER] = @intCast((self.divider & 0xFF00) >> 8);
+    rawMemory.*[MemMap.DIVIDER] = @intCast(self.dividerCounter >> 8);
 
-    // TODO: Can this be done branchless?
-    const timerEnabled: bool = (timerControl & 0x4) == 0x4;
-    if(timerEnabled) {
-        const currentFreq = TIMER_FREQ_TABLE[timerControl & 0x3];
-        const currentIncrement = TIMER_INCR_TABLE[timerControl & 0x3];
-        const addToTimer: u1 = @intCast(self.timerCounter / (currentFreq - 1)); 
-        timer.*, const overflow = @addWithOverflow(timer.*, addToTimer * currentIncrement);
-        self.timerCounter += 1;
-        self.timerCounter %= currentFreq;
-
-        if(overflow == 1) {
-            mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER);
-            timer.* = timerMod;
-        }
+    const timerMask = TIMER_MASK_TABLE[timerControl.clock];
+    const timerBit: bool = ((self.dividerCounter & timerMask) == timerMask) and timerControl.enable;
+    // Can happen when timerLastBit is true and timerControl.enable was set to false this frame (intended GB behavior). 
+    const timerFallingEdge: bool = !timerBit and self.timerLastBit;
+    timer.*, const overflow = @addWithOverflow(timer.*, @intFromBool(timerFallingEdge));
+    // TODO: Branchless?
+    if(overflow == 1) {
+        // TODO: After overflowing, it takes 4 cycles before the interrupt flag is set and the value from timer_mod is used.
+        // During that time, timer stays 0.
+        // If the cpu writes to timer during the 4 cycles, these two steps will be skipped. 
+        // If cpu writes to timer on the cycle that timer is set by the overflow, the cpu write will be overwritten.
+        // If cpu writes to timer_mod on the cycle that timer is set by the overflow, the overflow uses the new timer_mod.
+        mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER);
+        timer.* = mmu.read8(MemMap.TIMER_MOD);
     }
+
+    self.timerLastBit = timerBit;
 }
 
 pub fn initiateDMA(self: *Self, offset: u16) void {

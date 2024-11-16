@@ -39,6 +39,7 @@ pub fn runTimerTest() !void {
     defer mmu.deinit();
 
     mmu.write8(MemMap.TIMER, 0x00);
+    mmio.dividerCounter = 0;
     mmu.write8(MemMap.TIMER_MOD, 0x00);
 
     // 1024 cycles / increment
@@ -75,4 +76,6 @@ pub fn runTimerTest() !void {
         mmio.updateTimers(&mmu);
     }
     try std.testing.expectEqual(0x00, mmu.read8(MemMap.TIMER));
+
+    // TODO: Test timing of overflow (overflow happens over multiple cycles!).
 }

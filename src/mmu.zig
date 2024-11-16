@@ -30,7 +30,7 @@ pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     self.memory[MemMap.SERIAL_DATA] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
     self.memory[MemMap.SERIAL_CONTROL] = 0x7E;
     self.memory[MemMap.DIVIDER] = 0xAB;
-    self.mmio.divider = 0xAB;
+    self.mmio.dividerCounter = 0xAB00;
     self.memory[MemMap.TIMER] = 0x00;
     self.memory[MemMap.TIMER_MOD] = 0x00;
     self.memory[MemMap.TIMER_CONTROL] = 0xF8;
@@ -98,7 +98,7 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
         },
         MemMap.DIVIDER => {
             self.memory[addr] = 0;
-            self.mmio.divider = 0;
+            self.mmio.dividerCounter = 0;
         },
         MemMap.DMA => {
             // TODO: Disallow access to almost all memory, when a dma is running.
