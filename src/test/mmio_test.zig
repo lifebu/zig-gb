@@ -38,8 +38,6 @@ pub fn runTimerTest() !void {
     var mmu = try MMU.init(alloc, &mmio, null);
     defer mmu.deinit();
 
-    // TODO: Can I reduce the amount of code here?
-
     mmu.write8(MemMap.TIMER, 0x00);
     mmio.dividerCounter = 0;
     mmu.write8(MemMap.TIMER_MOD, 0x05);
@@ -139,4 +137,48 @@ pub fn runTimerTest() !void {
     mmu.write8(MemMap.TIMER_MOD, 0x22);
     mmio.updateTimers(&mmu);
     try std.testing.expectEqual(0x22, mmu.read8(MemMap.TIMER));
+}
+
+pub fn runDMATest() !void {
+    const alloc = std.testing.allocator;
+
+    var mmio = MMIO{};
+
+    var mmu = try MMU.init(alloc, &mmio, null);
+    defer mmu.deinit();
+    const rawMemory: *[]u8 = mmu.getRaw();
+    for(0x0300..0x039F, 1..) |addr, i| {
+        rawMemory.*[addr] = @truncate(i);
+    }
+    for(MemMap.OAM_LOW..MemMap.OAM_HIGH + 1) |addr| {
+        rawMemory.*[addr] = 0;
+    }
+
+    // correct address calculation.
+    mmu.write8(MemMap.DMA, 0x03);
+    try std.testing.expectEqual(true, mmio.dmaIsRunning);
+    try std.testing.expectEqual(0x0300, mmio.dmaStartAddr);
+    try std.testing.expectEqual(0, mmio.dmaCurrentOffset);
+
+    // first 4 cycles nothing happens.
+    for(0..4) |_| {
+        mmio.updateDMA(&mmu);
+    }
+    try std.testing.expectEqual(0, rawMemory.*[MemMap.OAM_LOW]);
+
+    // every 4 cycles one byte is copied.
+    for(0..160) |iByte| {
+        for(0..4) |_| {
+            mmio.updateDMA(&mmu);
+        }
+        try std.testing.expectEqual(rawMemory.*[mmio.dmaStartAddr + iByte], rawMemory.*[MemMap.OAM_LOW + iByte]);
+        try std.testing.expectEqual(0, rawMemory.*[MemMap.OAM_LOW + iByte + 1]);
+    }
+
+    // dma is now done.
+    try std.testing.expectEqual(false, mmio.dmaIsRunning);
+
+    // TODO: Also test DMA bus conflicts and what the CPU/PPU could access.
+    // https://hacktix.github.io/GBEDG/dma/
+    // https://gbdev.io/pandocs/OAM_DMA_Transfer.html
 }

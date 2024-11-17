@@ -21,3 +21,7 @@ test "MMIO_DividerTest" {
 test "MMIO_TimerTest" {
     try mmio_test.runTimerTest();
 }
+
+test "MMIO_DMATest" {
+    try mmio_test.runDMATest();
+}

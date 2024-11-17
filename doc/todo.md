@@ -28,8 +28,6 @@
     - MMIO:
         - Joypad: 
             - Test different InputState combinations and the resulting bit with test flags?
-        - Timer & Divider:
-        - DMA:
         - Interrupts:
     - PPU:
         - Static: MemoryDump + Picture => Compare them.
@@ -50,3 +48,25 @@
     - Status updates like DMA transfers and what was transfered etc.
 - Bugs:
     - When the PPU 
+
+
+Interrupt Handling:
+- two functions in cpu: IsInterruptRunning() and ExecInterrupt()
+- we have a state machine for the interrupts with a switch state and a current state.
+- also a bool that says if the interrupt is currently running.
+- do that so that we can have the interrupt handler run for multiple cycles.
+- the handler now looks very similar to the opcodes of the cpu.
+- But not it's own class (because the code is so little and so reliant on the CPU internals).
+- writeup:
+https://mgba.io/2018/03/09/holy-grail-bugs-revisited/#the-phantom-of-pinball-fantasies
+
+Required Data:
+- MMU:
+    - IE Register.
+    - IF Register.
+    - IME Register.
+- CPU:
+    - cpu halted state.
+    - cpu sp. 
+    - cpu pc.
+    - cpu cycles_ahead (lag cycles).
