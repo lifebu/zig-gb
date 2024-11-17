@@ -64,33 +64,54 @@
 ## Audio / APU
 - Platform: sf::Sound, sf::SoundBuffer (loadFromSamples: sample array (int16), channels, sample-rate). 
 - TBD
+https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
+https://github.com/bwhitman/pushpin/blob/master/src/gbsound.txt
 
 ## Debugging Features
 - Dependencies:
     - csfml, cimgui, csfml-imgui
-- VRAM Viewer, Color-coded tiles?
+- VRAM Viewer
+    - BG Map, Tiles, OAM, Palettes (~BGB).
+    - Color-coded tiles
+- IO MAP:
+    - State of entire system.
+- Joypad Visualization.
+- CPU State:
+- Some other ideas:
+    https://www.reddit.com/r/EmuDev/comments/1fu5tgd/finally_i_made_a_gameboycolor_emulator/
+    https://www.reddit.com/r/EmuDev/comments/fe1pnq/began_with_my_second_emulator_project_today_i_hit/
+    https://www.reddit.com/r/EmuDev/comments/tb4o6p/my_game_boy_advance_emulator_running_iridion_ii/
+    https://www.reddit.com/r/EmuDev/comments/mzpx30/adding_a_pokemon_trainer_to_my_gb_emulator_would/
+    https://www.reddit.com/r/EmuDev/comments/tiwlxr/i_added_a_gui_debugger_to_my_game_boy_color/
 
 ## Building
 - Build with package manager.
 - Test Build on windows.
 
 ## Github
-- Automatic builds
-- Automated Testing
+- Github Actions:
+    - Automatic builds
+    - Automated Testing
 - Releases.
 - Documentation/Readme.
+- github.io page?
 
 ## User Features
 - CLI
-- Emulator
 - Gracefull Errorhandling (like illegal instructions).
 - UI / Menus / Config:
     - Keybinds, Controller.
-    - Colors (Color Palette for DMG).
-- Savegames
-- Savestates
-- Fast-forward
-- Rapidfire
+    - DMG Color Palette.
+    d Hardware Revision (to load Boot roms).
+        - Select Boot Roms (GB, SGB, GBC, GBA).
+    - Multiplayer setup.
+    - Window size (Multiples).
+    - FPS Target.
+    - Frameskip.
+    - Audio: Mute, Enable/Disable Channels, Sample rate, audio buffer size, volume.
+- Emulator
+    - Savegames
+    - Reset.
 
 # Version 2.0:
 - CGB.
@@ -99,6 +120,13 @@
 - Infrared.
 - Boot Roms / Startup.
 - Cheats: GameGenie / GameShark
+
+## User Features
+- Emulator:
+    - Rewind
+    - Savestates
+    - Fast-forward
+    - Rapidfire
 
 # Version 3.0:
 - GBA
