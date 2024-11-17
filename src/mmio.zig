@@ -17,6 +17,7 @@ dividerCounter: u16 = 0,
 dmaIsRunning: bool = false,
 dmaStartAddr: u16 = 0x0000,
 dmaCurrentOffset: u16 = 0,
+dmaCounter: u3 = 0,
 
 pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // 0 means pressed for gameboy => 0xF nothing is pressed
@@ -95,6 +96,7 @@ pub fn initiateDMA(self: *Self, offset: u16) void {
     self.dmaIsRunning = true;
     self.dmaStartAddr = offset << 8;
     self.dmaCurrentOffset = 0;
+    self.dmaCounter = 0;
 }
 
 pub fn updateDMA(self: *Self, mmu: *MMU) void {
@@ -103,6 +105,14 @@ pub fn updateDMA(self: *Self, mmu: *MMU) void {
         return;
     }
 
+    // first time we overflow after 8 cycles for first write.
+    self.dmaCounter, const overflow = @addWithOverflow(self.dmaCounter, 1);
+    if(overflow == 0) {
+        return;
+    }
+
+    // Setting to 4 means that after the first time, we overflow every 4 cycles.
+    self.dmaCounter = 4;
     const sourceAddr: u16 = self.dmaStartAddr + self.dmaCurrentOffset;
     const destAddr: u16 = MemMap.OAM_LOW + self.dmaCurrentOffset;
     mmu.write8(destAddr, mmu.read8(sourceAddr));
