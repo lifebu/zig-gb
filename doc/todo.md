@@ -1,6 +1,11 @@
+# Version 1.0:
+## Define 1.0:
+- Move everything not "required" to 2.0?
+
+## Bugs / Missing.
 - PPU:
     - YFlip:
-        - IF you have double height object the y-Flip applies to the entire object.
+        - If you have double height object the y-Flip applies to the entire object.
     - Objects:
         - Selection Priority.
         - 10 Objects per Line.
@@ -17,56 +22,83 @@
         - The PPU Mode needs to be 0.
         - I set the initial mode for the PPU to 0x80, but it should be 0x85!
         https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
-- "Defensive Programming":
-    - Add a lot of asserts to different functions/systems to clearly define requirements.
-    - Example: MMU: What a game is allowed to access when (like the VRAM).
-- Cleanup CPU code!
-- Testing:
-    - CPU: 
-        - Stop, Halt
-        - EI Delay, DI
-    - MMIO:
-        - Joypad: 
-            - Test different InputState combinations and the resulting bit with test flags?
-        - Interrupts:
-    - PPU:
-        - Static: MemoryDump + Picture => Compare them.
-        - Dynamic: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
-            - Compare each written pixel?
-            - MemoryDump: When VBlank starts?
-            - CPUWriteList: Not each Write to PPU accessible memory.
-    - Cart (MBC): 
-    - TestRoms:
-        - Blargg (CPU)
-        - MealyBug (PPU)
-        - Mooneye (All)
-        - Acid2 (PPU)
-        - SameSuite (All)
-- Debugging Features:
-    - Add a bunch of features that make it easier to see where issues lie.
-    - Like a VRAM viewer that includes color-coded tile indices for a tile map for example.
-    - Status updates like DMA transfers and what was transfered etc.
-- Bugs:
-    - When the PPU 
 
+## Testing
+- CPU: STOP, HALT, EI Delay, DI, Halt-Bug
+- Cart: MBC, Header, ROM/RAM.
+- Input:
+    - Test different InputState combinations and the resulting bit with test flags?
+- Interrupts
+- MMU: OAM-BUG, Read/Write Behavior.
+- Test ROMS:
+    - Blargg (CPU)
+    - MealyBug (PPU)
+    - Mooneye (All)
+    - Acid2 (PPU)
+    - SameSuite (All)
+- PPU
+    - Static: MemoryDump + Picture => Compare them.
+    - Dynamic: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
+        - Compare each written pixel.
+        - MemoryDump: When VBlank starts?
+        - CPUWriteList: Each Write to PPU accessible memory.
 
-Interrupt Handling:
-- two functions in cpu: IsInterruptRunning() and ExecInterrupt()
-- we have a state machine for the interrupts with a switch state and a current state.
-- also a bool that says if the interrupt is currently running.
-- do that so that we can have the interrupt handler run for multiple cycles.
-- the handler now looks very similar to the opcodes of the cpu.
-- But not it's own class (because the code is so little and so reliant on the CPU internals).
-- writeup:
-https://mgba.io/2018/03/09/holy-grail-bugs-revisited/#the-phantom-of-pinball-fantasies
+## Refactor
+- Asserts (Defensive Programming, Tigerbeetle).
+- CPU: Instructions, STOP, HALT, EI, Halt-Bug.
+- Cart: MBC, Header, ROM/RAM.
+- Input
+- Interrupts:
+    cpu.IsInterruptRunning(): currentlyRunning: bool, 
+    cpu.ExecInterrupt(): State machine: BLANK, SAVE_PC_LOW, SAVE_PC_HIGH, JUMP 
+        - runs for multiple cycles
+    https://mgba.io/2018/03/09/holy-grail-bugs-revisited/#the-phantom-of-pinball-fantasies
+- MMU: OAM-BUG, Read/Write Behavior, Access Rights (DMA, VRAM, OAM).
+- PPU:
+- Timer and Divider.
 
-Required Data:
-- MMU:
-    - IE Register.
-    - IF Register.
-    - IME Register.
-- CPU:
-    - cpu halted state.
-    - cpu sp. 
-    - cpu pc.
-    - cpu cycles_ahead (lag cycles).
+- Platform Timing (window fps, vs gb fps).
+- Testsetup:
+    - Allow to run single test and all tests.
+
+## Audio / APU
+- Platform: sf::Sound, sf::SoundBuffer (loadFromSamples: sample array (int16), channels, sample-rate). 
+- TBD
+
+## Debugging Features
+- Dependencies:
+    - csfml, cimgui, csfml-imgui
+- VRAM Viewer, Color-coded tiles?
+
+## Building
+- Build with package manager.
+- Test Build on windows.
+
+## Github
+- Automatic builds
+- Automated Testing
+- Releases.
+- Documentation/Readme.
+
+## User Features
+- CLI
+- Emulator
+- Gracefull Errorhandling (like illegal instructions).
+- UI / Menus / Config:
+    - Keybinds, Controller.
+    - Colors (Color Palette for DMG).
+- Savegames
+- Savestates
+- Fast-forward
+- Rapidfire
+
+# Version 2.0:
+- CGB.
+- SGB.
+- Serial.
+- Infrared.
+- Boot Roms / Startup.
+- Cheats: GameGenie / GameShark
+
+# Version 3.0:
+- GBA

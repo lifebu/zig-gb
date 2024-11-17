@@ -12,6 +12,7 @@ lastButtonState: u4 = 0xF,
 
 // last bit we tested for timer (used to detect falling edge).
 timerLastBit: bool = false,
+// TODO: Maybe rename to "systemCounter"? 
 dividerCounter: u16 = 0,
 
 dmaIsRunning: bool = false,

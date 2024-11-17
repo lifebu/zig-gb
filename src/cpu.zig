@@ -128,12 +128,12 @@ pub fn getFromR16MemVariant(self: *Self, variant: R16MemVariant) u16 {
         .DE => self.registers.r16.DE,
         .HLinc => blk: {
             const addr: u16 = self.registers.r16.HL;
-            self.registers.r16.HL += 1;
+            self.registers.r16.HL +%= 1;
             break: blk addr;
         },
         .HLdec => blk: {
             const addr: u16 = self.registers.r16.HL;
-            self.registers.r16.HL -= 1;
+            self.registers.r16.HL -%= 1;
             break: blk addr;
         },
     };
