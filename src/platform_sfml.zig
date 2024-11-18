@@ -15,6 +15,10 @@ const BACKGROUND = "data/background.png";
 const SCALING = 4;
 const TARGET_FPS = 60.0;
 
+const NUM_SAMPLES = 512;
+const NUM_CHANNELS = 2; //Stereo
+const SAMPLE_RATE = 48_000;
+
 alloc: std.mem.Allocator,
 conf: Conf,
 
@@ -32,6 +36,11 @@ clock: sf.system.Clock = undefined,
 deltaMS: f32 = 0,
 targetDeltaMS: f32 = 0,
 fps: f32 = 0,
+
+// Audio
+samples: []i16 = undefined,
+sound: sf.audio.Sound = undefined,
+soundBuffer: sf.audio.SoundBuffer = undefined,
 
 pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     var self = Self{ .alloc = alloc, .conf = conf.*};
@@ -78,8 +87,22 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     errdefer alloc.free(self.pixels);
     @memset(self.pixels, sf.Color.Black);
 
+    // timing
     self.clock = try sf.system.Clock.create();
     self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
+
+    // audio
+    self.samples = try alloc.alloc(i16, NUM_SAMPLES * NUM_CHANNELS);
+    errdefer alloc.free(self.samples);
+    @memset(self.samples, 0);
+
+    self.soundBuffer = try sf.audio.SoundBuffer.createFromSamples(self.samples, NUM_CHANNELS, NUM_SAMPLES);
+    errdefer self.soundBuffer.destroy();
+
+    self.sound = try sf.audio.Sound.create();
+    errdefer self.sound.destroy();
+
+    self.sound.setVolume(0.0);
 
     return self;
 }
@@ -89,8 +112,13 @@ pub fn deinit(self: *Self) void {
     self.cpuTexture.destroy();
     self.gpuTexture.destroy();
     self.gpuSprite.destroy();
-    self.clock.destroy();
     self.alloc.free(self.pixels);
+
+    self.clock.destroy();
+
+    self.alloc.free(self.samples);
+    self.sound.destroy();
+    self.soundBuffer.destroy();
 }
 
 pub fn update(self: *Self) !bool {
@@ -128,8 +156,9 @@ pub fn update(self: *Self) !bool {
     return true;
 } 
 
-pub fn getRawPixels(self: *Self) *[]Def.Color {
-    return @ptrCast(&self.pixels);
+// Input
+pub fn getInputState(self: *Self) Def.InputState {
+    return self.currInputState;
 } 
 
 fn updateInputState(self: *Self) void {
@@ -147,8 +176,9 @@ fn updateInputState(self: *Self) void {
         };
 }
 
-pub fn getInputState(self: *Self) Def.InputState {
-    return self.currInputState;
+// graphics
+pub fn getRawPixels(self: *Self) *[]Def.Color {
+    return @ptrCast(&self.pixels);
 } 
 
 pub fn render(self: *Self) !void {
@@ -157,4 +187,20 @@ pub fn render(self: *Self) !void {
     self.gpuTexture.updateFromTexture(self.cpuTexture, null);
     self.window.draw(self.gpuSprite, null);
     self.window.display();
+} 
+
+// audio
+pub fn getSamples(self: *Self) *[]i16 {
+    return &self.samples;
+} 
+
+pub fn playAudio(self: *Self) !void {
+    const newBuffer: sf.audio.SoundBuffer = try sf.audio.SoundBuffer.createFromSamples(self.samples, NUM_CHANNELS, NUM_SAMPLES);
+    self.sound.setBuffer(newBuffer);
+    self.sound.setLoop(true);
+    self.sound.play();
+
+    self.soundBuffer.destroy();
+    // TODO: Is this actually a copy? Would that mean that newBuffer is actually destroyed?
+    self.soundBuffer = newBuffer;
 } 

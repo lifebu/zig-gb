@@ -60,6 +60,7 @@
 - Platform Timing (window fps, vs gb fps).
 - Testsetup:
     - Allow to run single test and all tests.
+- General Code Cleanup / Quality.
 
 ## Audio / APU
 - Platform: sf::Sound, sf::SoundBuffer (loadFromSamples: sample array (int16), channels, sample-rate). 
@@ -94,7 +95,7 @@ https://github.com/bwhitman/pushpin/blob/master/src/gbsound.txt
     - Automated Testing
 - Releases.
 - Documentation/Readme.
-- github.io page?
+- Github Pages
 
 ## User Features
 - CLI
@@ -112,13 +113,13 @@ https://github.com/bwhitman/pushpin/blob/master/src/gbsound.txt
 - Emulator
     - Savegames
     - Reset.
+    - Load Game, Recentlist.
 
 # Version 2.0:
 - CGB.
-- SGB.
 - Serial.
-- Infrared.
 - Boot Roms / Startup.
+    - SameBoy has open source boot roms!
 - Cheats: GameGenie / GameShark
 
 ## User Features
@@ -130,3 +131,7 @@ https://github.com/bwhitman/pushpin/blob/master/src/gbsound.txt
 
 # Version 3.0:
 - GBA
+
+# Maybe:
+- Infrared.
+- SGB.

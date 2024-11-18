@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const APU = @import("apu.zig");
 const CONF = @import("conf.zig");
 const CPU = @import("cpu.zig");
 const Def = @import("def.zig");
@@ -19,6 +20,8 @@ pub fn main() !void {
 
     var platform = try PlatformSFML.init(alloc, &conf);
     defer platform.deinit();
+
+    var apu = APU{};
 
     var cpu = try CPU.init();
     defer cpu.deinit();
@@ -44,11 +47,13 @@ pub fn main() !void {
                 mmio.updateTimers(&mmu);
                 mmio.updateDMA(&mmu);
                 ppu.step(&mmu, platform.getRawPixels());
+                apu.step(&mmu, platform.getSamples());
             }
             mmio.updateJoypad(&mmu, platform.getInputState());
         }
 
         try platform.render();
+        try platform.playAudio();
     }
 }
 
