@@ -7,7 +7,7 @@ const sf = struct {
 const Conf = @import("conf.zig");
 const Def = @import("def.zig");
 const MemMap = @import("mem_map.zig");
-const RBSoundStream = @import("platform/RBSoundStream.zig");
+const RBSoundStream = @import("platform/rb_soundstream.zig");
 
 const Self = @This();
 
@@ -90,7 +90,7 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     self.soundStream = try RBSoundStream.init(alloc);
     errdefer self.soundStream.deinit();
 
-    try self.soundStream.play();
+    self.soundStream.play();
 
     return self;
 }
@@ -177,5 +177,5 @@ pub fn render(self: *Self) !void {
 
 // audio
 pub fn getSamples(self: *Self) *std.RingBuffer {
-    return &self.soundStream.samples;
+    return self.soundStream.samples;
 } 
