@@ -6,18 +6,15 @@ const sf = struct {
 
 const Conf = @import("conf.zig");
 const Def = @import("def.zig");
-
 const MemMap = @import("mem_map.zig");
+const RBSoundStream = @import("platform/RBSoundStream.zig");
 
 const Self = @This();
 
 const BACKGROUND = "data/background.png";
-const SCALING = 4;
+const SCALING = 5;
 const TARGET_FPS = 60.0;
 
-const NUM_SAMPLES = 512;
-const NUM_CHANNELS = 2; //Stereo
-const SAMPLE_RATE = 48_000;
 
 alloc: std.mem.Allocator,
 conf: Conf,
@@ -38,9 +35,7 @@ targetDeltaMS: f32 = 0,
 fps: f32 = 0,
 
 // Audio
-samples: []i16 = undefined,
-sound: sf.audio.Sound = undefined,
-soundBuffer: sf.audio.SoundBuffer = undefined,
+soundStream: RBSoundStream = undefined,
 
 pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     var self = Self{ .alloc = alloc, .conf = conf.*};
@@ -92,17 +87,10 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
 
     // audio
-    self.samples = try alloc.alloc(i16, NUM_SAMPLES * NUM_CHANNELS);
-    errdefer alloc.free(self.samples);
-    @memset(self.samples, 0);
+    self.soundStream = try RBSoundStream.init(alloc);
+    errdefer self.soundStream.deinit();
 
-    self.soundBuffer = try sf.audio.SoundBuffer.createFromSamples(self.samples, NUM_CHANNELS, NUM_SAMPLES);
-    errdefer self.soundBuffer.destroy();
-
-    self.sound = try sf.audio.Sound.create();
-    errdefer self.sound.destroy();
-
-    self.sound.setVolume(0.0);
+    try self.soundStream.play();
 
     return self;
 }
@@ -116,9 +104,7 @@ pub fn deinit(self: *Self) void {
 
     self.clock.destroy();
 
-    self.alloc.free(self.samples);
-    self.sound.destroy();
-    self.soundBuffer.destroy();
+    self.soundStream.deinit();
 }
 
 pub fn update(self: *Self) !bool {
@@ -190,17 +176,6 @@ pub fn render(self: *Self) !void {
 } 
 
 // audio
-pub fn getSamples(self: *Self) *[]i16 {
-    return &self.samples;
-} 
-
-pub fn playAudio(self: *Self) !void {
-    const newBuffer: sf.audio.SoundBuffer = try sf.audio.SoundBuffer.createFromSamples(self.samples, NUM_CHANNELS, NUM_SAMPLES);
-    self.sound.setBuffer(newBuffer);
-    self.sound.setLoop(true);
-    self.sound.play();
-
-    self.soundBuffer.destroy();
-    // TODO: Is this actually a copy? Would that mean that newBuffer is actually destroyed?
-    self.soundBuffer = newBuffer;
+pub fn getSamples(self: *Self) *std.RingBuffer {
+    return &self.soundStream.samples;
 } 

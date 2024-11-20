@@ -53,7 +53,6 @@ pub fn main() !void {
         }
 
         try platform.render();
-        try platform.playAudio();
     }
 }
 
