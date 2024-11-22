@@ -7,12 +7,12 @@ const sf = struct {
 const Conf = @import("conf.zig");
 const Def = @import("def.zig");
 const MemMap = @import("mem_map.zig");
-const RBSoundStream = @import("platform/rb_soundstream.zig");
+const RingBufferMT = @import("util/RingBufferMT.zig");
 
 const Self = @This();
 
 const BACKGROUND = "data/background.png";
-const SCALING = 5;
+const SCALING = 4;
 const TARGET_FPS = 60.0;
 
 
@@ -35,7 +35,8 @@ targetDeltaMS: f32 = 0,
 fps: f32 = 0,
 
 // Audio
-soundStream: RBSoundStream = undefined,
+samples: *RingBufferMT = undefined,
+soundStream: *sf.c.sfSoundStream = undefined,
 
 pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     var self = Self{ .alloc = alloc, .conf = conf.*};
@@ -87,10 +88,16 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
 
     // audio
-    self.soundStream = try RBSoundStream.init(alloc);
-    errdefer self.soundStream.deinit();
+    self.samples = try alloc.create(RingBufferMT);
+    errdefer alloc.destroy(self.samples);
+    self.samples.* = try RingBufferMT.init(alloc, Def.NUM_SAMPLES * Def.NUM_CHANNELS);
 
-    self.soundStream.play();
+    const newStream = sf.c.sfSoundStream_create(soundStreamOnGetData, soundStreamOnSeek, Def.NUM_CHANNELS, Def.NUM_SAMPLES, @ptrCast(self.samples));
+    if (newStream) |stream| {
+        self.soundStream = stream;
+    } else return std.mem.Allocator.Error.OutOfMemory;
+
+    sf.c.sfSoundStream_play(self.soundStream);
 
     return self;
 }
@@ -104,7 +111,9 @@ pub fn deinit(self: *Self) void {
 
     self.clock.destroy();
 
-    self.soundStream.deinit();
+    self.samples.deinit();
+    self.alloc.destroy(self.samples);
+    sf.c.sfSoundStream_destroy(self.soundStream);
 }
 
 pub fn update(self: *Self) !bool {
@@ -176,6 +185,17 @@ pub fn render(self: *Self) !void {
 } 
 
 // audio
-pub fn getSamples(self: *Self) *std.RingBuffer {
-    return self.soundStream.samples;
+pub fn getSamples(self: *Self) *RingBufferMT {
+    return self.samples;
 } 
+
+export fn soundStreamOnGetData(_: ?*sf.c.sfSoundStreamChunk, any: ?*anyopaque) sf.c.sfBool {
+    const samples: *align(1) RingBufferMT = if (any != null) @ptrCast(any.?) else unreachable;
+    std.debug.print("Audio wanted to have data: Read: {d}, Write: {d}, Len: {d}\n", 
+        .{ samples.buffer.read_index, samples.buffer.write_index, samples.buffer.data.len });
+    return @intFromBool(true);
+}
+
+export fn soundStreamOnSeek(_: sf.c.sfTime, _: ?*anyopaque) void {
+    // Not needed.
+}
