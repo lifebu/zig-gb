@@ -97,6 +97,7 @@ const LCD_Y_FREQ: u16 = 456;
 
 pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
     const memory: *[]u8 = mmu.getRaw();
+    // TODO: Can this be done without ptr?
     const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
     if(!lcdc.lcd_enable) {
         return;

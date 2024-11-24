@@ -7,14 +7,14 @@ const sf = struct {
 const Conf = @import("conf.zig");
 const Def = @import("def.zig");
 const MemMap = @import("mem_map.zig");
-const RingBufferMT = @import("util/RingBufferMT.zig");
+const SoundStreamBuffer = @import("util/SoundStreamBuffer.zig");
+const SoundStream = @import("util/SoundStream.zig");
 
 const Self = @This();
 
 const BACKGROUND = "data/background.png";
 const SCALING = 4;
 const TARGET_FPS = 60.0;
-
 
 alloc: std.mem.Allocator,
 conf: Conf,
@@ -34,9 +34,8 @@ deltaMS: f32 = 0,
 targetDeltaMS: f32 = 0,
 fps: f32 = 0,
 
-// Audio
-samples: *RingBufferMT = undefined,
-soundStream: *sf.c.sfSoundStream = undefined,
+// audio
+soundStream: SoundStream = undefined,
 
 pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     var self = Self{ .alloc = alloc, .conf = conf.*};
@@ -88,16 +87,8 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
 
     // audio
-    self.samples = try alloc.create(RingBufferMT);
-    errdefer alloc.destroy(self.samples);
-    self.samples.* = try RingBufferMT.init(alloc, Def.NUM_SAMPLES * Def.NUM_CHANNELS);
-
-    const newStream = sf.c.sfSoundStream_create(soundStreamOnGetData, soundStreamOnSeek, Def.NUM_CHANNELS, Def.NUM_SAMPLES, @ptrCast(self.samples));
-    if (newStream) |stream| {
-        self.soundStream = stream;
-    } else return std.mem.Allocator.Error.OutOfMemory;
-
-    sf.c.sfSoundStream_play(self.soundStream);
+    self.soundStream = try SoundStream.init(alloc, Def.NUM_SAMPLES, Def.NUM_CHANNELS);
+    errdefer self.soundStream.deinit();
 
     return self;
 }
@@ -111,9 +102,7 @@ pub fn deinit(self: *Self) void {
 
     self.clock.destroy();
 
-    self.samples.deinit();
-    self.alloc.destroy(self.samples);
-    sf.c.sfSoundStream_destroy(self.soundStream);
+    self.soundStream.deinit();
 }
 
 pub fn update(self: *Self) !bool {
@@ -147,6 +136,8 @@ pub fn update(self: *Self) !bool {
     if(Def.CLEAR_PIXELS_EACH_FRAME) {
         @memset(self.pixels, sf.Color.Black);
     }
+
+    self.soundStream.update();
 
     return true;
 } 
@@ -185,17 +176,6 @@ pub fn render(self: *Self) !void {
 } 
 
 // audio
-pub fn getSamples(self: *Self) *RingBufferMT {
-    return self.samples;
+pub fn getSamples(self: *Self) *SoundStreamBuffer {
+    return self.soundStream.samples;
 } 
-
-export fn soundStreamOnGetData(_: ?*sf.c.sfSoundStreamChunk, any: ?*anyopaque) sf.c.sfBool {
-    const samples: *align(1) RingBufferMT = if (any != null) @ptrCast(any.?) else unreachable;
-    std.debug.print("Audio wanted to have data: Read: {d}, Write: {d}, Len: {d}\n", 
-        .{ samples.buffer.read_index, samples.buffer.write_index, samples.buffer.data.len });
-    return @intFromBool(true);
-}
-
-export fn soundStreamOnSeek(_: sf.c.sfTime, _: ?*anyopaque) void {
-    // Not needed.
-}
