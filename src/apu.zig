@@ -3,7 +3,7 @@ const assert = std.debug.assert;
 
 const MemMap = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
-const SoundStreamBuffer = @import("util/SoundStreamBuffer.zig");
+const DoubleBuffer = @import("util/DoubleBuffer.zig");
 
 const Self = @This();
 
@@ -24,7 +24,7 @@ const AudioControl = packed struct(u8) {
 };
 
 
-pub fn step(_: *Self, mmu: *MMU, _: *SoundStreamBuffer) void {
+pub fn step(_: *Self, mmu: *MMU, _: *DoubleBuffer) void {
     const memory: *[]u8 = mmu.getRaw();
     // TODO: Can this be done without ptr?
     const audio_control: *align(1) AudioControl = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);

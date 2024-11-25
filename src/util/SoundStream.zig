@@ -3,20 +3,21 @@ const sf = struct {
     usingnamespace @import("sfml");
 };
 
-const SoundStreamBuffer = @import("SoundStreamBuffer.zig");
+const DoubleBuffer = @import("DoubleBuffer.zig");
 
 const Self = @This();
 
 alloc: std.mem.Allocator,
-samples: *SoundStreamBuffer = undefined,
+samples: *DoubleBuffer = undefined,
 soundStream: *sf.c.sfSoundStream = undefined,
 
 pub fn init(alloc: std.mem.Allocator, comptime sample_size: usize, comptime num_channels: usize) !Self {
     var self = Self{ .alloc = alloc};
 
-    self.samples = try alloc.create(SoundStreamBuffer);
+    self.samples = try alloc.create(DoubleBuffer);
     errdefer alloc.destroy(self.samples);
-    self.samples.* = try SoundStreamBuffer.init(alloc, sample_size * num_channels);
+
+    self.samples.* = try DoubleBuffer.init(alloc, sample_size * num_channels);
     errdefer self.samples.deinit();
 
     const newStream = sf.c.sfSoundStream_create(soundStreamOnGetData, soundStreamOnSeek, num_channels, sample_size, @ptrCast(self.samples));
@@ -46,14 +47,14 @@ pub fn update(self: *Self) void {
 }
 
 export fn soundStreamOnGetData(chunk: ?*sf.c.sfSoundStreamChunk, any: ?*anyopaque) sf.c.sfBool {
-    const samples: *SoundStreamBuffer = if (any != null) @alignCast(@ptrCast(any.?)) else unreachable;
+    const samples: *DoubleBuffer = if (any != null) @alignCast(@ptrCast(any.?)) else unreachable;
     if(chunk == null) unreachable;
 
-    const length = samples.fillReadBuffer();
+    samples.swap();
     chunk.?.samples = @ptrCast(&samples.read_buffer);
-    chunk.?.sampleCount = @intCast(length);
+    chunk.?.sampleCount = @intCast(samples.read_index);
 
-    if(length == 0) {
+    if(chunk.?.sampleCount == 0) {
         std.debug.print("Warning! Soundstream ran out of data!\n", .{});
         return @intFromBool(false);
     }

@@ -7,7 +7,7 @@ const sf = struct {
 const Conf = @import("conf.zig");
 const Def = @import("def.zig");
 const MemMap = @import("mem_map.zig");
-const SoundStreamBuffer = @import("util/SoundStreamBuffer.zig");
+const DoubleBuffer = @import("util/DoubleBuffer.zig");
 const SoundStream = @import("util/SoundStream.zig");
 
 const Self = @This();
@@ -176,6 +176,6 @@ pub fn render(self: *Self) !void {
 } 
 
 // audio
-pub fn getSamples(self: *Self) *SoundStreamBuffer {
+pub fn getSamples(self: *Self) *DoubleBuffer {
     return self.soundStream.samples;
 } 
