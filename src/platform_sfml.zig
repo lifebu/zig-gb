@@ -87,7 +87,7 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
 
     // audio
-    self.soundStream = try SoundStream.init(alloc, Def.NUM_SAMPLES, Def.NUM_CHANNELS);
+    self.soundStream = try SoundStream.init(alloc, Def.NUM_SAMPLES, Def.SAMPLE_RATE, Def.NUM_CHANNELS);
     errdefer self.soundStream.deinit();
 
     return self;
