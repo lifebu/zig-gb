@@ -13,15 +13,23 @@ write_index: usize = 0,
 
 pub const Error = error{ Full };
 
+const NUM_ZERO_SAMPLES = 10;
+
 pub fn init(alloc: std.mem.Allocator, size: usize) !Self {
+    const write_data = try alloc.alloc(i16, size);
+    errdefer alloc.free(write_data);
+
+    const read_data = try alloc.alloc(i16, size);
+    errdefer alloc.free(read_data);
+
+    @memset(write_data, 0);
+    @memset(read_data, 0);
+
     const self = Self{ 
         .alloc = alloc,
-        .write_buffer = try alloc.alloc(i16, size),
-        .read_buffer = try alloc.alloc(i16, size),
+        .write_buffer = write_data,
+        .read_buffer = read_data,
     };
-    @memset(self.write_buffer, 0);
-    @memset(self.read_buffer, 0);
-
     return self;
 }
 
@@ -50,33 +58,26 @@ pub fn swap(self: *Self) void {
     defer self.mutex.unlock();
 
     if(self.write_index == 0) {
-        std.debug.print("buffer is empty, no swapping!\n", .{});
-        self.read_index = 0;
+        std.debug.print("buffer is empty, returning empty!\n", .{});
+        // TODO: Can this be done with some std function?
+        for (0..NUM_ZERO_SAMPLES) |i| {
+            self.read_buffer[i] = 0;
+        }
+        self.read_index = NUM_ZERO_SAMPLES;
         return;
     }
 
-    self.read_buffer = self.write_buffer[0..self.write_index - 1];
+    std.debug.print("buffer had juicy data!\n", .{});
+    // TODO: Can this be done with some std function?
+    for(0..self.write_index) |i| {
+        self.read_buffer[i] = self.write_buffer[i];
+    }
     self.read_index = self.write_index;
     self.write_index = 0;
-
-    // var num_zero: u32 = 0;
-    // var num_non_zero: u32 = 0;
-    // for(self.read_buffer[0..self.read_index - 1]) |val| {
-    //     if(val == 0) {
-    //         num_zero += 1;
-    //     } else {
-    //         num_non_zero += 1;
-    //     }
-    //     std.debug.print("{d}, ", .{val});
-    // }
-    // std.debug.print("\n", .{});
-    //
-    // std.debug.print("non-zeroes: {d}\n", .{num_non_zero});
 }
 
 /// write slice into buffer. returns error when full.
 pub fn write(self: *Self, values: []const i16) Error!void {
-    //std.debug.print("Wrote samples!\n", .{});
     self.mutex.lock();
     defer self.mutex.unlock();
 

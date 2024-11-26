@@ -107,7 +107,7 @@ pub fn step(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
 
         if(buffer.isFull()) {
             // TODO: this is pretty bad, because we would use samples when the buffer is full :/ 
-            //std.debug.print("Warning! Soundbuffer full. Samples will be skipped!\n", .{});
+            // std.debug.print("Warning! Soundbuffer full. Samples will be skipped!\n", .{});
             return;
         }
 

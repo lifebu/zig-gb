@@ -68,6 +68,9 @@
 https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
 https://github.com/bwhitman/pushpin/blob/master/src/gbsound.txt
 
+- Example of using sfml and audio:
+https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
+
 ## Debugging Features
 - Dependencies:
     - csfml, cimgui, csfml-imgui
