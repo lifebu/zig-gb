@@ -54,7 +54,11 @@ pub fn isGettingFull(self: *Self) bool {
     self.mutex.lock();
     defer self.mutex.unlock();
 
-    return self.write_index >= (self.write_buffer.len / 3) * 2;
+    const fullFactor: f32 = 0.50;
+    const fillIndexFloat: f32 = fullFactor * @as(f32, @floatFromInt(self.write_buffer.len));
+    const fullIndex: usize = @intFromFloat(fillIndexFloat);
+
+    return self.write_index >= fullIndex;
 }
 
 pub fn isEmpty(self: *Self) bool {
@@ -69,8 +73,8 @@ pub fn swap(self: *Self) void {
     self.mutex.lock();
     defer self.mutex.unlock();
 
-    const fillPercent: f32 = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
-    std.debug.print("DoubleBuffer: Fill: {d:.3}%.\n", .{fillPercent});
+    var fillPercent: f32 = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
+    // std.debug.print("DoubleBuffer: Fill before: {d:.3}%.\n", .{fillPercent});
 
     // Test sine-wave
     if(TEST_SINE_WAVE) {
@@ -89,16 +93,24 @@ pub fn swap(self: *Self) void {
 
     // not enough samples yet.
     if(self.write_index < self.read_buffer.len) {
-        std.debug.print("DoubleBuffer: Not enough samples yet.\n", .{});
+        // std.debug.print("DoubleBuffer: Not enough samples yet.\n", .{});
         @memset(self.read_buffer, 0);
         return;
     }
 
-    std.debug.print("DoubleBuffer: Enough samples.\n", .{});
+    // std.debug.print("DoubleBuffer: Enough samples.\n", .{});
     for(0..self.read_buffer.len) |i| {
         self.read_buffer[i] = self.write_buffer[i];
+        std.debug.print("{d}, ", .{self.write_buffer[i]});
     }
-    self.write_index = 0;
+    self.write_index -= self.read_buffer.len;
+
+    // TOOD: Just print out the audio data but don't play it!
+    @memset(self.read_buffer, 0);
+
+
+    fillPercent = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
+    // std.debug.print("DoubleBuffer: Fill after: {d:.3}%.\n", .{fillPercent});
 }
 
 /// write slice into buffer. returns error when full.

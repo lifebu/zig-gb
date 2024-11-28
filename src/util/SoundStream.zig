@@ -21,7 +21,7 @@ pub fn init(alloc: std.mem.Allocator, comptime sample_rate: usize, comptime num_
     errdefer alloc.destroy(self.samples);
 
     const min_samples = MIN_SAMPLES_MS * ((sample_rate * num_channels) / 1_000);
-    self.samples.* = try DoubleBuffer.init(alloc, min_samples, min_samples * 3);
+    self.samples.* = try DoubleBuffer.init(alloc, min_samples, min_samples * 4);
     errdefer self.samples.deinit();
 
     const newStream = sf.c.sfSoundStream_create(soundStreamOnGetData, soundStreamOnSeek, num_channels, sample_rate, @ptrCast(self.samples));

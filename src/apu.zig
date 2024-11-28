@@ -111,7 +111,8 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
     const audio_control: *align(1) AudioControl = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
 
     if(self.sample_counter == 0) {
-        const cycles_per_sample_min = (Def.SYSTEM_FREQ / Def.SAMPLE_RATE);
+        // TODO: Somehow I need a faster sample rate here?
+        const cycles_per_sample_min: i32 = (Def.SYSTEM_FREQ / Def.SAMPLE_RATE) + 2;
         // switch to a slower rate if the buffer is getting full!
         self.sample_counter = if(buffer.isGettingFull())  cycles_per_sample_min + 1 else cycles_per_sample_min;
 
@@ -136,7 +137,7 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
         }
 
         buffer.write(&samples) catch {
-            std.debug.print("write buffer is full, samples will be skipped!\n", .{});
+            // std.debug.print("write buffer is full, samples will be skipped!\n", .{});
         };
     }
     self.sample_counter -= 1;
