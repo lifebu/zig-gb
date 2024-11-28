@@ -1,25 +1,30 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+const Def = @import("../def.zig");
+
 const Self = @This();
 
 alloc: std.mem.Allocator,
 mutex: std.Thread.Mutex = std.Thread.Mutex{},
 
 read_buffer: []i16 = undefined,
-read_index: usize = 0,
 write_buffer: []i16 = undefined,
 write_index: usize = 0,
 
+test_time: f32 = 0,
+
 pub const Error = error{ Full };
 
-const NUM_ZERO_SAMPLES = 10;
+const TEST_SINE_WAVE = false;
 
-pub fn init(alloc: std.mem.Allocator, size: usize) !Self {
-    const write_data = try alloc.alloc(i16, size);
+pub fn init(alloc: std.mem.Allocator, read_size: usize, write_size: usize) !Self {
+    assert(read_size <= write_size);
+
+    const write_data = try alloc.alloc(i16, write_size);
     errdefer alloc.free(write_data);
 
-    const read_data = try alloc.alloc(i16, size);
+    const read_data = try alloc.alloc(i16, read_size);
     errdefer alloc.free(read_data);
 
     @memset(write_data, 0);
@@ -45,6 +50,13 @@ pub fn isFull(self: *Self) bool {
     return self.write_index >= self.write_buffer.len;
 }
 
+pub fn isGettingFull(self: *Self) bool {
+    self.mutex.lock();
+    defer self.mutex.unlock();
+
+    return self.write_index >= (self.write_buffer.len / 3) * 2;
+}
+
 pub fn isEmpty(self: *Self) bool {
     self.mutex.lock();
     defer self.mutex.unlock();
@@ -57,22 +69,35 @@ pub fn swap(self: *Self) void {
     self.mutex.lock();
     defer self.mutex.unlock();
 
-    if(self.write_index == 0) {
-        std.debug.print("buffer is empty, returning empty!\n", .{});
-        // TODO: Can this be done with some std function?
-        for (0..NUM_ZERO_SAMPLES) |i| {
-            self.read_buffer[i] = 0;
+    const fillPercent: f32 = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
+    std.debug.print("DoubleBuffer: Fill: {d:.3}%.\n", .{fillPercent});
+
+    // Test sine-wave
+    if(TEST_SINE_WAVE) {
+        const freq: f32 = 150.0;
+        const period: f32 = 1.0 / freq;
+        for(0..self.read_buffer.len) |i| {
+            // std.debug.print("DoubleBuffer: Got sine wave!\n", .{});
+            self.test_time -= if (self.test_time > period) period else 0.0;
+            const sine_sample: f32 = std.math.sin(2.0 * std.math.pi * self.test_time / period);
+            const sine_int: i16 = @intFromFloat(0.5 * (((sine_sample + 1.0) / 2.0) * 65535.0 - 32768.0));
+            self.test_time += 1.0 / @as(f32, @floatFromInt(Def.SAMPLE_RATE));
+            self.read_buffer[i] = sine_int;
         }
-        self.read_index = NUM_ZERO_SAMPLES;
         return;
     }
 
-    std.debug.print("buffer had juicy data!\n", .{});
-    // TODO: Can this be done with some std function?
-    for(0..self.write_index) |i| {
+    // not enough samples yet.
+    if(self.write_index < self.read_buffer.len) {
+        std.debug.print("DoubleBuffer: Not enough samples yet.\n", .{});
+        @memset(self.read_buffer, 0);
+        return;
+    }
+
+    std.debug.print("DoubleBuffer: Enough samples.\n", .{});
+    for(0..self.read_buffer.len) |i| {
         self.read_buffer[i] = self.write_buffer[i];
     }
-    self.read_index = self.write_index;
     self.write_index = 0;
 }
 

@@ -62,28 +62,30 @@ ch2_period_counter: u14 = 0,
 ch2_wave_duty_pos: u3 = 0,
 sample_counter: u10 = 0,
 
-// TODO: when the audio buffer is full (which happens because we are faster then the hardware), we need to freeze the emulation for a certain time-frame.
-// So that the hardware can catch up. Do this until the audio buffer is "empty enough" (~ percent of buffer length?).
 pub fn step(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
+    self.stepCounters(mmu);
+    self.stepSampleGeneration(mmu, buffer);
+}
+
+fn stepCounters(self: *Self, mmu: *MMU) void {
     const memory: *[]u8 = mmu.getRaw();
     // TODO: Can this be done without ptr?
     const audio_control: *align(1) AudioControl = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
-
     if(!audio_control.audio_enabled) {
         return;
     }
 
+    // ch1
     // const ch1Sweep: *align(1) Ch1Sweep = @ptrCast(&memory.*[MemMap.CH1_SWEEP]);
     // const ch1Length: *align(1) Ch12Length = @ptrCast(&memory.*[MemMap.CH1_LENGTH]);
     // const ch1Volume: *align(1) Ch12Volume = @ptrCast(&memory.*[MemMap.CH1_VOLUME]);
     // const ch1PeriodLow: u8 = memory.*[MemMap.CH1_LOW_PERIOD];
     // const ch1PeriodHigh: *align(1) Ch12PeriodHigh = @ptrCast(&memory.*[MemMap.CH1_HIGH_PERIOD]);
     // const ch1Period: u11 = ch1PeriodLow + (@as(u11, ch1PeriodHigh.period_high) << 8);
-    //
 
     // ch2
-    const ch2Length: *align(1) Ch12Length = @ptrCast(&memory.*[MemMap.CH2_LENGTH]);
-    //const ch2Volume: *align(1) Ch12Volume = @ptrCast(&memory.*[MemMap.CH2_VOLUME]);
+    // const ch2Length: *align(1) Ch12Length = @ptrCast(&memory.*[MemMap.CH2_LENGTH]);
+    // const ch2Volume: *align(1) Ch12Volume = @ptrCast(&memory.*[MemMap.CH2_VOLUME]);
     const ch2PeriodHigh: *align(1) Ch12PeriodHigh = @ptrCast(&memory.*[MemMap.CH2_HIGH_PERIOD]);
     if(self.ch2_period_counter == 0) {
         const ch2PeriodLow: u8 = memory.*[MemMap.CH2_LOW_PERIOD];
@@ -93,6 +95,7 @@ pub fn step(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
     }
     self.ch2_period_counter -= 1;
 
+    // TODO: Pandocs has a different calculation for this, would like to use their version!
     // self.ch2_period_counter, const ch2_freq_overflow = @addWithOverflow(self.ch2_period_counter, 1);
     // if(ch2_freq_overflow == 1) {
     //     const ch2PeriodLow: u8 = memory.*[MemMap.CH2_LOW_PERIOD];
@@ -100,36 +103,41 @@ pub fn step(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
     //     self.ch2_period_counter = ch2Period;
     //     self.ch2_wave_duty_pos +%= 1;
     // }
+}
 
-    self.sample_counter += 1;
-    if(self.sample_counter > CYCLES_PER_SAMPLE) {
-        self.sample_counter = 0;
+fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
+    const memory: *[]u8 = mmu.getRaw();
+    // TODO: Can this be done without ptr?
+    const audio_control: *align(1) AudioControl = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
 
-        if(buffer.isFull()) {
-            // TODO: this is pretty bad, because we would use samples when the buffer is full :/ 
-            // std.debug.print("Warning! Soundbuffer full. Samples will be skipped!\n", .{});
-            return;
-        }
-
-        const master_volume: *align(1) MasterVolume = @ptrCast(&memory.*[MemMap.MASTER_VOLUME]);
-        // generate a new sample!
-
-        // TODO: unsure what value ranges amplitudes should have?
-        // TODO: Missing ch1, ch3 and ch4 amplitudes
-        const ch2Amplitude: u1 = WAVE_DUTY_TABLE[ch2Length.wave_duty][self.ch2_wave_duty_pos];
+    if(self.sample_counter == 0) {
+        const cycles_per_sample_min = (Def.SYSTEM_FREQ / Def.SAMPLE_RATE);
+        // switch to a slower rate if the buffer is getting full!
+        self.sample_counter = if(buffer.isGettingFull())  cycles_per_sample_min + 1 else cycles_per_sample_min;
 
         var samples = [2]i16{0, 0};
-        // TODO: use MemMap.SoundPanning to have each channel on left, right, both or neither side "Simple Mixing and Panning".
-        const leftCh2Amplitude: u1 = ch2Amplitude;
-        const leftAmplitude: u1 = leftCh2Amplitude;
-        // TODO: Would be neat to create a slice directly from both samples instead of this indexing!
-        samples[0] = (std.math.maxInt(i16) / 7) * @as(i16, master_volume.left_volume * leftAmplitude); 
+        if(audio_control.audio_enabled) {
+            const master_volume: *align(1) MasterVolume = @ptrCast(&memory.*[MemMap.MASTER_VOLUME]);
+            const ch2Length: *align(1) Ch12Length = @ptrCast(&memory.*[MemMap.CH2_LENGTH]);
 
-        const rightCh2Amplitude: u1 = ch2Amplitude;
-        const rightAmplitude: u1 = rightCh2Amplitude;
-        samples[1] = (std.math.maxInt(i16) / 7) * @as(i16, master_volume.right_volume * rightAmplitude); 
+            // TODO: unsure what value ranges amplitudes should have?
+            // TODO: Missing ch1, ch3 and ch4 amplitudes
+            const ch2Amplitude: u1 = WAVE_DUTY_TABLE[ch2Length.wave_duty][self.ch2_wave_duty_pos];
 
-        buffer.write(&samples) catch unreachable;
+            // TODO: use MemMap.SoundPanning to have each channel on left, right, both or neither side "Simple Mixing and Panning".
+            const leftCh2Amplitude: u1 = ch2Amplitude;
+            const leftAmplitude: u1 = leftCh2Amplitude;
+            // TODO: Would be neat to create a slice directly from both samples instead of this indexing!
+            samples[0] = (std.math.maxInt(i16) / 7) * @as(i16, master_volume.left_volume * leftAmplitude); 
+
+            const rightCh2Amplitude: u1 = ch2Amplitude;
+            const rightAmplitude: u1 = rightCh2Amplitude;
+            samples[1] = (std.math.maxInt(i16) / 7) * @as(i16, master_volume.right_volume * rightAmplitude); 
+        }
+
+        buffer.write(&samples) catch {
+            std.debug.print("write buffer is full, samples will be skipped!\n", .{});
+        };
     }
-
+    self.sample_counter -= 1;
 }

@@ -87,7 +87,7 @@ pub fn init(alloc: std.mem.Allocator, conf: *const Conf) !Self {
     self.targetDeltaMS = (1.0 / TARGET_FPS) * 1_000.0;
 
     // audio
-    self.soundStream = try SoundStream.init(alloc, Def.NUM_SAMPLES, Def.SAMPLE_RATE, Def.NUM_CHANNELS);
+    self.soundStream = try SoundStream.init(alloc, Def.SAMPLE_RATE, Def.NUM_CHANNELS);
     errdefer self.soundStream.deinit();
 
     return self;
@@ -137,7 +137,9 @@ pub fn update(self: *Self) !bool {
         @memset(self.pixels, sf.Color.Black);
     }
 
-    self.soundStream.update();
+    if(!self.soundStream.isPlaying()) {
+        std.debug.print("Sound stream stopped running. Sound will be missing.\n", .{});
+    }
 
     return true;
 } 

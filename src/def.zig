@@ -7,7 +7,6 @@ pub const RESOLUTION_WIDTH = 160;
 pub const RESOLUTION_HEIGHT = 144;
 pub const CLEAR_PIXELS_EACH_FRAME = false;
 
-pub const NUM_SAMPLES = 1024;
 pub const NUM_CHANNELS = 2; //Stereo
 pub const SAMPLE_RATE = 48_000;
 

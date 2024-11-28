@@ -81,6 +81,8 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
     - State of entire system.
 - Joypad Visualization.
 - CPU State:
+- Audio:
+    - Fillpercent of the double buffer write buffer.
 - Some other ideas:
     https://www.reddit.com/r/EmuDev/comments/1fu5tgd/finally_i_made_a_gameboycolor_emulator/
     https://www.reddit.com/r/EmuDev/comments/fe1pnq/began_with_my_second_emulator_project_today_i_hit/
