@@ -103,11 +103,15 @@ pub fn swap(self: *Self) void {
         self.read_buffer[i] = self.write_buffer[i];
         std.debug.print("{d}, ", .{self.write_buffer[i]});
     }
+    // TODO: We need to do this copy, because we are reading the oldest samples in the write_buffer, and by subtracting the write_index would otherwise overwrite valid samples.
+    // Better use a ring buffer.
+    for((self.read_buffer.len + 1)..self.write_index) |i| {
+        self.write_buffer[i] = self.write_buffer[i - self.read_buffer.len - 1];
+    } 
     self.write_index -= self.read_buffer.len;
 
     // TOOD: Just print out the audio data but don't play it!
     @memset(self.read_buffer, 0);
-
 
     fillPercent = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
     // std.debug.print("DoubleBuffer: Fill after: {d:.3}%.\n", .{fillPercent});
