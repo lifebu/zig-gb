@@ -42,10 +42,10 @@ pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u
     self.memory[MemMap.CH1_VOLUME] = 0xF3;
     self.memory[MemMap.CH1_LOW_PERIOD] = 0xFF;
     self.memory[MemMap.CH1_HIGH_PERIOD] = 0xBF;
-    self.memory[MemMap.CH2_LENGTH] = 0x3F;
+    self.memory[MemMap.CH2_LENGTH] = 0x20; // TODO: Should be 0x3F, workaround for audio bug.
     self.memory[MemMap.CH2_VOLUME] = 0x00;
-    self.memory[MemMap.CH2_LOW_PERIOD] = 0xFF;
-    self.memory[MemMap.CH2_HIGH_PERIOD] = 0xBF;
+    self.memory[MemMap.CH2_LOW_PERIOD] = 0x00; // TODO: Should be 0xFF, workaround for audio bug.
+    self.memory[MemMap.CH2_HIGH_PERIOD] = 0xB0; // TODO: Should be 0xBF, workaround for audio bug.
     self.memory[MemMap.CH3_DAC] = 0x7F;
     self.memory[MemMap.CH3_LENGTH] = 0xFF;
     self.memory[MemMap.CH3_VOLUME] = 0x9F;
@@ -108,7 +108,7 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
             self.mmio.initiateDMA(val);
             return;
         },
-        MemMap.AUDIO_LOW...MemMap.AUDIO_HIGH => {
+        MemMap.AUDIO_LOW...MemMap.AUDIO_HIGH - 1 => {
             self.apu.onAPUWrite(self, addr, val);
             return;
         },

@@ -9,10 +9,10 @@ const DoubleBuffer = @import("util/DoubleBuffer.zig");
 const Self = @This();
 
 const WAVE_DUTY_TABLE = [4][8]u1 {
-    [_]u1{ 0, 0, 0, 0, 0, 0, 0, 1},
-    [_]u1{ 0, 0, 0, 0, 0, 0, 1, 1},
-    [_]u1{ 0, 0, 0, 0, 1, 1, 1, 1},
-    [_]u1{ 1, 1, 1, 1, 1, 1, 0, 0},
+    [_]u1{ 1, 1, 1, 1, 1, 1, 1, 0 }, // 12.5%
+    [_]u1{ 0, 1, 1, 1, 1, 1, 1, 0 }, // 25%
+    [_]u1{ 0, 1, 1, 1, 1, 0, 0, 0 }, // 50%
+    [_]u1{ 1, 0, 0, 0, 0, 0, 0, 1 }, // 75%
 };
 
 // TODO: Somehow I need a faster sample rate here?
@@ -68,11 +68,11 @@ const Sequencer = struct {
 /// index into the current wave duty pattern in the wave duty table.
 ch1_duty_idx: u3 = 0,
 /// counter that increments the duty index
-ch1_step_counter: u14 = 0,
+ch1_step_counter: u11 = 0,
 /// index into the current wave duty pattern in the wave duty table.
 ch2_duty_idx: u3 = 0,
 /// counter that increments the duty index
-ch2_step_counter: u14 = 0,
+ch2_step_counter: u11 = 0,
 /// length timer that shuts of channel 2 after some time.
 ch2_length_timer: u9 = 0,
 /// old value of the div register. Used to determine falling edges for the frame sequencer.
@@ -120,6 +120,12 @@ pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                 // TODO: Inconsistent naming.
                 memory.*[MemMap.SOUND_CONTROL] = @bitCast(audio_ctrl);
             }
+        },
+        // TODO: Audio is on ice for now, because in ducktales the actual CH2_LOW_PERIOD, which the game should set to a value is never touched.
+        MemMap.CH2_LOW_PERIOD => {
+            var a: u32 = 0;
+            a += 1;
+            memory.*[addr] = val;
         },
         // TODO: Check the trigger bits for Channel 1, 2, 4 (HIGH_PERIOD)
         // TODO: Triggering Channel 3 and 4 resets them.
@@ -189,13 +195,24 @@ fn stepCounters(self: *Self, mmu: *MMU) void {
         // From: https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
         // TODO: Thise is actually wrong, because the first period change does not happen immediately. 
         // Pandocs states I need to increment it and wait until it overflows. 
-        if(self.ch2_step_counter == 0) {
+        // TODO: This is completly wrong it increses the duty index up to 4 cycles!
+        //
+        self.ch2_step_counter, const overflow = @addWithOverflow(self.ch2_step_counter, 1);
+        if(overflow == 1) {
             const ch2PeriodLow: u8 = memory.*[MemMap.CH2_LOW_PERIOD];
+            const ch2PeriodHighPart: u3 = ch2PeriodHigh.period_high;
+            if(ch2PeriodHighPart == 0) {}
             const ch2Period: u11 = ch2PeriodLow + (@as(u11, ch2PeriodHigh.period_high) << 8);
-            self.ch2_step_counter = (2048 - @as(u14, ch2Period)) * 4;
+            self.ch2_step_counter = ch2Period;
             self.ch2_duty_idx +%= 1;
         }
-        self.ch2_step_counter -= 1;
+        // if(self.ch2_step_counter == 0) {
+        //     const ch2PeriodLow: u8 = memory.*[MemMap.CH2_LOW_PERIOD];
+        //     const ch2Period: u11 = ch2PeriodLow + (@as(u11, ch2PeriodHigh.period_high) << 8);
+        //     self.ch2_step_counter = (2048 - @as(u14, ch2Period)) * 4;
+        //     self.ch2_duty_idx +%= 1;
+        // }
+        // self.ch2_step_counter -= 1;
     }
 }
 
@@ -209,9 +226,10 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
         const memory: *[]u8 = mmu.getRaw();
         // TODO: This two array-buffer is pretty bad.
         var samples = [2]i16{0, 0};
-        defer buffer.write(&samples) catch {
-            // std.debug.print("write buffer is full, samples will be skipped!\n", .{});
-        };
+        // TODO: Audio is disabled for now, way to broken :/
+        // defer buffer.write(&samples) catch {
+        //     // std.debug.print("write buffer is full, samples will be skipped!\n", .{});
+        // };
 
         const audio_ctrl: AudioControl = @bitCast(memory.*[MemMap.SOUND_CONTROL]);
         if(!audio_ctrl.audio_enabled) {
@@ -226,7 +244,15 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
         const ch2Amplitude: u4 = ch2Duty * ch2Volume;
         // TODO: The DAC output actually slowly decreses towards 0.
         // Converts from Digital [x0-xF] to Analog [-1.0, 1.0]
-        const ch2DACOutput: f32 = (@as(f32, @floatFromInt(ch2Amplitude)) / 7.5) - 1.0;
+        var ch2DACOutput: f32 = (@as(f32, @floatFromInt(ch2Amplitude)) / 7.5) - 1.0;        
+        if(!audio_ctrl.ch2_running) {
+            ch2DACOutput = 0.0; // Neutral.
+        }
+
+        if(ch2DACOutput != 0.0) {
+            var b: u32 = 0;
+            b += 1;
+        }
 
         // TODO: Missing Mixing of multiple channels
         // TODO: use MemMap.SoundPanning to have each channel on left, right, both or neither side
@@ -240,6 +266,11 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
         samples[0] = @intFromFloat(leftSampleFlt);
         const rightSampleFlt: f32 = rightSample * maxSample;
         samples[1] = @intFromFloat(rightSampleFlt);
+
+        if(samples[0] == -32766) {
+            var a: u32 = 0;
+            a += 1;
+        }
     }
 }
 
