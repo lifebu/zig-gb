@@ -28,7 +28,7 @@ pub fn main() !void {
 
     var mmio = MMIO{};
 
-    var mmu = try MMU.init(alloc, &mmio, conf.gbFile);
+    var mmu = try MMU.init(alloc, &apu, &mmio, conf.gbFile);
     defer mmu.deinit();
 
     var ppu = PPU{};

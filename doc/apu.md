@@ -31,6 +31,7 @@ Channel -> DAC -> Mixer -> Amplifier -> HighPassFilter
     - converts digital to analog for each channel.
 - mixer: creates two stereo samples from all 4 channels.
 - amplifier: defines the volume.
+- HighPassFilter: smooths out transitions over time. 
 
 ## APU:
 - runs on system clock (not affected by double speed).
@@ -73,7 +74,7 @@ Channel -> DAC -> Mixer -> Amplifier -> HighPassFilter
     - duty step counter: index into the selected waveform.
         - can only be reset by turning APU off.
     - duty step timer: increments at channel's sample rate (8 times channel frequency).
-        - is reset by triggering this channel.
+        - is reset by triggering this channel and APU off.
     - starting a pulse channel always outputs digital zero.
 - Wave channel (CH3):
     - sample index counter: index into wave ram table.
@@ -96,18 +97,17 @@ Channel -> DAC -> Mixer -> Amplifier -> HighPassFilter
     - There is a case where the LFSR locks up!
 
 # TODO:
+d- Turning APU on/off
+    - NR52 Audio Control
+d- Triggering Channel.
+d- Turning off Channel.
+d- Core Square Function.
+d- Frame Sequencer
+d- Channel Length Timer.
+d- DAC
+- Mixer
+- Amplifier
+
+- Look at the warning boxes in pandocs to implement more nuanced behaviour.
 - A set of compile time flags I can use to disable/enable channels and audio features:
     - Length timer, stereo mixing, volume, volume envelope, 
-- Maybe create structure by having some of the APU systems be defined with functions.
-    - stepMixer() or so.
-    - Also use those names throughout the code-base.
-- Turning APU off:
-    - Resets all counters.
-- Triggering a channel.
-    - Resets channel 3 and 4.
-- Amplifier:
-    - Master Volume control.
-    - Channel volume control.
-    - Volume envelope (maybe have static "1.0" factor at start).
-- Channel Length Timer:
-    - shut down channel off after certain amount of time.

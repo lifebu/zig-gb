@@ -28,6 +28,9 @@ pub const HIGH_PAGE: u16        = 0xFF00;
 pub const HRAM_LOW: u16         = 0xFF80;
 pub const HRAM_HIGH: u16        = 0xFFFF;
 
+pub const AUDIO_LOW: u16        = 0xFF10;
+pub const AUDIO_HIGH: u16       = 0xFF40;
+
 // IO
 pub const JOYPAD: u16           = 0xFF00;
 pub const SERIAL_DATA: u16      = 0xFF01;

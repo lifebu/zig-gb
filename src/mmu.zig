@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const APU = @import("apu.zig");
 const Cart = @import("cart.zig");
 const MemMap = @import("mem_map.zig");
 const MMIO = @import("mmio.zig");
@@ -10,11 +11,12 @@ allocator: std.mem.Allocator,
 cart: Cart = undefined,
 memory: []u8 = undefined,
 mmio: *MMIO,
+apu: *APU,
 // TODO: Would be nice if this could be known at compile time.
 disableChecks: bool = false,
 
-pub fn init(alloc: std.mem.Allocator, mmio: *MMIO, gbFile: ?[]const u8) !Self {
-    var self = Self{ .allocator = alloc, .mmio = mmio };
+pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u8) !Self {
+    var self = Self{ .allocator = alloc, .apu = apu, .mmio = mmio };
 
     self.memory = try alloc.alloc(u8, 0x10000);
     errdefer alloc.free(self.memory);
@@ -93,6 +95,7 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
 
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH => {
+            // TODO: Maybe the MMU does not own the cart, but just like every other system, we inject the cart into the mmu?
             self.cart.onWrite(self.getRaw(), addr, val);
             return;
         },
@@ -103,6 +106,10 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
         MemMap.DMA => {
             // TODO: Disallow access to almost all memory, when a dma is running.
             self.mmio.initiateDMA(val);
+            return;
+        },
+        MemMap.AUDIO_LOW...MemMap.AUDIO_HIGH => {
+            self.apu.onAPUWrite(self, addr, val);
             return;
         },
         else => {
