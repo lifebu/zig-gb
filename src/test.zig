@@ -25,3 +25,7 @@ test "MMIO_TimerTest" {
 test "MMIO_DMATest" {
     try mmio_test.runDMATest();
 }
+
+test "MMIO_JoypadTest" {
+    try mmio_test.runJoypadTests();
+}

@@ -16,6 +16,8 @@ apu: *APU,
 disableChecks: bool = false,
 
 pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u8) !Self {
+    // TODO: Should rethink why the cart lives in the MMU but the rest of the system are references. Can they be given to the mmu through calls?
+    // which means the CPU needs to pass it to the read functions.
     var self = Self{ .allocator = alloc, .apu = apu, .mmio = mmio };
 
     self.memory = try alloc.alloc(u8, 0x10000);
@@ -99,6 +101,12 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
             self.cart.onWrite(self.getRaw(), addr, val);
             return;
         },
+        MemMap.JOYPAD => {
+            // TODO: Better if the subsystem makes sure of that?
+            // Only the lower nibble can be written to!
+            const old_joyp: u8 = self.memory[MemMap.JOYPAD];
+            self.memory[addr] = (val & 0xF0) | (old_joyp & 0x0F);
+        },
         MemMap.DIVIDER => {
             self.memory[addr] = 0;
             self.mmio.dividerCounter = 0;
@@ -142,6 +150,7 @@ pub fn testFlag(self: *const Self, addr: u16, value: u8) bool {
     return flag.* & value == value;
 }
 
+// TODO: Instead of the "getRaw()" function we can also have write8Protect and write8 ?
 /// Use this function if you know you can bypass all the mmu side-effects.
 pub fn getRaw(self: *Self) *[]u8 {
     return &self.memory;

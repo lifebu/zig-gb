@@ -21,6 +21,10 @@ dmaCurrentOffset: u16 = 0,
 dmaCounter: u3 = 0,
 
 pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
+    // TODO: Maybe we can just update the joypad on write?
+    // And store the last InputState in the mmio? 
+    // This would also allow that we move the code that disallows changing the lower nibble to here!
+
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 
     // disable phsysically impossible inputs: Left and Right, Up and Down
@@ -47,7 +51,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     } else { 
         joyp = (joyp & 0xF0) | 0x0F; 
     }
-    mmu.write8(MemMap.JOYPAD, joyp);
+    mmu.getRaw().*[MemMap.JOYPAD] = joyp;
 
     // TODO: Can we do this branchless?
     // Interrupts

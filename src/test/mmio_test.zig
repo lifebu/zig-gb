@@ -1,6 +1,8 @@
 
 const std = @import("std");
 
+const APU = @import("../apu.zig");
+const Def = @import("../def.zig");
 const MMIO = @import("../mmio.zig");
 const MMU = @import("../mmu.zig");
 const MemMap = @import("../mem_map.zig");
@@ -9,9 +11,9 @@ const MemMap = @import("../mem_map.zig");
 pub fn runDividerTest() !void {
     const alloc = std.testing.allocator;
 
+    var apu = APU{};
     var mmio = MMIO{};
-
-    var mmu = try MMU.init(alloc, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio, null);
     defer mmu.deinit();
 
     var expectedDIV: u8 = 0;
@@ -33,9 +35,9 @@ pub fn runDividerTest() !void {
 pub fn runTimerTest() !void {
     const alloc = std.testing.allocator;
 
+    var apu = APU{};
     var mmio = MMIO{};
-
-    var mmu = try MMU.init(alloc, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio, null);
     defer mmu.deinit();
 
     mmu.write8(MemMap.TIMER, 0x00);
@@ -142,10 +144,11 @@ pub fn runTimerTest() !void {
 pub fn runDMATest() !void {
     const alloc = std.testing.allocator;
 
+    const apu = APU{};
     var mmio = MMIO{};
-
-    var mmu = try MMU.init(alloc, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio, null);
     defer mmu.deinit();
+
     const rawMemory: *[]u8 = mmu.getRaw();
     for(0x0300..0x039F, 1..) |addr, i| {
         rawMemory.*[addr] = @truncate(i);
@@ -181,4 +184,186 @@ pub fn runDMATest() !void {
     // TODO: Also test DMA bus conflicts and what the CPU/PPU could access.
     // https://hacktix.github.io/GBEDG/dma/
     // https://gbdev.io/pandocs/OAM_DMA_Transfer.html
+}
+
+// TODO: Use this in the MMIO code?
+/// The state of the joypad byte.
+const JoyState = packed struct(u8) {
+    const Self = @This();
+
+    not_a_right: bool,
+    not_b_left: bool,
+    not_select_up: bool,
+    not_start_down: bool,
+    not_select_dpad: bool,
+    not_select_buttons: bool,
+    _: u2,
+
+    // TODO: Maybe doing the casts in some functions in the packed structs makes the code way more cleaner?
+    pub fn toByte(self: Self) u8 {
+        return @bitCast(self);
+    }
+
+    // TODO: Maybe doing the casts in some functions in the packed structs makes the code way more cleaner?
+    pub fn fromByte(self: Self, val: u8) void {
+        self = @bitCast(val);
+    }
+};
+
+pub fn runJoypadTests() !void {
+    const alloc = std.testing.allocator;
+
+    var apu = APU{};
+    var mmio = MMIO{};
+    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    defer mmu.deinit();
+
+    const TestCase = struct {
+        name: []const u8,
+        write: u8,
+        expected: u8,
+        input: Def.InputState,
+    };
+
+    // TODO: Move those testcases to json?
+    const testCases = [_]TestCase {
+        TestCase {
+            .name = "Nothing selected but have pressed button/dpad",
+            .write = 0b1111_1111,
+            .expected = 0b1111_1111,
+            .input = Def.InputState {
+                .isDownPressed = true, .isUpPressed = false, .isLeftPressed = true, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = true, .isBPressed = false, .isAPressed = true,
+            },
+        },
+        TestCase {
+            .name = "Select dpad and nothing pressed",
+            .write = 0b1110_1111,
+            .expected = 0b1110_1111,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select dpad and down pressed.",
+            .write = 0b1110_1111,
+            .expected = 0b1110_0111,
+            .input = Def.InputState {
+                .isDownPressed = true, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select dpad and up pressed.",
+            .write = 0b1110_1111,
+            .expected = 0b1110_1011,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = true, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select dpad and left pressed.",
+            .write = 0b1110_1111,
+            .expected = 0b1110_1101,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = true, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select dpad and right pressed.",
+            .write = 0b1110_1111,
+            .expected = 0b1110_1110,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = true,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select dpad and left,right,up,down pressed (impossible inputs).",
+            .write = 0b1110_1111,
+            .expected = 0b1110_1111,
+            .input = Def.InputState {
+                .isDownPressed = true, .isUpPressed = true, .isLeftPressed = true, .isRightPressed = true,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select button and nothing pressed",
+            .write = 0b1101_1111,
+            .expected = 0b1101_1111,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select button and start pressed.",
+            .write = 0b1101_1111,
+            .expected = 0b1101_0111,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = true, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select button and select pressed.",
+            .write = 0b1101_1111,
+            .expected = 0b1101_1011,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = true, .isBPressed = false, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select button and b pressed.",
+            .write = 0b1101_1111,
+            .expected = 0b1101_1101,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = true, .isAPressed = false,
+            },
+        },
+        TestCase {
+            .name = "Select button and a pressed.",
+            .write = 0b1101_1111,
+            .expected = 0b1101_1110,
+            .input = Def.InputState {
+                .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
+                .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = true,
+            },
+        },
+        TestCase {
+            .name = "Select buttons and dpad and some inputs pressed. Expecting output and of dpad and buttons.",
+            .write = 0b1100_1111,
+            .expected = 0b1100_0001,
+            .input = Def.InputState {
+                .isDownPressed = true, .isUpPressed = false, .isLeftPressed = true, .isRightPressed = false,
+                .isStartPressed = true, .isSelectPressed = true, .isBPressed = false, .isAPressed = false,
+            },
+        },
+    };
+
+    for(testCases, 0..) |testCase, i| {
+        if(i == 0) { // Change value to attach debugger.
+            var val: u32 = 0;
+            val += 1;
+        }
+        mmu.write8(MemMap.JOYPAD, testCase.write);
+        mmio.updateJoypad(&mmu, testCase.input);
+        std.testing.expectEqual(testCase.expected, mmu.read8(MemMap.JOYPAD)) catch |err| {
+            std.debug.print("Failed {d}: {s}\n", .{ i, testCase.name });
+            return err;
+        };
+    }
+
+    // Lower nibble is read-only to cpu.
+    mmu.getRaw().*[MemMap.JOYPAD] = 0b1111_1111;
+    mmu.write8(MemMap.JOYPAD, 0b1111_0000);
+    std.testing.expectEqual(0b1111_1111, mmu.read8(MemMap.JOYPAD)) catch |err| {
+        std.debug.print("Failed {d}: {s}\n", .{ testCases.len, "Lower nibble is ready-only to cpu" });
+        return err;
+    };
 }

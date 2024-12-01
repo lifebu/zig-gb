@@ -26,9 +26,10 @@
 ## Testing
 - CPU: STOP, HALT, EI Delay, DI, Halt-Bug
 - Cart: MBC, Header, ROM/RAM.
-- Input:
-    - Test different InputState combinations and the resulting bit with test flags?
-- Interrupts
+- Interrupts:
+    - Interrupt handling.
+    - Interrupt sources (other systems).
+    - Interrupt timing.
 - MMU: OAM-BUG, Read/Write Behavior.
 - Test ROMS:
     - Blargg (CPU)

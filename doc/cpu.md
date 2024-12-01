@@ -1,7 +1,7 @@
 
 # Testing 
 
-zig test test/test.zig --test-filter "MMIO"
+zig test src/test.zig --test-filter "MMIO"
 
 - using the blargg-gb test roms I can run them and wait until they are finished.
 - they are finished when the cpu has reached an JR instruction that jumps to itself (endless loop).
