@@ -71,6 +71,13 @@ https://github.com/bwhitman/pushpin/blob/master/src/gbsound.txt
 - Example of using sfml and audio:
 https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
 
+- Started to work on the apu, but the sound is completly broken.
+    - Disabled for now.
+    - Need to revisit this with more debugging features (imgui).
+    - And start step by step
+        - generate hardcoded 50% duty squarewave.
+        - generate squarewave by using duty table with frequency index.
+
 ## Debugging Features
 - Dependencies:
     - csfml, cimgui, csfml-imgui

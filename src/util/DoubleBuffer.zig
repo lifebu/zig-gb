@@ -80,8 +80,8 @@ pub fn swap(self: *Self) void {
     if(TEST_SINE_WAVE) {
         const freq: f32 = 150.0;
         const period: f32 = 1.0 / freq;
+        // std.debug.print("DoubleBuffer: Got sine wave!\n", .{});
         for(0..self.read_buffer.len) |i| {
-            // std.debug.print("DoubleBuffer: Got sine wave!\n", .{});
             self.test_time -= if (self.test_time > period) period else 0.0;
             const sine_sample: f32 = std.math.sin(2.0 * std.math.pi * self.test_time / period);
             const sine_int: i16 = @intFromFloat(0.5 * (((sine_sample + 1.0) / 2.0) * 65535.0 - 32768.0));
@@ -94,27 +94,31 @@ pub fn swap(self: *Self) void {
     // not enough samples yet.
     if(self.write_index < self.read_buffer.len) {
         // std.debug.print("DoubleBuffer: Not enough samples yet.\n", .{});
-        @memset(self.read_buffer, 0);
-        return;
+        @memset(self.read_buffer, 1);
+    }
+    else {
+        // std.debug.print("DoubleBuffer: Enough samples.\n", .{});
+        for(0..self.read_buffer.len) |i| {
+            self.read_buffer[i] = self.write_buffer[i];
+        }
+        // TODO: We need to do this copy, because we are reading the oldest samples in the write_buffer, and by subtracting the write_index would otherwise overwrite valid samples.
+        // Better use a ring buffer.
+        for((self.read_buffer.len + 1)..self.write_index) |i| {
+            self.write_buffer[i] = self.write_buffer[i - self.read_buffer.len - 1];
+        } 
+        self.write_index -= self.read_buffer.len;
+
+
+        fillPercent = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
+        // std.debug.print("DoubleBuffer: Fill after: {d:.3}%.\n", .{fillPercent});
     }
 
-    // std.debug.print("DoubleBuffer: Enough samples.\n", .{});
-    for(0..self.read_buffer.len) |i| {
-        self.read_buffer[i] = self.write_buffer[i];
-        // std.debug.print("{d}, ", .{self.write_buffer[i]});
-    }
-    // TODO: We need to do this copy, because we are reading the oldest samples in the write_buffer, and by subtracting the write_index would otherwise overwrite valid samples.
-    // Better use a ring buffer.
-    for((self.read_buffer.len + 1)..self.write_index) |i| {
-        self.write_buffer[i] = self.write_buffer[i - self.read_buffer.len - 1];
-    } 
-    self.write_index -= self.read_buffer.len;
+    // for(0..self.read_buffer.len) |i| {
+    //     std.debug.print("{d}, ", .{self.read_buffer[i]});
+    // }
 
     // TOOD: Just print out the audio data but don't play it!
     // @memset(self.read_buffer, 0);
-
-    fillPercent = @as(f32, @floatFromInt(self.write_index)) / @as(f32, @floatFromInt(self.write_buffer.len)) * 100.0;
-    // std.debug.print("DoubleBuffer: Fill after: {d:.3}%.\n", .{fillPercent});
 }
 
 /// write slice into buffer. returns error when full.
