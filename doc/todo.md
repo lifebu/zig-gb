@@ -24,12 +24,9 @@
         https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
 
 ## Testing
-- CPU: STOP, HALT, EI Delay, DI, Halt-Bug
+- CPU: STOP, HALT, Halt-Bug
 - Cart: MBC, Header, ROM/RAM.
 - Interrupts:
-    - Interrupt handling.
-    - Interrupt sources (other systems).
-    - Interrupt timing.
 - MMU: OAM-BUG, Read/Write Behavior.
 - Test ROMS:
     - Blargg (CPU)
@@ -97,6 +94,8 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
     https://www.reddit.com/r/EmuDev/comments/tb4o6p/my_game_boy_advance_emulator_running_iridion_ii/
     https://www.reddit.com/r/EmuDev/comments/mzpx30/adding_a_pokemon_trainer_to_my_gb_emulator_would/
     https://www.reddit.com/r/EmuDev/comments/tiwlxr/i_added_a_gui_debugger_to_my_game_boy_color/
+- Maybe allow input-scripts to be run?
+    - Like that one Nintendo-DS Emulator?
 
 ## Building
 - Build with package manager.

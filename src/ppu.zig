@@ -124,7 +124,7 @@ pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
     }
 }
 
-pub fn updateState(self: *Self, mmu: *MMU) void {
+fn updateState(self: *Self, mmu: *MMU) void {
     const memory: *[]u8 = mmu.getRaw();
     const lcd_stat: *align(1) LCDStat = @ptrCast(&memory.*[MemMap.LCD_STAT]);
     var lcdY: u8 = mmu.read8(MemMap.LCD_Y);
@@ -142,7 +142,6 @@ pub fn updateState(self: *Self, mmu: *MMU) void {
 
         if(lcdY == 144) {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);
-
         } 
 
         const lyCompare = mmu.read8(MemMap.LCD_Y_COMPARE);

@@ -4,6 +4,7 @@ const blargg = @import("test/blargg_parser.zig");
 const cpu_test = @import("test/cpu_test.zig");
 const ppu_test = @import("test/ppu_test.zig");
 const mmio_test = @import("test/mmio_test.zig");
+const interrupt_test = @import("test/interrupt_test.zig");
 
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 test "CPU_SingleStepTest" {
@@ -28,4 +29,8 @@ test "MMIO_DMATest" {
 
 test "MMIO_JoypadTest" {
     try mmio_test.runJoypadTests();
+}
+
+test "InterruptTest" {
+    try interrupt_test.runInterruptTests();
 }

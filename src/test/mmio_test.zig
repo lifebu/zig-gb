@@ -144,7 +144,7 @@ pub fn runTimerTest() !void {
 pub fn runDMATest() !void {
     const alloc = std.testing.allocator;
 
-    const apu = APU{};
+    var apu = APU{};
     var mmio = MMIO{};
     var mmu = try MMU.init(alloc, &apu, &mmio, null);
     defer mmu.deinit();

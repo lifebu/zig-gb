@@ -134,6 +134,7 @@ pub fn read16(self: *const Self, addr: u16) u16 {
 }
 
 pub fn write16(self: *Self, addr: u16, val: u16) void {
+    // TODO: Do we need the same write behaviour as write8?
     // TODO: Implement something that allows writes on the memory boundary.
     std.debug.assert(addr <= 0xFFFF);
     const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
@@ -150,7 +151,7 @@ pub fn testFlag(self: *const Self, addr: u16, value: u8) bool {
     return flag.* & value == value;
 }
 
-// TODO: Instead of the "getRaw()" function we can also have write8Protect and write8 ?
+// TODO: Instead of the "getRaw()" function we can also have write8_user() (for cpu) and write8 (for systems) ?
 /// Use this function if you know you can bypass all the mmu side-effects.
 pub fn getRaw(self: *Self) *[]u8 {
     return &self.memory;

@@ -46,6 +46,8 @@ sp: u16 = 0,
 // How many cycles the cpu is now ahead of the rest of the system.
 cycles_ahead: u8 = 0,
 ime: bool = false,
+// The effect of EI is delayed by one instruction.
+ime_requested: bool = false,
 // TODO: Maybe state flags?
 // TODO: How to handle stopped state of cpu?
 isStopped: bool = false,
@@ -225,6 +227,12 @@ pub fn step(self: *Self, mmu: *MMU) !void {
     if(self.isHalted) {
         self.cycles_ahead = 4;
         return;
+    }
+
+    // TODO: I would like an implementation without a super late bool check, okay for now.
+    if(self.ime_requested) {
+        self.ime_requested = false;
+        self.ime = true;
     }
 
     // TODO: Check if we can actually implement most of the instructions without all the pointers?
@@ -1047,6 +1055,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // DI (Disable Interrupts)
         0xF3 => op: {
+            self.ime_requested = false;
             self.ime = false;
             break: op Operation { .deltaPC = 1, .cycles =  4 };
         },
@@ -1087,8 +1096,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // EI (Enable Interrupts)
         0xFB => op: {
-            // TODO: The effect of EI is delayed by one instruction. ei followed by di does not allow any interrupts between them.
-            self.ime = true;
+            self.ime_requested = true;
             break: op Operation { .deltaPC = 1, .cycles =  4 };
         },
         // CP a, imm8

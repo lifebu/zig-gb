@@ -24,6 +24,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // TODO: Maybe we can just update the joypad on write?
     // And store the last InputState in the mmio? 
     // This would also allow that we move the code that disallows changing the lower nibble to here!
+    // Also update when the actual input changed from platform (sfml events: key_pressed, key_released)
 
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 
@@ -55,7 +56,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
 
     // TODO: Can we do this branchless?
     // Interrupts
-    if (self.lastDpadState < dpad or self.lastButtonState < buttons) {
+    if (dpad < self.lastDpadState or buttons < self.lastButtonState) {
         mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_JOYPAD);
     }
     self.lastDpadState = dpad;
