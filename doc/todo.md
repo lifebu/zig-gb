@@ -26,7 +26,6 @@
 ## Testing
 - CPU: STOP, HALT, Halt-Bug
 - Cart: MBC, Header, ROM/RAM.
-- Interrupts:
 - MMU: OAM-BUG, Read/Write Behavior (Write Protections).
 - Test ROMS:
     - Blargg (CPU)

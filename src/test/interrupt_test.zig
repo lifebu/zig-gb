@@ -297,6 +297,5 @@ pub fn runInterruptTests() !void {
     }
 
     // TODO: Missing Tests:
-    // - Interrupt service setup and routine: https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
     // - Spurious Stat Interrupt (DMG Bug). (Only two games depend on this).
 }
