@@ -164,9 +164,80 @@ pub fn runInterruptTests() !void {
         return err;
     };
 
+    // Interrupt request: STAT: LY = LYC.
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0100_0000; // Select LY = LYC.
+    ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
+    mmu.getRaw().*[MemMap.LCD_CONTROL] = 0b1000_0000;
+    mmu.getRaw().*[MemMap.LCD_Y] = 9;
+    mmu.getRaw().*[MemMap.LCD_Y_COMPARE] = 10;
+    ppu.step(&mmu, &pixels);
+    std.testing.expectEqual(0b0000_0010, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+        std.debug.print("Failed: STAT for LY=LYC requests interrupt.\n", .{});
+        return err;
+    };
+
+    // Interrupt request: STAT: Mode 0
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0000_1000; // Select Mode 0 (HBlank)
+    ppu.lyCounter = 0;
+    ppu.lastSTATLine = false;
+    mmu.getRaw().*[MemMap.LCD_Y] = 0;
+    while(mmu.getRaw().*[MemMap.LCD_Y] == 0) {
+        ppu.step(&mmu, &pixels);
+    }
+    std.testing.expectEqual(0b0000_0010, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+        std.debug.print("Failed: STAT for Mode 0 (HBlank) requests interrupt.\n", .{});
+        return err;
+    };
+
+    // Interrupt request: STAT: Mode 1
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0001_0000; // Select Mode 1 (VBlank)
+    ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
+    ppu.lastSTATLine = false;
+    mmu.getRaw().*[MemMap.LCD_Y] = Def.RESOLUTION_HEIGHT - 1;
+    ppu.step(&mmu, &pixels);
+    // Will trigger VBlank and STAT interrupt!
+    std.testing.expectEqual(0b0000_0011, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+        std.debug.print("Failed: STAT for Mode 1 (VBlank) requests interrupt.\n", .{});
+        return err;
+    };
+
+    // Interrupt request: STAT: Mode 2
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0010_0000; // Select Mode 2 (OAMScan)
+    ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
+    ppu.lastSTATLine = false;
+    mmu.getRaw().*[MemMap.LCD_Y] = 0;
+    ppu.step(&mmu, &pixels);
+    std.testing.expectEqual(0b0000_0010, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+        std.debug.print("Failed: STAT for Mode 2 (OAMScan) requests interrupt.\n", .{});
+        return err;
+    };
+
+    // Interrupt request: STAT: STAT Blocking.
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0010_1000; // Select Mode 0 (HBlank) and Mode 2 (OAMScan)
+    ppu.lyCounter = 0;
+    mmu.getRaw().*[MemMap.LCD_Y] = 0;
+    while(mmu.getRaw().*[MemMap.INTERRUPT_FLAG] == 0) { // Go until we have an HBlank interrupt.
+        ppu.step(&mmu, &pixels);
+    }
+    // We now got a HBlank stat interrupt, clear it and try to get an OAMScan Stat interrupt.
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    while(mmu.getRaw().*[MemMap.LCD_Y] == 0) { // Go until we are on the second line
+        ppu.step(&mmu, &pixels);
+    }
+    std.testing.expectEqual(0b0000_0000, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+        std.debug.print("Failed: STAT interrupts are blocked for consecutive STAT sources.\n", .{});
+        return err;
+    };
+
     // Interrupt request: VBlank: Reached VBlank
     mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    ppu.lyCounter = 455;
+    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0000_0000; // Select no STAT interrupt
+    ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
     mmu.getRaw().*[MemMap.LCD_Y] = Def.RESOLUTION_HEIGHT - 1;
     ppu.step(&mmu, &pixels);
     std.testing.expectEqual(0b0000_0001, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
@@ -225,12 +296,7 @@ pub fn runInterruptTests() !void {
         };
     }
 
-
     // TODO: Missing Tests:
-    // - Interrupt request (IF): LCD STAT
-        // - STAT Interrupt blocking.
-        // - Spurious Stat Interrupt (DMG Bug). 
-        // - Sources:
-            // LY = LYC, Mode 0, Mode 1, Mode 2  
     // - Interrupt service setup and routine: https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
+    // - Spurious Stat Interrupt (DMG Bug). (Only two games depend on this).
 }

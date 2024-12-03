@@ -93,7 +93,7 @@ linePixelWait: u8 = 0, // Wait 12 cycles before starting to draw.
 currPixelX: u8 = 0,
 objectsInCurrLine: u4 = 0,
 lyCounter: u16 = 0,
-const LCD_Y_FREQ: u16 = 456;
+pub const DOTS_PER_LINE: u16 = 456;
 
 pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
     const memory: *[]u8 = mmu.getRaw();
@@ -133,7 +133,7 @@ fn updateState(self: *Self, mmu: *MMU) void {
 
     // Line counting
     self.lyCounter += 1;
-    if(self.lyCounter >= LCD_Y_FREQ) {
+    if(self.lyCounter >= DOTS_PER_LINE) {
         self.lyCounter = 0;
 
         lcdY += 1;
