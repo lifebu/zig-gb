@@ -99,7 +99,6 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
         MemMap.ROM_LOW...MemMap.ROM_HIGH => {
             // TODO: Maybe the MMU does not own the cart, but just like every other system, we inject the cart into the mmu?
             self.cart.onWrite(self.getRaw(), addr, val);
-            return;
         },
         MemMap.JOYPAD => {
             // TODO: Better if the subsystem makes sure of that?
@@ -110,6 +109,17 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
         MemMap.DIVIDER => {
             self.memory[addr] = 0;
             self.mmio.dividerCounter = 0;
+        },
+        MemMap.LCD_Y => {
+            // TODO: Better if the subsystem makes sure of that?
+            return; // Read-Only
+        },
+        MemMap.LCD_STAT => {
+            // TODO: Better if the subsystem makes sure of that?
+            // low 3 bits are read only.
+            const old: u8 = self.memory[MemMap.LCD_STAT];
+            const result: u8 = (val & 0xF8) | (old & 0x07);
+            self.memory[addr] = result;
         },
         MemMap.DMA => {
             // TODO: Disallow access to almost all memory, when a dma is running.

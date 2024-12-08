@@ -139,7 +139,7 @@ fn updateState(self: *Self, mmu: *MMU) void {
 
         lcdY += 1;
         lcdY %= 154;
-        mmu.write8(MemMap.LCD_Y, lcdY);
+        memory.*[MemMap.LCD_Y] = lcdY;
 
         if(lcdY == 144) {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);

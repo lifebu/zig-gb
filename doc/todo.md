@@ -26,6 +26,8 @@
 ## Testing
 - Cart: MBC, Header, ROM/RAM.
 - MMU: Read/Write Behavior (Write Protections).
+- Hardware Registers: Read/Write Behavior
+    - LCD: LCD Stat (low 3 bits read-only), LY (Read-only)
 - Test ROMS:
     - Blargg (CPU)
     - MealyBug (PPU)
@@ -77,6 +79,10 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
         - generate by using i16 duty table with frequency index.
         - generate by using u1 duty table with frequency index and convert to i16.
         - incorporate volume and mixing.
+
+- Hardware Registers: Read/Write Behavior
+    - Audio: NR11, NR13, NR14, NR21, NR23, NR24, NR31, NR33, NR34, NR41, NR44, NR52
+    https://gbdev.io/pandocs/Hardware_Reg_List.html
 
 ## Debugging Features
 - Dependencies:
@@ -136,6 +142,12 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
     - STOP (+ Tests!).
     - No licenced game uses this outside fo CGB speed switching.
 - CGB.
+- Hardware Registers: Read/Write Behavior
+    - CGB: KEY1
+    - CGB: HDMA1-5
+    - CGB: RP (Infrared)
+    - CGB: PCM12, PCm34
+    https://gbdev.io/pandocs/Hardware_Reg_List.html
 - Serial.
 - Boot Roms / Startup.
     - SameBoy has open source boot roms!
