@@ -2,9 +2,10 @@ const std = @import("std");
 
 
 const APU = @import("../apu.zig");
+const CPU = @import("../cpu.zig");
 const MMIO = @import("../mmio.zig");
 const MMU = @import("../mmu.zig");
-const CPU = @import("../cpu.zig");
+const MemMap = @import("../mem_map.zig");
 
 const CPUState = struct {
     pc: u16 = 0,
@@ -159,6 +160,105 @@ pub fn runSingleStepTests() !void {
             };
         }
     }
+}
+
+pub fn runHaltTests() !void {
+    const alloc = std.testing.allocator;
+
+    var apu = APU{};
+    var mmio = MMIO{};
+
+    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    defer mmu.deinit();
+    mmu.disableChecks = true;
+    // const memory: *[]u8 = mmu.getRaw();
+
+    var cpu = try CPU.init();
+    defer cpu.deinit();
+
+    // Halt stops cpu
+    mmu.write8(MemMap.WRAM_LOW, 0x76); // HALT
+    mmu.write8(MemMap.WRAM_LOW + 1, 0x03); // INC BC
+    cpu.pc = MemMap.WRAM_LOW;
+    for (0..2) |_| {
+        try cpu.step(&mmu);
+    }
+    std.testing.expectEqual(MemMap.WRAM_LOW + 1, cpu.pc) catch |err| {
+        std.debug.print("Failed: Halt stops the cpu.\n", .{});
+        return err;
+    };
+
+    // IME set, no pending interrupt after halt => cpu still paused.
+    cpu.isHalted = false;
+    cpu.pc = MemMap.WRAM_LOW;
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0x00;
+    mmu.write8(MemMap.WRAM_LOW, 0xFB); // EI => IME Set.
+    mmu.write8(MemMap.WRAM_LOW + 1, 0x00); // NOOP
+    mmu.write8(MemMap.WRAM_LOW + 2, 0x76); // HALT
+    mmu.write8(MemMap.WRAM_LOW + 3, 0x03); // INC BC
+    for (0..4) |_| {
+        try cpu.step(&mmu);
+    }
+    std.testing.expectEqual(MemMap.WRAM_LOW + 3, cpu.pc) catch |err| {
+        std.debug.print("Failed: Halt: IME set, no pending interrupt after halt: cpu halted.\n", .{});
+        return err;
+    };
+
+    // IME set, pending interrupt after halt => interrupt handled, cpu resumed.
+    cpu.isHalted = false;
+    cpu.pc = MemMap.WRAM_LOW;
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
+    mmu.write8(MemMap.WRAM_LOW, 0xFB); // EI => IME Set.
+    mmu.write8(MemMap.WRAM_LOW + 1, 0x00); // NOOP
+    mmu.write8(MemMap.WRAM_LOW + 2, 0x76); // HALT
+    for (0..3) |_| {
+        try cpu.step(&mmu);
+    }
+    // cpu is now halted (pc is on INC BC).
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0b0001_0000;
+    try cpu.step(&mmu);
+    std.testing.expectEqual(0x60, cpu.pc) catch |err| {
+        std.debug.print("Failed: Halt: IME set, pending interrupt after halt: interrupt handled.\n", .{});
+        return err;
+    };
+    std.testing.expectEqual(false, cpu.isHalted) catch |err| {
+        std.debug.print("Failed: Halt: IME set, pending interrupt after halt: cpu resumed.\n", .{});
+        return err;
+    };
+
+    // IME not set, no interrupt pending during halt => interrupt pending after halt => cpu resumes after halt, interrupt not handled.
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
+    cpu.pc = MemMap.WRAM_LOW;
+    mmu.write8(MemMap.WRAM_LOW, 0xF3); // DI => IME cleared.
+    mmu.write8(MemMap.WRAM_LOW + 1, 0x76); // HALT
+    mmu.write8(MemMap.WRAM_LOW + 2, 0x03); // INC BC
+    for (0..2) |_| {
+        try cpu.step(&mmu);
+    }
+    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0b0001_0000;
+    try cpu.step(&mmu);
+    std.testing.expectEqual(false, cpu.isHalted) catch |err| {
+        std.debug.print("Failed: Halt: IME not set, no pending interrupt during halt, pending interrupt after halt: cpu resumes.\n", .{});
+        return err;
+    };
+    std.testing.expectEqual(MemMap.WRAM_LOW + 2, cpu.pc) catch |err| {
+        std.debug.print("Failed: Halt: IME not set, no pending interrupt during halt, pending interrupt after halt: cpu resumes after halt instruction.\n", .{});
+        return err;
+    };
+
+    // TODO: Halt Bug => Could not be triggered by any released game => Not for now. 
+    // IME not set, interrupt pending during halt => halt-bug
+    // halt bug (does not affect gbc and gba):
+        // Happens when: IME = 0 and IF & IE != 0 => assert that this never happens in real game?  
+        // halt exists immediately, pc is not incremented. 
+        // The byte after halt (next instruction) is read twice. 
+        // Special cases (result of pc never being incremented). 
+        // ei => halt. interrupt is serviced after halt. interrupt returns to halt (because pc was never incremented) => executes halt again.
+        // halt => rst. rst instruction's return address will point at rst itself. ret would return to rst and execute it again.
+        // ei => halt => rst: ei behaviour "wins".  
 }
 
 // test "blargg" {

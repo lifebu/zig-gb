@@ -24,15 +24,16 @@
         https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
 
 ## Testing
-- CPU: STOP, HALT, Halt-Bug
 - Cart: MBC, Header, ROM/RAM.
-- MMU: OAM-BUG, Read/Write Behavior (Write Protections).
+- MMU: Read/Write Behavior (Write Protections).
 - Test ROMS:
     - Blargg (CPU)
     - MealyBug (PPU)
     - Mooneye (All)
     - Acid2 (PPU)
     - SameSuite (All)
+    - Double-halt-cancel: https://github.com/nitro2k01/little-things-gb/tree/main/double-halt-cancel
+    - windesync: https://github.com/nitro2k01/little-things-gb/tree/main/windesync-validate
 - PPU
     - Static: MemoryDump + Picture => Compare them.
     - Dynamic: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
@@ -42,7 +43,7 @@
 
 ## Refactor
 - Asserts (Defensive Programming, Tigerbeetle).
-- CPU: Instructions, STOP, HALT, EI, Halt-Bug.
+- CPU: Instructions, HALT, Halt-Bug.
 - Cart: MBC, Header, ROM/RAM.
 - Input
 - Interrupts:
@@ -73,7 +74,9 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
     - Need to revisit this with more debugging features (imgui).
     - And start step by step
         - generate hardcoded 50% duty squarewave.
-        - generate squarewave by using duty table with frequency index.
+        - generate by using i16 duty table with frequency index.
+        - generate by using u1 duty table with frequency index and convert to i16.
+        - incorporate volume and mixing.
 
 ## Debugging Features
 - Dependencies:
@@ -95,6 +98,8 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
     https://www.reddit.com/r/EmuDev/comments/tiwlxr/i_added_a_gui_debugger_to_my_game_boy_color/
 - Maybe allow input-scripts to be run?
     - Like that one Nintendo-DS Emulator?
+- Debugging:
+    - set breakpoints depending on PC, Reading/Writing specific memory adresses (similar to bgb).
 
 ## Building
 - Build with package manager.
@@ -127,6 +132,9 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
     - Load Game, Recentlist.
 
 # Version 2.0:
+- CPU:
+    - STOP (+ Tests!).
+    - No licenced game uses this outside fo CGB speed switching.
 - CGB.
 - Serial.
 - Boot Roms / Startup.
@@ -146,3 +154,9 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
 # Maybe:
 - Infrared.
 - SGB.
+- CPU:
+    - Halt-Bug: Have not found a shipped game with this bug.
+- Interrupts:
+    - Spurious Stat Interrupt (DMG Bug).
+- MMU: OAM-BUG
+    - No shipped game would trigger this.

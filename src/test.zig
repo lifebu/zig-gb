@@ -11,6 +11,10 @@ test "CPU_SingleStepTest" {
     try cpu_test.runSingleStepTests();
 }
 
+test "CPU_HaltTest" {
+    try cpu_test.runHaltTests();
+}
+
 test "PPU_StaticTest" {
     try ppu_test.runStaticTest();
 }

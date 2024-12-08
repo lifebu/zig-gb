@@ -476,7 +476,11 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             // TODO: Break the range, this is not readable honestly!
             // HALT
             if(opcode == 0x76) {
-                // TODO: implement HALT Bug 
+                const enable = mmu.read8(MemMap.INTERRUPT_ENABLE);
+                const flag = mmu.read8(MemMap.INTERRUPT_FLAG);
+                // HALT-Bug not implemented
+                std.debug.assert(self.ime or ((enable & flag) == 0));
+
                 self.isHalted = true;
                 break :op Operation{ .deltaPC = 1, .cycles = 4 };
             }

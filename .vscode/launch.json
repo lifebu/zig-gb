@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/zig-gb",
             "args": [
-                "playground/pkmn_blu.gb",
+                "playground/ducktales.gb",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
