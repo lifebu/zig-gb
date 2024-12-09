@@ -35,7 +35,6 @@ pub fn runStaticTest() !void {
     var apu = APU{};
     var mmu = try MMU.init(alloc, &apu, &mmio, null);
     defer mmu.deinit();
-    mmu.disableChecks = true;
 
     const testConfig: []TestType = json.value;
     for(testConfig) |testCase| {

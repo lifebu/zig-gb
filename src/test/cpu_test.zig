@@ -45,7 +45,7 @@ fn testOutput(cpu: *const CPU, mmu: *const MMU, testCase: *const TestType) !void
         std.debug.assert(ramPair.len == 2);
         const address: u16 = ramPair[0];
         const value: u8 = @intCast(ramPair[1]);
-        try std.testing.expectEqual(mmu.read8(address), value);
+        try std.testing.expectEqual(mmu.read8_sys(address), value);
     }
 
     const opcodeName: []u8 = testCase.name[0..2];
@@ -99,8 +99,6 @@ pub fn runSingleStepTests() !void {
 
         var mmu = try MMU.init(alloc, &apu, &mmio, null);
         defer mmu.deinit();
-        mmu.disableChecks = true;
-        const memory: *[]u8 = mmu.getRaw();
 
         var cpu = try CPU.init();
         defer cpu.deinit();
@@ -121,7 +119,7 @@ pub fn runSingleStepTests() !void {
                 std.debug.assert(ramPair.len == 2);
                 const address: u16 = ramPair[0];
                 const value: u8 = @intCast(ramPair[1]);
-                memory.*[address] = value;
+                mmu.write8_sys(address, value);
             }
             cpu.isHalted = false;
 
@@ -150,7 +148,7 @@ pub fn runSingleStepTests() !void {
                 for (testCase.final.ram) |ramPair| {
                     std.debug.assert(ramPair.len == 2);
                     const address: u16 = ramPair[0];
-                    const value: u8 = mmu.read8(address);
+                    const value: u8 = mmu.read8_sys(address);
                     std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
                 }
                 std.debug.print("\n", .{});
@@ -170,15 +168,13 @@ pub fn runHaltTests() !void {
 
     var mmu = try MMU.init(alloc, &apu, &mmio, null);
     defer mmu.deinit();
-    mmu.disableChecks = true;
-    // const memory: *[]u8 = mmu.getRaw();
 
     var cpu = try CPU.init();
     defer cpu.deinit();
 
     // Halt stops cpu
-    mmu.write8(MemMap.WRAM_LOW, 0x76); // HALT
-    mmu.write8(MemMap.WRAM_LOW + 1, 0x03); // INC BC
+    mmu.write8_sys(MemMap.WRAM_LOW, 0x76); // HALT
+    mmu.write8_sys(MemMap.WRAM_LOW + 1, 0x03); // INC BC
     cpu.pc = MemMap.WRAM_LOW;
     for (0..2) |_| {
         try cpu.step(&mmu);
@@ -191,12 +187,12 @@ pub fn runHaltTests() !void {
     // IME set, no pending interrupt after halt => cpu still paused.
     cpu.isHalted = false;
     cpu.pc = MemMap.WRAM_LOW;
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0x00;
-    mmu.write8(MemMap.WRAM_LOW, 0xFB); // EI => IME Set.
-    mmu.write8(MemMap.WRAM_LOW + 1, 0x00); // NOOP
-    mmu.write8(MemMap.WRAM_LOW + 2, 0x76); // HALT
-    mmu.write8(MemMap.WRAM_LOW + 3, 0x03); // INC BC
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.INTERRUPT_ENABLE, 0x00);
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xFB); // EI => IME Set.
+    mmu.write8_sys(MemMap.WRAM_LOW + 1, 0x00); // NOOP
+    mmu.write8_sys(MemMap.WRAM_LOW + 2, 0x76); // HALT
+    mmu.write8_sys(MemMap.WRAM_LOW + 3, 0x03); // INC BC
     for (0..4) |_| {
         try cpu.step(&mmu);
     }
@@ -208,16 +204,16 @@ pub fn runHaltTests() !void {
     // IME set, pending interrupt after halt => interrupt handled, cpu resumed.
     cpu.isHalted = false;
     cpu.pc = MemMap.WRAM_LOW;
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
-    mmu.write8(MemMap.WRAM_LOW, 0xFB); // EI => IME Set.
-    mmu.write8(MemMap.WRAM_LOW + 1, 0x00); // NOOP
-    mmu.write8(MemMap.WRAM_LOW + 2, 0x76); // HALT
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.INTERRUPT_ENABLE, 0xFF);
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xFB); // EI => IME Set.
+    mmu.write8_sys(MemMap.WRAM_LOW + 1, 0x00); // NOOP
+    mmu.write8_sys(MemMap.WRAM_LOW + 2, 0x76); // HALT
     for (0..3) |_| {
         try cpu.step(&mmu);
     }
     // cpu is now halted (pc is on INC BC).
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0b0001_0000;
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0b0001_0000);
     try cpu.step(&mmu);
     std.testing.expectEqual(0x60, cpu.pc) catch |err| {
         std.debug.print("Failed: Halt: IME set, pending interrupt after halt: interrupt handled.\n", .{});
@@ -229,16 +225,16 @@ pub fn runHaltTests() !void {
     };
 
     // IME not set, no interrupt pending during halt => interrupt pending after halt => cpu resumes after halt, interrupt not handled.
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.INTERRUPT_ENABLE, 0xFF);
     cpu.pc = MemMap.WRAM_LOW;
-    mmu.write8(MemMap.WRAM_LOW, 0xF3); // DI => IME cleared.
-    mmu.write8(MemMap.WRAM_LOW + 1, 0x76); // HALT
-    mmu.write8(MemMap.WRAM_LOW + 2, 0x03); // INC BC
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xF3); // DI => IME cleared.
+    mmu.write8_sys(MemMap.WRAM_LOW + 1, 0x76); // HALT
+    mmu.write8_sys(MemMap.WRAM_LOW + 2, 0x03); // INC BC
     for (0..2) |_| {
         try cpu.step(&mmu);
     }
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0b0001_0000;
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0b0001_0000);
     try cpu.step(&mmu);
     std.testing.expectEqual(false, cpu.isHalted) catch |err| {
         std.debug.print("Failed: Halt: IME not set, no pending interrupt during halt, pending interrupt after halt: cpu resumes.\n", .{});

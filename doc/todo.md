@@ -26,6 +26,7 @@
 ## Testing
 - Cart: MBC, Header, ROM/RAM.
 - MMU: Read/Write Behavior (Write Protections).
+- OAM DMA Bus conflict.
 - Hardware Registers: Read/Write Behavior
     - LCD: LCD Stat (low 3 bits read-only), LY (Read-only)
 - Test ROMS:

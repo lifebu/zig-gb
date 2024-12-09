@@ -98,16 +98,14 @@ lastSTATLine: bool = false,
 pub const DOTS_PER_LINE: u16 = 456;
 
 pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
-    const memory: *[]u8 = mmu.getRaw();
-    // TODO: Can this be done without ptr?
-    const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
+    const lcdc: LCDC = @bitCast(mmu.read8_sys(MemMap.LCD_CONTROL));
     if(!lcdc.lcd_enable) {
         return;
     }
 
     self.updateState(mmu);
 
-    const lcd_stat: *align(1) LCDStat = @ptrCast(&memory.*[MemMap.LCD_STAT]);
+    const lcd_stat: LCDStat = @bitCast(mmu.read8_sys(MemMap.LCD_STAT));
     switch (lcd_stat.ppu_mode) {
         .OAM_SCAN => {},
         .DRAW => {
@@ -117,8 +115,8 @@ pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
             }
 
             assert(self.currPixelX <= 160);
-            const lcdY: u8 = mmu.read8(MemMap.LCD_Y);
-            self.drawPixel(memory, self.currPixelX, lcdY, pixels);
+            const lcdY: u8 = mmu.read8_sys(MemMap.LCD_Y);
+            self.drawPixel(mmu, self.currPixelX, lcdY, pixels);
             self.currPixelX += 1;
         },
         .H_BLANK => {},
@@ -127,10 +125,8 @@ pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
 }
 
 fn updateState(self: *Self, mmu: *MMU) void {
-    const memory: *[]u8 = mmu.getRaw();
-    const lcd_stat: *align(1) LCDStat = @ptrCast(&memory.*[MemMap.LCD_STAT]);
-    var lcdY: u8 = mmu.read8(MemMap.LCD_Y);
-
+    var lcd_stat: LCDStat = @bitCast(mmu.read8_sys(MemMap.LCD_STAT));
+    var lcdY: u8 = mmu.read8_sys(MemMap.LCD_Y);
 
     // Line counting
     self.lyCounter += 1;
@@ -139,13 +135,13 @@ fn updateState(self: *Self, mmu: *MMU) void {
 
         lcdY += 1;
         lcdY %= 154;
-        memory.*[MemMap.LCD_Y] = lcdY;
+        mmu.write8_sys(MemMap.LCD_Y, lcdY);
 
         if(lcdY == 144) {
             mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);
         } 
 
-        const lyCompare = mmu.read8(MemMap.LCD_Y_COMPARE);
+        const lyCompare = mmu.read8_sys(MemMap.LCD_Y_COMPARE);
         lcd_stat.ly_is_lyc = lyCompare == lcdY;
     }
 
@@ -170,6 +166,8 @@ fn updateState(self: *Self, mmu: *MMU) void {
             self.linePixelWait = 0;
         }
     }
+
+    mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
     
     if(STATLine and !self.lastSTATLine) {
         mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_LCD);
@@ -189,8 +187,8 @@ fn getPalette(paletteByte: u8) [4]Def.Color {
     };
 }
 
-fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Color) void {
-    const lcdc: *align(1) LCDC = @ptrCast(&memory.*[MemMap.LCD_CONTROL]);
+fn drawPixel(_: *Self, mmu: *MMU, pixelX: u8, pixelY: u8, pixels: *[]Def.Color) void {
+    const lcdc: LCDC = @bitCast(mmu.read8_sys(MemMap.LCD_CONTROL));
 
     const bgMapBaseAddress: u16 = if(lcdc.bg_map_area == .FIRST_MAP) FIRST_TILE_MAP_ADDRESS else SECOND_TILE_MAP_ADDRESS;
     const windowMapBaseAddress: u16 = if(lcdc.window_map_area == .FIRST_MAP) FIRST_TILE_MAP_ADDRESS else SECOND_TILE_MAP_ADDRESS;
@@ -198,23 +196,23 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
     const signedAdressing: bool = bgWindowTileBaseAddress == SECOND_TILE_ADDRESS;
     const objTileBaseAddress: u16 = FIRST_TILE_ADDRESS; 
 
-    const bgPalette = getPalette(memory.*[MemMap.BG_PALETTE]);
-    const objPalette0 = getPalette(memory.*[MemMap.OBJ_PALETTE_0]);
-    const objPalette1 = getPalette(memory.*[MemMap.OBJ_PALETTE_1]);
+    const bgPalette = getPalette(mmu.read8_sys(MemMap.BG_PALETTE));
+    const objPalette0 = getPalette(mmu.read8_sys(MemMap.OBJ_PALETTE_0));
+    const objPalette1 = getPalette(mmu.read8_sys(MemMap.OBJ_PALETTE_1));
 
     var pixelColorID: u8 = 0;
 
     // background
     if(lcdc.bg_window_enable) {
-        const bgScrollX: u8 = memory.*[MemMap.SCROLL_X];
-        const bgScrollY: u8 = memory.*[MemMap.SCROLL_Y];
+        const bgScrollX: u8 = mmu.read8_sys(MemMap.SCROLL_X);
+        const bgScrollY: u8 = mmu.read8_sys(MemMap.SCROLL_Y);
         const tileMapX: u16 = (@as(u16, pixelX) + bgScrollX); 
         const tileMapY: u16 = (@as(u16, pixelY) + bgScrollY);
 
         const tileMapIndexX: u16 = (tileMapX / TILE_SIZE_X) % TILE_MAP_SIZE_X;
         const tileMapIndexY: u16 = (tileMapY / TILE_SIZE_Y) % TILE_MAP_SIZE_Y;
         const tileMapAddress: u16 = bgMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
-        var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
+        var tileAddressOffset: u16 = mmu.read8_sys(tileMapAddress);
         if(signedAdressing) {
             if(tileAddressOffset < 128) {
                 tileAddressOffset += 128;
@@ -228,8 +226,8 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
         const tilePixelY: u16 = tileMapY % TILE_SIZE_Y;
 
         const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
-        const firstRowByte: u8 = memory.*[tileRowBaseAddress];
-        const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+        const firstRowByte: u8 = mmu.read8_sys(tileRowBaseAddress);
+        const secondRowByte: u8 = mmu.read8_sys(tileRowBaseAddress + 1);
 
         const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
 
@@ -247,8 +245,8 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
     if(lcdc.window_enable and lcdc.bg_window_enable)
     {
         window: {
-            const winPosX: u16 = memory.*[MemMap.WINDOW_X];
-            const winPosY: u16 = memory.*[MemMap.WINDOW_Y];
+            const winPosX: u16 = mmu.read8_sys(MemMap.WINDOW_X);
+            const winPosY: u16 = mmu.read8_sys(MemMap.WINDOW_Y);
             if(pixelX + winPosX < 7) {
                 return; // outside of screen.
             }
@@ -261,7 +259,7 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const tileMapIndexX: u16 = (pixelX / TILE_SIZE_X);
             const tileMapIndexY: u16 = (pixelY / TILE_SIZE_Y);
             const tileMapAddress: u16 = windowMapBaseAddress + tileMapIndexX + (tileMapIndexY * TILE_MAP_SIZE_Y);
-            var tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
+            var tileAddressOffset: u16 = mmu.read8_sys(tileMapAddress);
             if(signedAdressing) {
                 if(tileAddressOffset < 128) {
                     tileAddressOffset += 128;
@@ -275,8 +273,8 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const tilePixelY: u16 = pixelY % TILE_SIZE_Y;
 
             const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
-            const firstRowByte: u8 = memory.*[tileRowBaseAddress];
-            const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+            const firstRowByte: u8 = mmu.read8_sys(tileRowBaseAddress);
+            const secondRowByte: u8 = mmu.read8_sys(tileRowBaseAddress + 1);
 
             const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
 
@@ -296,7 +294,7 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
         var obj_index: u16 = 0;
         while(obj_index < OAM_SIZE) : (obj_index += 1) {
             const objectAddress: u16 = OAM_BASE_ADDRESS + (obj_index * OBJ_SIZE_BYTE);
-            const obj: *align(1) Object = @ptrCast(&memory.*[objectAddress]);
+            const obj: *align(1) Object = @ptrCast(&mmu.memory[objectAddress]);
             const objHeight: u8 = if(lcdc.obj_size == .DOUBLE_HEIGHT) TILE_SIZE_Y * 2 else TILE_SIZE_Y;
 
             const objPixelX: i16 = @as(i16, pixelX) + 8 - @as(i16, obj.xPosition);
@@ -314,8 +312,8 @@ fn drawPixel(_: *Self, memory: *[]u8, pixelX: u8, pixelY: u8, pixels: *[]Def.Col
             const tilePixelY: u8 = @as(u8, @intCast(if(obj.flags.yFlip == 1) objHeight - 1 - objPixelY  else objPixelY)) % TILE_SIZE_Y;
 
             const tileRowBaseAddress: u16 = tileAddress + (tilePixelY * TILE_LINE_SIZE_BYTE);
-            const firstRowByte: u8 = memory.*[tileRowBaseAddress];
-            const secondRowByte: u8 = memory.*[tileRowBaseAddress + 1];
+            const firstRowByte: u8 = mmu.read8_sys(tileRowBaseAddress);
+            const secondRowByte: u8 = mmu.read8_sys(tileRowBaseAddress + 1);
 
             const bitOffset: u3 = @intCast(TILE_SIZE_X - tilePixelX - 1);
 

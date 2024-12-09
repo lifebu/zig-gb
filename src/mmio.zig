@@ -40,7 +40,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     buttons &= ~(@as(u4, @intFromBool(inputState.isSelectPressed)) << 2);
     buttons &= ~(@as(u4, @intFromBool(inputState.isStartPressed)) << 3);
 
-    var joyp: u8 = mmu.read8(MemMap.JOYPAD); 
+    var joyp: u8 = mmu.read8_sys(MemMap.JOYPAD); 
     const selectDpad: bool = (joyp & 0x10) != 0x10;
     const selectButtons: bool = (joyp & 0x20) != 0x20;
     if(selectDpad and selectButtons)  { 
@@ -52,7 +52,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     } else { 
         joyp = (joyp & 0xF0) | 0x0F; 
     }
-    mmu.getRaw().*[MemMap.JOYPAD] = joyp;
+    mmu.write8_sys(MemMap.JOYPAD, joyp);
 
     // TODO: Can we do this branchless?
     // Interrupts
@@ -71,19 +71,18 @@ const TimerControl = packed struct(u8) {
 };
 
 pub fn updateTimers(self: *Self, mmu: *MMU) void {
-    const rawMemory: *[]u8 = mmu.getRaw();
-    const timer: *u8 = &rawMemory.*[MemMap.TIMER];
-    const timerControl: *TimerControl = @ptrCast(&rawMemory.*[MemMap.TIMER_CONTROL]);
+    var timer: u8 = mmu.read8_sys(MemMap.TIMER);
+    const timerControl: TimerControl = @bitCast(mmu.read8_sys(MemMap.TIMER_CONTROL));
 
     self.dividerCounter +%= 1;
     // GB only sees high 8 bit => divider increments every 256 cycles. 
-    rawMemory.*[MemMap.DIVIDER] = @intCast(self.dividerCounter >> 8);
+    mmu.write8_sys(MemMap.DIVIDER, @intCast(self.dividerCounter >> 8));
 
     const timerMask = TIMER_MASK_TABLE[timerControl.clock];
     const timerBit: bool = ((self.dividerCounter & timerMask) == timerMask) and timerControl.enable;
     // Can happen when timerLastBit is true and timerControl.enable was set to false this frame (intended GB behavior). 
     const timerFallingEdge: bool = !timerBit and self.timerLastBit;
-    timer.*, const overflow = @addWithOverflow(timer.*, @intFromBool(timerFallingEdge));
+    timer, const overflow = @addWithOverflow(timer, @intFromBool(timerFallingEdge));
     // TODO: Branchless?
     if(overflow == 1) {
         // TODO: After overflowing, it takes 4 cycles before the interrupt flag is set and the value from timer_mod is used.
@@ -92,8 +91,9 @@ pub fn updateTimers(self: *Self, mmu: *MMU) void {
         // If cpu writes to timer on the cycle that timer is set by the overflow, the cpu write will be overwritten.
         // If cpu writes to timer_mod on the cycle that timer is set by the overflow, the overflow uses the new timer_mod.
         mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_TIMER);
-        timer.* = mmu.read8(MemMap.TIMER_MOD);
+        timer = mmu.read8_sys(MemMap.TIMER_MOD);
     }
+    mmu.write8_sys(MemMap.TIMER, timer);
 
     self.timerLastBit = timerBit;
 }
@@ -121,7 +121,7 @@ pub fn updateDMA(self: *Self, mmu: *MMU) void {
     self.dmaCounter = 4;
     const sourceAddr: u16 = self.dmaStartAddr + self.dmaCurrentOffset;
     const destAddr: u16 = MemMap.OAM_LOW + self.dmaCurrentOffset;
-    mmu.write8(destAddr, mmu.read8(sourceAddr));
+    mmu.write8_sys(destAddr, mmu.read8_sys(sourceAddr));
 
     self.dmaCurrentOffset += 1;
     self.dmaIsRunning = (destAddr + 1) < MemMap.OAM_HIGH;

@@ -12,8 +12,6 @@ cart: Cart = undefined,
 memory: []u8 = undefined,
 mmio: *MMIO,
 apu: *APU,
-// TODO: Would be nice if this could be known at compile time.
-disableChecks: bool = false,
 
 pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     // TODO: Should rethink why the cart lives in the MMU but the rest of the system are references. Can they be given to the mmu through calls?
@@ -82,23 +80,26 @@ pub fn deinit(self: *Self) void {
     self.cart.deinit();
 }
 
-pub fn read8(self: *const Self, addr: u16) u8 {
+/// User level read, 8bit unsigned. Has read protections for some hardware registers and memory regions.
+pub fn read8_usr(self: *const Self, addr: u16) u8 {
+   return self.memory[addr];
+}
+/// System level read, 8bit unsigned. No read protections
+pub fn read8_sys(self: *const Self, addr: u16) u8 {
    return self.memory[addr];
 }
 
-pub fn readi8(self: *const Self, addr: u16) i8 {
+/// User level read, 8bit signed. Has read protections for some hardware registers and memory regions.
+pub fn readi8_usr(self: *const Self, addr: u16) i8 {
    return @bitCast(self.memory[addr]);
 }
 
-pub fn write8(self: *Self, addr: u16, val: u8) void {
-    if(self.disableChecks) {
-        self.memory[addr] = val;
-    }
-
+/// User level write, 8bit unsigned. Has write protections for some hardware registers and memory regions.
+pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH => {
             // TODO: Maybe the MMU does not own the cart, but just like every other system, we inject the cart into the mmu?
-            self.cart.onWrite(self.getRaw(), addr, val);
+            self.cart.onWrite(self, addr, val);
         },
         MemMap.JOYPAD => {
             // TODO: Better if the subsystem makes sure of that?
@@ -135,18 +136,40 @@ pub fn write8(self: *Self, addr: u16, val: u8) void {
         }
     }
 }
+/// System level write, 8bit unsigned. No write protections
+pub fn write8_sys(self: *Self, addr: u16, val: u8) void {
+    self.memory[addr] = val;
+}
 
-pub fn read16(self: *const Self, addr: u16) u16 {
+/// User level read, 16bit unsigned. Has read protections for some hardware registers and memory regions.
+pub fn read16_usr(self: *const Self, addr: u16) u16 {
+    // TODO: Implement something that allows reads on the memory boundary.
+    std.debug.assert(addr <= 0xFFFF);
+    const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
+    return elem.*;
+}
+/// System level read, 16bit unsigned. No read protections.
+pub fn read16_sys(self: *const Self, addr: u16) u16 {
     // TODO: Implement something that allows reads on the memory boundary.
     std.debug.assert(addr <= 0xFFFF);
     const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
     return elem.*;
 }
 
-pub fn write16(self: *Self, addr: u16, val: u16) void {
+/// User level write, 16bit unsigned. Has write protections for some hardware registers and memory regions.
+pub fn write16_usr(self: *Self, addr: u16, val: u16) void {
     // TODO: Do we need the same write behaviour as write8?
     // TODO: Implement something that allows writes on the memory boundary.
     std.debug.assert(addr <= 0xFFFF);
+
+    const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
+    elem.* = val;
+}
+/// System level write, 16bit unsigned. No write protections
+pub fn write16_sys(self: *Self, addr: u16, val: u16) void {
+    // TODO: Implement something that allows writes on the memory boundary.
+    std.debug.assert(addr <= 0xFFFF);
+
     const elem: *align(1) u16 = @ptrCast(&self.memory[addr]);
     elem.* = val;
 }
@@ -159,10 +182,4 @@ pub fn setFlag(self: *const Self, addr: u16, value: u8) void {
 pub fn testFlag(self: *const Self, addr: u16, value: u8) bool {
     const flag: *u8 = &self.memory[addr];
     return flag.* & value == value;
-}
-
-// TODO: Instead of the "getRaw()" function we can also have write8_user() (for cpu) and write8 (for systems) ?
-/// Use this function if you know you can bypass all the mmu side-effects.
-pub fn getRaw(self: *Self) *[]u8 {
-    return &self.memory;
 }

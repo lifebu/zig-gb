@@ -83,8 +83,7 @@ sequencer_counter: u3 = 0,
 sample_counter: u10 = 0,
 
 pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
-    const memory: *[]u8 = mmu.getRaw();
-    var curr_audio_ctrl: AudioControl = @bitCast(memory.*[MemMap.SOUND_CONTROL]);
+    var curr_audio_ctrl: AudioControl = @bitCast(mmu.read8_sys(MemMap.SERIAL_CONTROL));
 
     switch(addr) {
         MemMap.SOUND_CONTROL => {
@@ -115,17 +114,17 @@ pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
 
                 // Reset all audio registers.
                 for(MemMap.AUDIO_LOW..MemMap.AUDIO_HIGH) |i| {
-                    memory.*[i] = 0;
+                    mmu.write8_sys(@intCast(i), 0);
                 }
                 // TODO: Inconsistent naming.
-                memory.*[MemMap.SOUND_CONTROL] = @bitCast(audio_ctrl);
+                mmu.write8_sys(MemMap.SERIAL_CONTROL, @bitCast(audio_ctrl));
             }
         },
         // TODO: Audio is on ice for now, because in ducktales the actual CH2_LOW_PERIOD, which the game should set to a value is never touched.
         MemMap.CH2_LOW_PERIOD => {
             var a: u32 = 0;
             a += 1;
-            memory.*[addr] = val;
+            mmu.write8_sys(addr, val);
         },
         // TODO: Check the trigger bits for Channel 1, 2, 4 (HIGH_PERIOD)
         // TODO: Triggering Channel 3 and 4 resets them.
@@ -136,19 +135,19 @@ pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                 self.ch2_step_counter = 0;
                 // TODO: I am assuming that this is how this works, Pandocs is extremly vague about this.
                 // Gameboy Sound Emulation Blog is implemented completly differently.
-                const ch2_length: Ch12Length = @bitCast(memory.*[MemMap.CH2_LENGTH]);
+                const ch2_length: Ch12Length = @bitCast(mmu.read8_sys(MemMap.CH2_LENGTH));
                 self.ch2_length_timer = ch2_length.initial_length;
             }
-            memory.*[MemMap.SOUND_CONTROL] = @bitCast(curr_audio_ctrl);
+            mmu.write8_sys(MemMap.SERIAL_CONTROL, @bitCast(curr_audio_ctrl));
         },
         MemMap.CH2_LENGTH => {
             // TODO: I am assuming that this is how this works, Pandocs is extremly vague about this.
             // Gameboy Sound Emulation Blog is implemented completly differently.
-            const ch2_length: Ch12Length = @bitCast(memory.*[MemMap.CH2_LENGTH]);
+            const ch2_length: Ch12Length = @bitCast(mmu.read8_sys(MemMap.CH2_LENGTH));
             self.ch2_length_timer = ch2_length.initial_length;
         },
         else => {
-            memory.*[addr] = val;
+            mmu.write8_sys(addr, val);
         },
     }
 }
@@ -159,15 +158,14 @@ pub fn step(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
 }
 
 fn stepCounters(self: *Self, mmu: *MMU) void {
-    const memory: *[]u8 = mmu.getRaw();
-    const sequencer: Sequencer = self.stepSequencer(memory.*[MemMap.DIVIDER]);
+    const sequencer: Sequencer = self.stepSequencer(mmu.read8_sys(MemMap.DIVIDER));
 
-    var audio_ctrl: AudioControl = @bitCast(memory.*[MemMap.SOUND_CONTROL]);
+    var audio_ctrl: AudioControl = @bitCast(mmu.read8_sys(MemMap.SOUND_CONTROL));
     if(!audio_ctrl.audio_enabled) {
         return;
     }
 
-    const ch2PeriodHigh: Ch12PeriodHigh = @bitCast(memory.*[MemMap.CH2_HIGH_PERIOD]);
+    const ch2PeriodHigh: Ch12PeriodHigh = @bitCast(mmu.read8_sys(MemMap.CH2_HIGH_PERIOD));
     // TODO: Implement other channels.
     // check if channels need to be turned off.
     if(audio_ctrl.ch2_running) {
@@ -175,7 +173,7 @@ fn stepCounters(self: *Self, mmu: *MMU) void {
 
         // is DAC on?
         // TODO: Channel 3 DAC is controlled directly!
-        const ch2Volume: Ch12Volume = @bitCast(memory.*[MemMap.CH2_VOLUME]);
+        const ch2Volume: Ch12Volume = @bitCast(mmu.read8_sys(MemMap.CH2_VOLUME));
         if(ch2Volume.initial_volume == 0 and ch2Volume.env_dir == 0) {
             audio_ctrl.ch2_running = false;
         }
@@ -188,7 +186,7 @@ fn stepCounters(self: *Self, mmu: *MMU) void {
             }
         }
     }
-    memory.*[MemMap.SOUND_CONTROL] = @bitCast(audio_ctrl);
+    mmu.write8_sys(MemMap.SOUND_CONTROL, @bitCast(audio_ctrl));
 
     // ch2
     if(audio_ctrl.ch2_running) {
@@ -199,7 +197,7 @@ fn stepCounters(self: *Self, mmu: *MMU) void {
         //
         self.ch2_step_counter, const overflow = @addWithOverflow(self.ch2_step_counter, 1);
         if(overflow == 1) {
-            const ch2PeriodLow: u8 = memory.*[MemMap.CH2_LOW_PERIOD];
+            const ch2PeriodLow: u8 = mmu.read8_sys(MemMap.CH2_LOW_PERIOD);
             const ch2PeriodHighPart: u3 = ch2PeriodHigh.period_high;
             if(ch2PeriodHighPart == 0) {}
             const ch2Period: u11 = ch2PeriodLow + (@as(u11, ch2PeriodHigh.period_high) << 8);
@@ -223,7 +221,6 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
         // switch to a slower rate if the buffer is getting full!
         self.sample_counter = if(buffer.isGettingFull()) cycles_per_sample_min + 1 else cycles_per_sample_min;
 
-        const memory: *[]u8 = mmu.getRaw();
         // TODO: This two array-buffer is pretty bad.
         var samples = [2]i16{0, 0};
         // TODO: Audio is disabled for now, way to broken :/
@@ -231,12 +228,12 @@ fn stepSampleGeneration(self: *Self, mmu: *MMU, buffer: *DoubleBuffer) void {
         //     // std.debug.print("write buffer is full, samples will be skipped!\n", .{});
         // };
 
-        const audio_ctrl: AudioControl = @bitCast(memory.*[MemMap.SOUND_CONTROL]);
+        const audio_ctrl: AudioControl = @bitCast(mmu.read8_sys(MemMap.SOUND_CONTROL));
         if(!audio_ctrl.audio_enabled) {
             return;
         }
 
-        const ch2Length: Ch12Length = @bitCast(memory.*[MemMap.CH2_LENGTH]);
+        const ch2Length: Ch12Length = @bitCast(mmu.read8_sys(MemMap.CH2_LENGTH));
         // TODO: Just a test full volume!
         const ch2Volume: u4 = 0xF;
         const ch2Duty: u1 = WAVE_DUTY_TABLE[ch2Length.wave_duty][self.ch2_duty_idx];

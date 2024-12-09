@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const MemMap = @import("mem_map.zig");
+const MMU = @import("mmu.zig");
 
 const Self = @This();
 
@@ -162,7 +163,7 @@ pub fn getCart(self: *Self) *[]u8 {
     return &self.rom;
 }
 
-pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
+pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
     // TODO: I don't know if this code can be adapted well to other mbcs.
     const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
     var ramChanged: bool = false;
@@ -286,9 +287,9 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
             if(self.mbc_registers.ram_enable) {
                 const ramStart: u32 = self.mbc_registers.ram_bank * RAM_BANK_SIZE_BYTE;
                 const ramEnd: u32 = ramStart + RAM_BANK_SIZE_BYTE;
-                std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], ram[ramStart..ramEnd]);
+                std.mem.copyForwards(u8, mmu.memory[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], ram[ramStart..ramEnd]);
             } else {
-                std.mem.copyForwards(u8, memory.*[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], self.zero_ram_bank);
+                std.mem.copyForwards(u8, mmu.memory[MemMap.CART_RAM_LOW..MemMap.CART_RAM_HIGH], self.zero_ram_bank);
             }
         }
     }
@@ -296,7 +297,7 @@ pub fn onWrite(self: *Self, memory: *[]u8, addr: u16, val: u8) void {
     if(romChanged) {
         const romStart: u32 = self.mbc_registers.rom_bank * ROM_BANK_SIZE_BYTE;
         const romEnd: u32 = romStart + ROM_BANK_SIZE_BYTE;
-        std.mem.copyForwards(u8, memory.*[MemMap.ROM_MIDDLE..MemMap.ROM_HIGH], self.rom[romStart..romEnd]);
+        std.mem.copyForwards(u8, mmu.memory[MemMap.ROM_MIDDLE..MemMap.ROM_HIGH], self.rom[romStart..romEnd]);
     }
 
     if(ramChanged and !self.mbc_registers.ram_enable) {

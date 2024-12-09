@@ -81,7 +81,7 @@ pub fn getFromR8Variant(self: *Self, variant: R8Variant, mmu: *MMU) u8 {
         .E => self.registers.r8.E,
         .H => self.registers.r8.H,
         .L => self.registers.r8.L,
-        .HL => mmu.read8(self.registers.r16.HL),
+        .HL => mmu.read8_usr(self.registers.r16.HL),
         .A => self.registers.r8.A,
     };
 }
@@ -98,7 +98,7 @@ pub fn setFromR8Variant(self: *Self, variant: R8Variant, mmu: *MMU, val: u8) voi
         .E => self.registers.r8.E = val,
         .H => self.registers.r8.H = val,
         .L => self.registers.r8.L = val,
-        .HL =>  mmu.write8(self.registers.r16.HL, val),
+        .HL =>  mmu.write8_usr(self.registers.r16.HL, val),
         .A => self.registers.r8.A = val,
     };
 }
@@ -167,8 +167,8 @@ fn debugPrintState(self: *Self, mmu: *MMU) void {
     std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ self.registers.r8.H, self.registers.r8.L });
     std.debug.print("SP: {X:0>4} PC: 00:{X:0>4} ", .{ self.sp, self.pc });
     std.debug.print("({X:0>2} {X:0>2} {X:0>2} {X:0>2})", .{
-        mmu.read8(self.pc), mmu.read8(self.pc +% 1), 
-        mmu.read8(self.pc +% 2), mmu.read8(self.pc +% 3), 
+        mmu.read8_sys(self.pc), mmu.read8_sys(self.pc +% 1), 
+        mmu.read8_sys(self.pc +% 2), mmu.read8_sys(self.pc +% 3), 
     });
     std.debug.print("\n", .{});
 }
@@ -190,8 +190,8 @@ pub fn tryInterrupt(self: *Self, mmu: *MMU) bool {
         return false;
     }
 
-    const enable = mmu.read8(MemMap.INTERRUPT_ENABLE);
-    const flag = mmu.read8(MemMap.INTERRUPT_FLAG);
+    const enable = mmu.read8_sys(MemMap.INTERRUPT_ENABLE);
+    const flag = mmu.read8_sys(MemMap.INTERRUPT_FLAG);
     var currFlag = MemMap.INTERRUPT_VBLANK;
     // TODO: Can I calculate this from the current flag?
     var flagIndex: u8 = 0;
@@ -205,9 +205,9 @@ pub fn tryInterrupt(self: *Self, mmu: *MMU) bool {
         self.isHalted = false;
         self.ime = false;
         const mask: u8 = ~currFlag;
-        mmu.write8(MemMap.INTERRUPT_FLAG, flag & mask);
+        mmu.write8_sys(MemMap.INTERRUPT_FLAG, flag & mask);
         self.sp -= 2;
-        mmu.write16(self.sp, self.pc);
+        mmu.write16_sys(self.sp, self.pc);
         self.pc = interruptVector[flagIndex];
         self.cycles_ahead = 20;
         return true;
@@ -236,13 +236,13 @@ pub fn step(self: *Self, mmu: *MMU) !void {
     }
 
     // TODO: Check if we can actually implement most of the instructions without all the pointers?
-    var opcode: u8 = mmu.read8(self.pc);
+    var opcode: u8 = mmu.read8_usr(self.pc);
     const operation: Operation = try switch (opcode) {
         // NOOP
         0x00 => Operation{ .deltaPC = 1, .cycles = 4 },
         // LD r16, imm16
         0x01, 0x11, 0x21, 0x31 => op: {
-            const source: u16 = mmu.read16((self.pc +% 1));
+            const source: u16 = mmu.read16_usr((self.pc +% 1));
             const destVar: R16Variant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const dest: *u16 = self.getFromR16Variant(destVar);
             dest.* = source;
@@ -253,7 +253,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         0x02, 0x12, 0x22, 0x32 => op: {
             const destVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const dest: u16 = self.getFromR16MemVariant(destVar);
-            mmu.write8(dest, self.registers.r8.A);
+            mmu.write8_usr(dest, self.registers.r8.A);
 
             break: op Operation{ .deltaPC =  1, .cycles = 8 };
         },
@@ -293,7 +293,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // LD r8, imm8
         0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E => op: {
-            const source: u8 =  mmu.read8(self.pc +% 1);
+            const source: u8 =  mmu.read8_usr(self.pc +% 1);
             const destVar: R8Variant = @enumFromInt((opcode & 0b0011_1000) >> 3);
             self.setFromR8Variant(destVar, mmu, source);
 
@@ -315,8 +315,8 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // LD (imm16),SP
         0x08 => op: {
-            const source: u16 = mmu.read16(self.pc +% 1);
-            mmu.write16(source, self.sp);
+            const source: u16 = mmu.read16_usr(self.pc +% 1);
+            mmu.write16_usr(source, self.sp);
 
             break: op Operation { .deltaPC = 3, .cycles = 20 };
         },
@@ -324,7 +324,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         0x0A, 0x1A, 0x2A, 0x3A => op: {
             const sourceVar: R16MemVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const source: u16 = self.getFromR16MemVariant(sourceVar);
-            self.registers.r8.A = mmu.read8(source);
+            self.registers.r8.A = mmu.read8_usr(source);
 
             break: op Operation{ .deltaPC =  1, .cycles = 8 };
         }, 
@@ -385,7 +385,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // JR r8
         0x18 => op: {
-            const relDest: i8 = mmu.readi8(self.pc +% 1);
+            const relDest: i8 = mmu.readi8_usr(self.pc +% 1);
             self.pc +%= @as(u16, @bitCast(@as(i16, relDest))); 
             self.pc +%= 2; // size of instruction 
 
@@ -411,7 +411,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
             const cond: bool = self.getFromCondVariant(condVar);
 
-            const relDest: i8 = mmu.readi8(self.pc +% 1);
+            const relDest: i8 = mmu.readi8_usr(self.pc +% 1);
             self.pc +%= if (cond) @as(u16, @bitCast(@as(i16, relDest))) else 0;
             self.pc +%= 2; // size of instruction 
 
@@ -476,8 +476,8 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             // TODO: Break the range, this is not readable honestly!
             // HALT
             if(opcode == 0x76) {
-                const enable = mmu.read8(MemMap.INTERRUPT_ENABLE);
-                const flag = mmu.read8(MemMap.INTERRUPT_FLAG);
+                const enable = mmu.read8_usr(MemMap.INTERRUPT_ENABLE);
+                const flag = mmu.read8_usr(MemMap.INTERRUPT_FLAG);
                 // HALT-Bug not implemented
                 std.debug.assert(self.ime or ((enable & flag) == 0));
 
@@ -622,7 +622,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             const cond: bool = self.getFromCondVariant(condVar);
 
             if(cond) {
-                self.pc = mmu.read16(self.sp);
+                self.pc = mmu.read16_usr(self.sp);
                 self.sp += 2;
             }
 
@@ -633,7 +633,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             const destVar: R16StkVariant = @enumFromInt((opcode & 0b0011_0000) >> 4);
             const dest: *u16 = self.getFromR16StkVariant(destVar);
 
-            const stack: u16 = mmu.read16(self.sp);
+            const stack: u16 = mmu.read16_usr(self.sp);
             dest.* = stack;
             self.sp += 2;
 
@@ -649,7 +649,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             const condVar: CondVariant = @enumFromInt((opcode & 0b0001_1000) >> 3);
             const cond: bool = self.getFromCondVariant(condVar);
 
-            const target: u16 = mmu.read16(self.pc +% 1);
+            const target: u16 = mmu.read16_usr(self.pc +% 1);
             self.pc = if(cond) target else (self.pc + 3);
 
             break: op Operation { .deltaPC = 0, .cycles =  if (cond) 16 else 12 };
@@ -660,13 +660,13 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             const source: *u16 = self.getFromR16StkVariant(sourceVar);
 
             self.sp -= 2;
-            mmu.write16(self.sp, source.*);
+            mmu.write16_usr(self.sp, source.*);
 
             break: op Operation{ .deltaPC = 1, .cycles = 16 };
         },
         // JP imm16
         0xC3 => op : {
-            self.pc = mmu.read16(self.pc +% 1);
+            self.pc = mmu.read16_usr(self.pc +% 1);
 
             break: op Operation { .deltaPC = 0, .cycles =  16 };
         },
@@ -680,10 +680,10 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             if(cond) {
                 // push next address onto stack.
                 self.sp -= 2;
-                mmu.write16(self.sp, self.pc +% 3);
+                mmu.write16_usr(self.sp, self.pc +% 3);
 
                 // jump to imm16
-                self.pc = mmu.read16(self.pc +% 1);
+                self.pc = mmu.read16_usr(self.pc +% 1);
             }
 
             break: op Operation { .deltaPC = if(cond) 0 else 3, .cycles = if(cond) 24 else 12 };
@@ -691,7 +691,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // ADD a, imm8
         0xC6 => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const result, const overflow = @addWithOverflow(A.*, source);
 
@@ -707,7 +707,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF => op : {
             // push next address onto stack.
             self.sp -= 2;
-            mmu.write16(self.sp, self.pc +% 1);
+            mmu.write16_usr(self.sp, self.pc +% 1);
 
             const target: u16 = 8 * @as(u16, ((opcode & 0b0011_1000) >> 3));
             self.pc = target;
@@ -718,7 +718,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         0xC9 => op : {
             // TODO: We have instructions for conditional calls/returns. Which are basically the same code as the unconditional returns.
             // TODO: Can I compbine those? return and conditional return have the same opcode structure, they only differ by the first bit.
-            self.pc = mmu.read16(self.sp);
+            self.pc = mmu.read16_usr(self.sp);
             self.sp += 2;
 
             break: op Operation { .deltaPC = 0, .cycles =  16 };
@@ -726,7 +726,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // PREFIX CB
         0xCB => op: {
             // TODO: Maybe there is solution without nesting this?
-            opcode = mmu.read8(self.pc +% 1);
+            opcode = mmu.read8_usr(self.pc +% 1);
             break: op switch (opcode) {
                 // RLC r8
                 0x00...0x07 => op_pfx: {
@@ -897,16 +897,16 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             // TODO: Can I compbine those? Call and conditional call have the same opcode structure, they only differ by the first bit.
             // push next address onto stack.
             self.sp -= 2;
-            mmu.write16(self.sp, self.pc +% 3);
+            mmu.write16_usr(self.sp, self.pc +% 3);
 
             // jump to imm16
-            self.pc = mmu.read16(self.pc +% 1);
+            self.pc = mmu.read16_usr(self.pc +% 1);
 
             break: op Operation { .deltaPC = 0, .cycles =  24 };
         },
         // ADC a, imm8
         0xCE => op: {
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
             const sourceCarry, const carryOverflow = @addWithOverflow(source, carry);
@@ -925,7 +925,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // SUB a, r8
         0xD6 => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const result, const overflow = @subWithOverflow(A.*, source);
 
@@ -939,7 +939,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },  
         // RETI
         0xD9 => op : {
-            self.pc = mmu.read16(self.sp);
+            self.pc = mmu.read16_usr(self.sp);
             self.sp += 2;
             self.ime = true;
 
@@ -948,7 +948,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // SBC a, imm8
         0xDE => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const carry: u8 = @intFromBool(self.registers.r8.F.Flags.carry);
             const sourceCarry, const carryOverflow = @addWithOverflow(source, carry);
@@ -966,21 +966,21 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },  
         // LDH [imm8], a
         0xE0 => op: {
-            const source: u8 = mmu.read8(self.pc +% 1);
-            mmu.write8(MemMap.HIGH_PAGE + source, self.registers.r8.A);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
+            mmu.write8_usr(MemMap.HIGH_PAGE + source, self.registers.r8.A);
 
             break: op Operation { .deltaPC = 2, .cycles = 12 };
         },
         // LD [c], a
         0xE2 => op: {
-            mmu.write8(MemMap.HIGH_PAGE + self.registers.r8.C, self.registers.r8.A);
+            mmu.write8_usr(MemMap.HIGH_PAGE + self.registers.r8.C, self.registers.r8.A);
 
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
         // LD [imm16], a
         0xEA => op: {
-            const dest: u16 = mmu.read16(self.pc +% 1);
-            mmu.write8(dest, self.registers.r8.A);
+            const dest: u16 = mmu.read16_usr(self.pc +% 1);
+            mmu.write8_usr(dest, self.registers.r8.A);
 
             break: op Operation { .deltaPC = 3, .cycles = 16 };
         },
@@ -990,7 +990,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             // Difference is only if we use an immediate value or not. Can we make this a better re-use?
             // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
             // So I can change the mask to improve this! Cycle time is the same as HL!
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             A.* &= source;
 
@@ -1003,7 +1003,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // ADD SP, imm8 (signed)
         0xE8 => op: {
-            const deltaSP: i8 = mmu.readi8(self.pc +% 1); 
+            const deltaSP: i8 = mmu.readi8_usr(self.pc +% 1); 
 
             self.registers.r8.F.Flags.zero = false;
             self.registers.r8.F.Flags.nBCD = false;
@@ -1025,7 +1025,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // XOR a, imm8
         0xEE => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             A.* ^= source;
 
@@ -1038,22 +1038,22 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // LDH a, [imm8]
         0xF0 => op: {
-            const source: u8 = mmu.read8(self.pc +% 1);
-            self.registers.r8.A = mmu.read8(MemMap.HIGH_PAGE + source);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
+            self.registers.r8.A = mmu.read8_usr(MemMap.HIGH_PAGE + source);
 
             break: op Operation { .deltaPC = 2, .cycles = 12 };
         },
         // LDH a, [c]
         0xF2 => op: {
             // TODO: Could we combine some of the high loads/writes with a new high variant? 
-            self.registers.r8.A = mmu.read8(MemMap.HIGH_PAGE + self.registers.r8.C);
+            self.registers.r8.A = mmu.read8_usr(MemMap.HIGH_PAGE + self.registers.r8.C);
 
             break: op Operation { .deltaPC = 1, .cycles = 8 };
         },
         // LD a, [imm16]
         0xFA => op: {
-            const source: u16 = mmu.read16(self.pc +% 1);
-            self.registers.r8.A = mmu.read8(source);
+            const source: u16 = mmu.read16_usr(self.pc +% 1);
+            self.registers.r8.A = mmu.read8_usr(source);
 
             break: op Operation { .deltaPC = 3, .cycles = 16 };
         },
@@ -1066,7 +1066,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         // OR a, imm8
         0xF6 => op: {
             // TODO: For add, adc, sub, sbc, and, xor, or, cp we have basically the same code and instruction.
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const dest: *u8 = &self.registers.r8.A;
             dest.* |= source;
 
@@ -1079,7 +1079,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
         },
         // LD HL, SP+imm8(signed)
         0xF8 => op: {
-            const deltaSP: i8 = mmu.readi8(self.pc +% 1); 
+            const deltaSP: i8 = mmu.readi8_usr(self.pc +% 1); 
 
             self.registers.r8.F.Flags.zero = false;
             self.registers.r8.F.Flags.nBCD = false;
@@ -1109,7 +1109,7 @@ pub fn step(self: *Self, mmu: *MMU) !void {
             // Difference is only if we use an immediate value or not. Can we make this a better re-use?
             // The difference of the instructions is that the variant is HL + the 2nd bit is set (6th value).
             // So I can change the mask to improve this! Cycle time is the same as HL!
-            const source: u8 = mmu.read8(self.pc +% 1);
+            const source: u8 = mmu.read8_usr(self.pc +% 1);
             const A: *u8 = &self.registers.r8.A;
             const result, const overflow = @subWithOverflow(A.*, source);
 

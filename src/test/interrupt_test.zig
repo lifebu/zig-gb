@@ -24,7 +24,7 @@ pub fn runInterruptTests() !void {
     defer alloc.free(pixels);
 
     // IME is reset by DI.
-    mmu.write8(MemMap.WRAM_LOW, 0xF3); // DI
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xF3); // DI
     cpu.pc = MemMap.WRAM_LOW;
     cpu.ime = true;
     try cpu.step(&mmu);
@@ -34,7 +34,7 @@ pub fn runInterruptTests() !void {
     };
 
     // IME is set by RETI
-    mmu.write8(MemMap.WRAM_LOW, 0xD9); // RETI
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xD9); // RETI
     cpu.pc = MemMap.WRAM_LOW;
     cpu.sp = MemMap.WRAM_HIGH;
     cpu.ime = false;
@@ -45,7 +45,7 @@ pub fn runInterruptTests() !void {
     };
 
     // IME is set by EI with 1 instruction delay
-    mmu.write8(MemMap.WRAM_LOW, 0xFB); // EI
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xFB); // EI
     cpu.pc = MemMap.WRAM_LOW;
     cpu.ime = false;
     try cpu.step(&mmu);
@@ -60,8 +60,8 @@ pub fn runInterruptTests() !void {
     };
 
     // IME is reset by the interrupt handler
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0b0001_0000;
-    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0b0001_0000);
+    mmu.write8_sys(MemMap.INTERRUPT_ENABLE, 0xFF);
     cpu.pc = MemMap.WRAM_LOW;
     cpu.ime = true;
     try cpu.step(&mmu);
@@ -71,13 +71,13 @@ pub fn runInterruptTests() !void {
     };
 
     // CPU can write to IF.
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.write8(MemMap.WRAM_LOW, 0x77);  // LD (HL), A
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.WRAM_LOW, 0x77);  // LD (HL), A
     cpu.registers.r16.HL = MemMap.INTERRUPT_FLAG;
     cpu.registers.r8.A = 0xFF;
     cpu.pc = MemMap.WRAM_LOW;
     try cpu.step(&mmu);
-    std.testing.expectEqual(0xFF, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0xFF, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: CPU can write to IF.\n", .{});
         return err;
     };
@@ -122,8 +122,8 @@ pub fn runInterruptTests() !void {
             var val: u32 = 0;
             val += 1;
         }
-        mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = testCase.interupt_flag;
-        mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
+        mmu.write8_sys(MemMap.INTERRUPT_FLAG, testCase.interupt_flag);
+        mmu.write8_sys(MemMap.INTERRUPT_ENABLE, 0xFF);
         cpu.pc = MemMap.WRAM_LOW;
         cpu.ime = true;
         try cpu.step(&mmu);
@@ -138,13 +138,13 @@ pub fn runInterruptTests() !void {
         .isDownPressed = false, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
         .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
     });
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.write8(MemMap.JOYPAD, 0b1110_1111);
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.JOYPAD, 0b1110_1111);
     mmio.updateJoypad(&mmu, Def.InputState {
         .isDownPressed = true, .isUpPressed = false, .isLeftPressed = false, .isRightPressed = false,
         .isStartPressed = false, .isSelectPressed = false, .isBPressed = false, .isAPressed = false,
     });
-    std.testing.expectEqual(0b0001_0000, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0001_0000, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: Joypad requests interrupt.\n", .{});
         return err;
     };
@@ -152,111 +152,111 @@ pub fn runInterruptTests() !void {
     // TODO: Interrupt request: Serial.
 
     // Interrupt request: Timer: TIMA overflows.
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
     mmio.dividerCounter = 0;
-    mmu.getRaw().*[MemMap.TIMER] = 0xFF;
-    mmu.write8(MemMap.TIMER_CONTROL, 0b0000_0101); // 16 cycles per increment.
+    mmu.write8_sys(MemMap.TIMER, 0xFF);
+    mmu.write8_sys(MemMap.TIMER_CONTROL, 0b0000_0101); // 16 cycles per increment.
     for(0..16) |_| {
         mmio.updateTimers(&mmu);
     }
-    std.testing.expectEqual(0b0000_0100, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0100, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: Joypad requests interrupt.\n", .{});
         return err;
     };
 
     // Interrupt request: STAT: LY = LYC.
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0100_0000; // Select LY = LYC.
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.LCD_STAT, 0b0100_0000); // Select LY = LYC.
     ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
-    mmu.getRaw().*[MemMap.LCD_CONTROL] = 0b1000_0000;
-    mmu.getRaw().*[MemMap.LCD_Y] = 9;
-    mmu.getRaw().*[MemMap.LCD_Y_COMPARE] = 10;
+    mmu.write8_sys(MemMap.LCD_CONTROL, 0b1000_0000);
+    mmu.write8_sys(MemMap.LCD_Y, 9);
+    mmu.write8_sys(MemMap.LCD_Y_COMPARE, 10);
     ppu.step(&mmu, &pixels);
-    std.testing.expectEqual(0b0000_0010, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0010, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: STAT for LY=LYC requests interrupt.\n", .{});
         return err;
     };
 
     // Interrupt request: STAT: Mode 0
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0000_1000; // Select Mode 0 (HBlank)
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.LCD_STAT, 0b0000_1000); // Select Mode 0 (HBlank)
     ppu.lyCounter = 0;
     ppu.lastSTATLine = false;
-    mmu.getRaw().*[MemMap.LCD_Y] = 0;
-    while(mmu.getRaw().*[MemMap.LCD_Y] == 0) {
+    mmu.write8_sys(MemMap.LCD_Y, 0);
+    while(mmu.read8_sys(MemMap.LCD_Y) == 0) {
         ppu.step(&mmu, &pixels);
     }
-    std.testing.expectEqual(0b0000_0010, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0010, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: STAT for Mode 0 (HBlank) requests interrupt.\n", .{});
         return err;
     };
 
     // Interrupt request: STAT: Mode 1
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0001_0000; // Select Mode 1 (VBlank)
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.LCD_STAT, 0b0001_0000); // Select Mode 1 (VBlank)
     ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
     ppu.lastSTATLine = false;
-    mmu.getRaw().*[MemMap.LCD_Y] = Def.RESOLUTION_HEIGHT - 1;
+    mmu.write8_sys(MemMap.LCD_Y, Def.RESOLUTION_HEIGHT - 1);
     ppu.step(&mmu, &pixels);
     // Will trigger VBlank and STAT interrupt!
-    std.testing.expectEqual(0b0000_0011, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0011, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: STAT for Mode 1 (VBlank) requests interrupt.\n", .{});
         return err;
     };
 
     // Interrupt request: STAT: Mode 2
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0010_0000; // Select Mode 2 (OAMScan)
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.LCD_STAT, 0b0010_0000); // Select Mode 2 (OAMScan)
     ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
     ppu.lastSTATLine = false;
-    mmu.getRaw().*[MemMap.LCD_Y] = 0;
+    mmu.write8_sys(MemMap.LCD_Y, 0);
     ppu.step(&mmu, &pixels);
-    std.testing.expectEqual(0b0000_0010, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0010, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: STAT for Mode 2 (OAMScan) requests interrupt.\n", .{});
         return err;
     };
 
     // Interrupt request: STAT: STAT Blocking.
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0010_1000; // Select Mode 0 (HBlank) and Mode 2 (OAMScan)
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.LCD_STAT, 0b0010_1000); // Select Mode 0 (HBlank) and Mode 2 (OAMScan)
     ppu.lyCounter = 0;
-    mmu.getRaw().*[MemMap.LCD_Y] = 0;
-    while(mmu.getRaw().*[MemMap.INTERRUPT_FLAG] == 0) { // Go until we have an HBlank interrupt.
+    mmu.write8_sys(MemMap.LCD_Y, 0);
+    while(mmu.read8_sys(MemMap.INTERRUPT_FLAG) == 0) { // Go until we have an HBlank interrupt.
         ppu.step(&mmu, &pixels);
     }
     // We now got a HBlank stat interrupt, clear it and try to get an OAMScan Stat interrupt.
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    while(mmu.getRaw().*[MemMap.LCD_Y] == 0) { // Go until we are on the second line
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    while(mmu.read8_sys(MemMap.LCD_Y) == 0) { // Go until we are on the second line
         ppu.step(&mmu, &pixels);
     }
-    std.testing.expectEqual(0b0000_0000, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0000, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: STAT interrupts are blocked for consecutive STAT sources.\n", .{});
         return err;
     };
 
     // Interrupt request: VBlank: Reached VBlank
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0x00;
-    mmu.getRaw().*[MemMap.LCD_STAT] = 0b0000_0000; // Select no STAT interrupt
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0x00);
+    mmu.write8_sys(MemMap.LCD_STAT, 0b0000_0000); // Select no STAT interrupt
     ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
-    mmu.getRaw().*[MemMap.LCD_Y] = Def.RESOLUTION_HEIGHT - 1;
+    mmu.write8_sys(MemMap.LCD_Y, Def.RESOLUTION_HEIGHT - 1);
     ppu.step(&mmu, &pixels);
-    std.testing.expectEqual(0b0000_0001, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+    std.testing.expectEqual(0b0000_0001, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
         std.debug.print("Failed: VBlank requests interrupt.\n", .{});
         return err;
     };
 
     // Interrupt priorities: VBlank > LCD > Timer > Serial > Joypad
-    mmu.getRaw().*[MemMap.INTERRUPT_FLAG] = 0b0001_1111; // All interupts are pending.
-    mmu.getRaw().*[MemMap.INTERRUPT_ENABLE] = 0xFF;
+    mmu.write8_sys(MemMap.INTERRUPT_FLAG, 0b0001_1111); // All interupts are pending.
+    mmu.write8_sys(MemMap.INTERRUPT_ENABLE, 0xFF);
     cpu.pc = MemMap.WRAM_LOW;
     // Reenable IME for each interrupt vector.
-    mmu.getRaw().*[MemMap.WRAM_LOW] = 0xF3; // DI
-    mmu.getRaw().*[MemMap.WRAM_LOW + 1] = 0xFB; // EI
-    mmu.getRaw().*[0x40] = 0xFB; // EI
-    mmu.getRaw().*[0x48] = 0xFB; // EI
-    mmu.getRaw().*[0x50] = 0xFB; // EI
-    mmu.getRaw().*[0x58] = 0xFB; // EI
-    mmu.getRaw().*[0x60] = 0xFB; // EI
+    mmu.write8_sys(MemMap.WRAM_LOW, 0xF3); // DI
+    mmu.write8_sys(MemMap.WRAM_LOW + 1, 0xFB); // EI
+    mmu.write8_sys(0x40, 0xFB); // EI
+    mmu.write8_sys(0x48, 0xFB); // EI
+    mmu.write8_sys(0x50, 0xFB); // EI
+    mmu.write8_sys(0x58, 0xFB); // EI
+    mmu.write8_sys(0x60, 0xFB); // EI
     try cpu.step(&mmu);
 
     const InterruptPrioTest = struct {
@@ -290,7 +290,7 @@ pub fn runInterruptTests() !void {
         try cpu.step(&mmu); // EI
         try cpu.step(&mmu); // NOP
         try cpu.step(&mmu); // Interrupt!
-        std.testing.expectEqual(testCase.expected_if, mmu.read8(MemMap.INTERRUPT_FLAG)) catch |err| {
+        std.testing.expectEqual(testCase.expected_if, mmu.read8_sys(MemMap.INTERRUPT_FLAG)) catch |err| {
             std.debug.print("Failed Interrupt Priority Test {d}: {s}\n", .{ i, testCase.name });
             return err;
         };
