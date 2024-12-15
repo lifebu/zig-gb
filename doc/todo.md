@@ -32,12 +32,6 @@
 
 ## Testing
 - Cart: MBC, Header, ROM/RAM.
-- OAM DMA Bus conflict.
-    - Writes do nothing, Reads return 0xFF.
-    - Cannot Acces ROM, CartRAM, WRAM, VRAM, ECHO, OAM. 
-    - CGB: Cartridge (ROM, CartRAM) and WRAM are on seperate busses.
-    - What about the HighPage with all the registers? (0xFF00-0xFF7F)
-    - With registers: cannot access: 0x0000-0xFF7F and 0xFFFF
 - Test ROMS:
     - Blargg (CPU)
     - MealyBug (PPU)

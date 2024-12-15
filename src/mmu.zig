@@ -84,6 +84,14 @@ pub fn deinit(self: *Self) void {
 
 /// User level read, 8bit unsigned. Has read protections for some hardware registers and memory regions.
 pub fn read8_usr(self: *const Self, addr: u16) u8 {
+    // TODO: Branchless?
+    // During DMA, only HRAM is writeable
+    if(self.mmio.dmaIsRunning) {
+        if(addr < MemMap.HRAM_LOW or addr >= MemMap.HRAM_HIGH) {
+            return 0xFF;
+        }
+    }
+
     switch(addr) {
         MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
             // TODO: Better if the subsystem makes sure of that?
@@ -127,6 +135,14 @@ pub fn readi8_usr(self: *const Self, addr: u16) i8 {
 
 /// User level write, 8bit unsigned. Has write protections for some hardware registers and memory regions.
 pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
+    // TODO: Branchless?
+    // During DMA, only HRAM is writeable
+    if(self.mmio.dmaIsRunning) {
+        if(addr < MemMap.HRAM_LOW or addr >= MemMap.HRAM_HIGH) {
+            return;
+        }
+    }
+
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH - 1 => {
             // TODO: Maybe the MMU does not own the cart, but just like every other system, we inject the cart into the mmu?

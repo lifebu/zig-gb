@@ -88,8 +88,30 @@ pub fn runWriteMemoryTests() !void {
         };
     }
 
+    // OAM DMA Transfer: Can only write HRAM.
+    mmu.write8_usr(MemMap.DMA, 0x03);
+    for(0..MemMap.HRAM_LOW) |i| {
+        const addr: u16 = @intCast(i);
+        mmu.write8_sys(addr, 0x00);
+        mmu.write8_usr(addr, 0xFF);
+        std.testing.expectEqual(0x00, mmu.read8_sys(addr)) catch |err| {
+            std.debug.print("Failed: During OAM DMA only HRAM is writeable. Writeable address: {d}\n", .{i});
+            return err;
+        };
+    }
+    for(MemMap.HRAM_HIGH..MemMap.INTERRUPT_ENABLE) |i| {
+        const addr: u16 = @intCast(i);
+        mmu.write8_sys(addr, 0x00);
+        mmu.write8_usr(addr, 0xFF);
+        std.testing.expectEqual(0x00, mmu.read8_sys(addr)) catch |err| {
+            std.debug.print("Failed: During OAM DMA only HRAM is writeable. Writeable address: {d}\n", .{i});
+            return err;
+        };
+    }
+
     // TODO: Missing Tests:
     // Cannot access CGB palettes during PPU Mode 3 (DRAW).
+    // CGB: WRAM and Cart ar on seperate memory busses => depending on start address of dma, writes might be allowed.
 }
 
 pub fn runReadMemoryTests() !void {
@@ -157,9 +179,29 @@ pub fn runReadMemoryTests() !void {
         };
     }
 
+    // OAM DMA Transfer: Can only read HRAM.
+    mmu.write8_usr(MemMap.DMA, 0x03);
+    for(0..MemMap.HRAM_LOW) |i| {
+        const addr: u16 = @intCast(i);
+        mmu.write8_sys(addr, 0x01);
+        std.testing.expectEqual(0xFF, mmu.read8_usr(addr)) catch |err| {
+            std.debug.print("Failed: During OAM DMA only HRAM is readable. Readable address: {d}\n", .{i});
+            return err;
+        };
+    }
+    for(MemMap.HRAM_HIGH..MemMap.INTERRUPT_ENABLE) |i| {
+        const addr: u16 = @intCast(i);
+        mmu.write8_sys(addr, 0x01);
+        std.testing.expectEqual(0xFF, mmu.read8_usr(addr)) catch |err| {
+            std.debug.print("Failed: During OAM DMA only HRAM is readable. Writeable address: {d}\n", .{i});
+            return err;
+        };
+    }
+
     // TODO: Missing Tests:
     // Unused (FEA0-FEFF)
         // 0xFF when OAM is blocked.
+    // CGB: WRAM and Cart ar on seperate memory busses => depending on start address of dma, reads might be allowed.
 }
 
 // TODO: Should this be part of the tests of the subsystem?
