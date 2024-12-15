@@ -4,6 +4,7 @@ const APU = @import("apu.zig");
 const Cart = @import("cart.zig");
 const MemMap = @import("mem_map.zig");
 const MMIO = @import("mmio.zig");
+const PPU = @import("ppu.zig");
 
 const Self = @This();
 
@@ -16,6 +17,7 @@ apu: *APU,
 pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u8) !Self {
     // TODO: Should rethink why the cart lives in the MMU but the rest of the system are references. Can they be given to the mmu through calls?
     // which means the CPU needs to pass it to the read functions.
+    // Maybe use singletons for this?
     var self = Self{ .allocator = alloc, .apu = apu, .mmio = mmio };
 
     self.memory = try alloc.alloc(u8, 0x10000);
@@ -82,7 +84,36 @@ pub fn deinit(self: *Self) void {
 
 /// User level read, 8bit unsigned. Has read protections for some hardware registers and memory regions.
 pub fn read8_usr(self: *const Self, addr: u16) u8 {
-   return self.memory[addr];
+    switch(addr) {
+        MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
+            // TODO: Better if the subsystem makes sure of that?
+            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
+            if(lcd_stat.ppu_mode == .DRAW) {
+                return 0xFF; 
+            }
+
+            return self.memory[addr];
+        },
+        MemMap.ECHO_LOW...MemMap.ECHO_HIGH - 1 => {
+            const echo_diff: u16 = comptime MemMap.ECHO_LOW - MemMap.WRAM_LOW;
+            return self.memory[addr - echo_diff]; 
+        },
+        MemMap.OAM_LOW...MemMap.OAM_HIGH - 1 => {
+            // TODO: Better if the subsystem makes sure of that?
+            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
+            if(lcd_stat.ppu_mode == .OAM_SCAN or lcd_stat.ppu_mode == .DRAW) {
+                return 0xFF; 
+            }
+
+            return self.memory[addr];
+        },
+        MemMap.UNUSED_LOW...MemMap.UNUSED_HIGH - 1 => {
+            return 0x00;
+        },
+        else => {
+            return self.memory[addr]; 
+        }
+    }
 }
 /// System level read, 8bit unsigned. No read protections
 pub fn read8_sys(self: *const Self, addr: u16) u8 {
@@ -91,15 +122,40 @@ pub fn read8_sys(self: *const Self, addr: u16) u8 {
 
 /// User level read, 8bit signed. Has read protections for some hardware registers and memory regions.
 pub fn readi8_usr(self: *const Self, addr: u16) i8 {
-   return @bitCast(self.memory[addr]);
+   return @bitCast(self.read8_usr(addr));
 }
 
 /// User level write, 8bit unsigned. Has write protections for some hardware registers and memory regions.
 pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
     switch(addr) {
-        MemMap.ROM_LOW...MemMap.ROM_HIGH => {
+        MemMap.ROM_LOW...MemMap.ROM_HIGH - 1 => {
             // TODO: Maybe the MMU does not own the cart, but just like every other system, we inject the cart into the mmu?
             self.cart.onWrite(self, addr, val);
+        },
+        MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
+            // TODO: Better if the subsystem makes sure of that?
+            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
+            if(lcd_stat.ppu_mode == .DRAW) {
+                return; 
+            }
+
+            self.memory[addr] = val;
+        },
+        MemMap.ECHO_LOW...MemMap.ECHO_HIGH - 1 => {
+            const echo_diff: u16 = comptime MemMap.ECHO_LOW - MemMap.WRAM_LOW;
+            self.memory[addr - echo_diff] = val; 
+        },
+        MemMap.OAM_LOW...MemMap.OAM_HIGH - 1 => {
+            // TODO: Better if the subsystem makes sure of that?
+            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
+            if(lcd_stat.ppu_mode == .OAM_SCAN or lcd_stat.ppu_mode == .DRAW) {
+                return; 
+            }
+
+            self.memory[addr] = val;
+        },
+        MemMap.UNUSED_LOW...MemMap.UNUSED_HIGH - 1 => {
+            return; // Read-Only
         },
         MemMap.JOYPAD => {
             // TODO: Better if the subsystem makes sure of that?

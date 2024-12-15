@@ -74,19 +74,28 @@ const LCDC = packed struct {
     lcd_enable: bool,
 };
 
-const LCDStat = packed struct {
+pub const LCDStat = packed struct {
     ppu_mode: enum(u2) {
         H_BLANK,
         V_BLANK,
         OAM_SCAN,
         DRAW,
     },
-    ly_is_lyc: bool,
-    mode_0_select: bool,
-    mode_1_select: bool,
-    mode_2_select: bool,
-    lyc_select: bool,
-    _: u1,
+    ly_is_lyc: bool = false,
+    mode_0_select: bool = false,
+    mode_1_select: bool = false,
+    mode_2_select: bool = false,
+    lyc_select: bool = false,
+    _: u1 = 0,
+
+    // TODO: Not sure If I want those functions? they don't save a lot of code, but make the intention clearer?
+    pub fn toByte(self: LCDStat) u8 {
+        return @bitCast(self);
+    }
+
+    pub fn fromByte(val: u8) LCDStat {
+        return @bitCast(val);
+    }
 };
 
 linePixelWait: u8 = 0, // Wait 12 cycles before starting to draw.

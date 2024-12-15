@@ -41,10 +41,14 @@ test "InterruptTest" {
     try interrupt_test.runInterruptTests();
 }
 
-test "MMU_WriteTest" {
-    try mmu_test.runWriteTests();
+test "MMU_WriteMemoryTest" {
+    try mmu_test.runWriteMemoryTests();
 }
 
-test "MMU_ReadTest" {
-    try mmu_test.runReadTests();
+test "MMU_WriteIOTest" {
+    try mmu_test.runWriteIOTests();
+}
+
+test "MMU_ReadMemoryTest" {
+    try mmu_test.runReadMemoryTests();
 }

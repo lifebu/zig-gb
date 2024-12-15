@@ -1,6 +1,8 @@
 /// Ranges are: [LOW, HIGH) (high excluding!). 
 
 // Memory
+// TODO: Apparently switch cases are including the maximum value, what about for loops (exlcuding max) and slices (slices are excluding max)? 
+// TODO: Check all uses of this and fix all instances (could explain some of the off-by-one errors).
 pub const ROM_LOW: u16          = 0x0000;
 pub const ROM_MIDDLE: u16       = 0x4000;
 pub const ROM_HIGH: u16         = 0x8000;

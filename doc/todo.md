@@ -3,6 +3,13 @@
 - Move everything not "required" to 2.0?
 
 ## Bugs / Missing.
+- MMU:
+    - slices and for-loops are ranges excluding max.
+    - switches are ranges including max.
+    - Check all uses of the MemMap and fix it accordingly.
+    - would explain some off-by-one errors!
+    - also check all the tests and add more specific tests that make sure that ranges are correctly adhered to.
+    - example: Clear out the entire OAM, use DMA Transfer and check the the number of written bytes is the expected OAM size.
 - PPU:
     - YFlip:
         - If you have double height object the y-Flip applies to the entire object.
@@ -25,10 +32,7 @@
 
 ## Testing
 - Cart: MBC, Header, ROM/RAM.
-- MMU: Read/Write Behavior (Write Protections).
 - OAM DMA Bus conflict.
-- Hardware Registers: Read/Write Behavior
-    - LCD: LCD Stat (low 3 bits read-only), LY (Read-only)
 - Test ROMS:
     - Blargg (CPU)
     - MealyBug (PPU)
