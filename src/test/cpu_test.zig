@@ -97,7 +97,7 @@ pub fn runSingleStepTests() !void {
         var apu = APU{};
         var mmio = MMIO{};
 
-        var mmu = try MMU.init(alloc, &apu, &mmio, null);
+        var mmu = try MMU.init(alloc, &apu, &mmio);
         defer mmu.deinit();
 
         var cpu = try CPU.init();
@@ -166,7 +166,7 @@ pub fn runHaltTests() !void {
     var apu = APU{};
     var mmio = MMIO{};
 
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     var cpu = try CPU.init();

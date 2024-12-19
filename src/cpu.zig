@@ -218,6 +218,8 @@ pub fn tryInterrupt(self: *Self, mmu: *MMU) bool {
 
 
 pub fn step(self: *Self, mmu: *MMU) !void {
+    mmu.clearWriteRecord();
+
     if(self.tryInterrupt(mmu)) {
         return;
     }

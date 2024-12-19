@@ -70,7 +70,7 @@ zero_ram_bank: []u8 = undefined,
 mbc: MBC = .NO_MBC,
 mbc_registers: MBCRegisters = undefined,
 
-pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self {
+pub fn init(alloc: std.mem.Allocator, mmu: *MMU, gbFile: ?[]const u8) !Self {
     var self = Self{ .allocator = alloc };
 
     if (gbFile) |filePath| {
@@ -81,7 +81,7 @@ pub fn init(alloc: std.mem.Allocator, memory: *[]u8, gbFile: ?[]const u8) !Self 
         errdefer alloc.free(self.rom);
 
         // Initial copy of the first banks.
-        std.mem.copyForwards(u8, memory.*[MemMap.ROM_LOW..MemMap.ROM_HIGH], self.rom[0..2 * ROM_BANK_SIZE_BYTE]);
+        std.mem.copyForwards(u8, mmu.memory[MemMap.ROM_LOW..MemMap.ROM_HIGH], self.rom[0..2 * ROM_BANK_SIZE_BYTE]);
 
         const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
         self.mbc = try getMBC(header);
@@ -165,7 +165,12 @@ pub fn getCart(self: *Self) *[]u8 {
     return &self.rom;
 }
 
-pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
+pub fn onWrite(self: *Self, mmu: *MMU) void {
+    if(mmu.write_record == null) {
+        return;
+    }
+    const write_record: MMU.WriteRecord = mmu.write_record.?; 
+
     // TODO: I don't know if this code can be adapted well to other mbcs.
     const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);
     var ramChanged: bool = false;
@@ -177,16 +182,16 @@ pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
             return;
         },
         .MBC_1 => {
-            switch(addr) {
+            switch(write_record.addr) {
                 0x0000...0x1FFF => {
-                    self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+                    self.mbc_registers.ram_enable = @as(u4, @truncate(write_record.val)) == 0xA;
                     ramChanged = true;
                 },
                 0x2000...0x3FFF => {
                     const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
                     const numBanks: u9 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
                     const mask: u9 = @intCast(numBanks - 1);
-                    self.mbc_registers.rom_bank = @truncate(@max(1, val) & mask);
+                    self.mbc_registers.rom_bank = @truncate(@max(1, write_record.val) & mask);
                     romChanged = true;
                 },
                 0x4000...0x5FFF => {
@@ -197,29 +202,29 @@ pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                     }
 
                     const mask: u9 = @intCast(numBanks - 1);
-                    self.mbc_registers.ram_bank = @truncate(val & mask);
+                    self.mbc_registers.ram_bank = @truncate(write_record.val & mask);
                     ramChanged = true;
                 },
                 0x6000...0x7FFF => {
-                    self.mbc_registers.bank_mode = @truncate(val);
+                    self.mbc_registers.bank_mode = @truncate(write_record.val);
                 },
                 // TODO: Error?, Always test the MBC on all write?
                 else => {},
             }
         },
         .MBC_3 => {
-            switch(addr) {
+            switch(write_record.addr) {
                 // TODO: Implement RTC
                 0x0000...0x1FFF => {
                     // TODO: This also enables access to the RTC registers.
-                    self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+                    self.mbc_registers.ram_enable = @as(u4, @truncate(write_record.val)) == 0xA;
                     ramChanged = true;
                 },
                 0x2000...0x3FFF => {
                     const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
                     const numBanks: u9 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
                     const mask: u9 = @intCast(numBanks - 1);
-                    self.mbc_registers.rom_bank = @truncate(@max(1, val) & mask);
+                    self.mbc_registers.rom_bank = @truncate(@max(1, write_record.val) & mask);
                     romChanged = true;
                 },
                 0x4000...0x5FFF => {
@@ -232,7 +237,7 @@ pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                     }
 
                     const mask: u9 = @intCast(numBanks - 1);
-                    self.mbc_registers.ram_bank = @truncate(val & mask);
+                    self.mbc_registers.ram_bank = @truncate(write_record.val & mask);
                     ramChanged = true;
                 },
                 0x6000...0x7FFF => {
@@ -245,9 +250,9 @@ pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
             }
         },
         .MBC_5 => {
-            switch(addr) {
+            switch(write_record.addr) {
                 0x0000...0x1FFF => {
-                    self.mbc_registers.ram_enable = @as(u4, @truncate(val)) == 0xA;
+                    self.mbc_registers.ram_enable = @as(u4, @truncate(write_record.val)) == 0xA;
                     ramChanged = true;
                 },
                 0x2000...0x2FFF => {
@@ -255,7 +260,7 @@ pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                     const romSizeByte = ROM_SIZE_BYTE[header.rom_size];
                     const numBanks: u9 = @truncate(romSizeByte / ROM_BANK_SIZE_BYTE);
                     const mask: u9 = @intCast(numBanks - 1);
-                    self.mbc_registers.rom_bank = @truncate(@max(1, val) & mask);
+                    self.mbc_registers.rom_bank = @truncate(@max(1, write_record.val) & mask);
                     romChanged = true;
                 },
                 0x3000...0x3FFF => {
@@ -271,7 +276,7 @@ pub fn onWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                     }
 
                     const mask: u9 = @intCast(numBanks - 1);
-                    self.mbc_registers.ram_bank = @truncate(val & mask);
+                    self.mbc_registers.ram_bank = @truncate(write_record.val & mask);
                     ramChanged = true;
                 },
                 // TODO: Error?, Always test the MBC on all write?

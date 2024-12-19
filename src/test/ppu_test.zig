@@ -33,7 +33,7 @@ pub fn runStaticTest() !void {
 
     // TODO: Need a way to fill the mmu with a test memory dump.
     var apu = APU{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     const testConfig: []TestType = json.value;

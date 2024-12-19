@@ -13,7 +13,7 @@ pub fn runDividerTest() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     var expectedDIV: u8 = 0;
@@ -35,7 +35,7 @@ pub fn runTimerTest() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     mmu.write8_sys(MemMap.TIMER, 0x00);
@@ -144,7 +144,7 @@ pub fn runDMATest() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     for(0x0300..0x039F, 1..) |addr, i| {
@@ -212,7 +212,7 @@ pub fn runJoypadTests() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     const TestCase = struct {

@@ -12,7 +12,7 @@ pub fn runWriteMemoryTests() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     // TODO: maybe combine those tests into an array of configs?
@@ -119,7 +119,7 @@ pub fn runReadMemoryTests() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     // Echo-RAM: Read: E000-FDFF <==> C000-DDFF
@@ -210,7 +210,7 @@ pub fn runWriteIOTests() !void {
 
     var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio, null);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
 
     mmu.write8_sys(MemMap.LCD_Y, 0x00);

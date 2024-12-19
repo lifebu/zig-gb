@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const APU = @import("apu.zig");
+const CART = @import("cart.zig");
 const CONF = @import("conf.zig");
 const CPU = @import("cpu.zig");
 const Def = @import("def.zig");
@@ -30,8 +31,11 @@ pub fn main() !void {
 
     // TODO: Passing all the subsystems to the mmu just so that it can call them on writes (so they can handle writes), creates nasty dependencies.
     // Especially annoying for writing tests. Can I do that better?
-    var mmu = try MMU.init(alloc, &apu, &mmio, conf.gbFile);
+    var mmu = try MMU.init(alloc, &apu, &mmio);
     defer mmu.deinit();
+
+    var cart = try CART.init(alloc, &mmu, conf.gbFile);
+    defer cart.deinit();
 
     var ppu = PPU{};
 
@@ -41,9 +45,12 @@ pub fn main() !void {
         cyclesPerFrame = 70224;
 
         var cycles: u32 = 0;
-        while(cycles < cyclesPerFrame) {
+        while(cycles < cyclesPerFrame) : (cycles += cpu.cycles_ahead) {
             try cpu.step(&mmu); 
-            cycles += cpu.cycles_ahead;
+
+            cart.onWrite(&mmu);
+            // TODO: This can be an onWrite behaviour.
+            mmio.updateJoypad(&mmu, platform.getInputState());
 
             for(cpu.cycles_ahead) |_| {
                 mmio.updateTimers(&mmu);
@@ -51,7 +58,6 @@ pub fn main() !void {
                 ppu.step(&mmu, platform.getRawPixels());
                 apu.step(&mmu, platform.getSamples());
             }
-            mmio.updateJoypad(&mmu, platform.getInputState());
         }
 
         try platform.render();

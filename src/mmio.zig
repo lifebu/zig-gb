@@ -25,6 +25,7 @@ pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // And store the last InputState in the mmio? 
     // This would also allow that we move the code that disallows changing the lower nibble to here!
     // Also update when the actual input changed from platform (sfml events: key_pressed, key_released)
+    // Or just: Update once per frame (before cycle loop) and once on every write.
 
     // 0 means pressed for gameboy => 0xF nothing is pressed
     var dpad: u4 = 0xF; 

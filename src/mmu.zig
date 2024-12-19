@@ -1,21 +1,26 @@
 const std = @import("std");
 
 const APU = @import("apu.zig");
-const Cart = @import("cart.zig");
 const MemMap = @import("mem_map.zig");
 const MMIO = @import("mmio.zig");
 const PPU = @import("ppu.zig");
 
 const Self = @This();
+/// Record of the last write that the user (cpu) did.
+pub const WriteRecord = struct {
+    addr: u32,
+    val: u8,
+    old_val: u8,
+};
 
 allocator: std.mem.Allocator,
-cart: Cart = undefined,
 memory: []u8 = undefined,
 mmio: *MMIO,
 apu: *APU,
+/// Record of the last write that the user (cpu) did.
+write_record: ?WriteRecord = null,
 
-pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u8) !Self {
-    // TODO: Should rethink why the cart lives in the MMU but the rest of the system are references. Can they be given to the mmu through calls?
+pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO) !Self {
     // which means the CPU needs to pass it to the read functions.
     // Maybe use singletons for this?
     var self = Self{ .allocator = alloc, .apu = apu, .mmio = mmio };
@@ -23,9 +28,6 @@ pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u
     self.memory = try alloc.alloc(u8, 0x10000);
     errdefer alloc.free(self.memory);
     @memset(self.memory, 0);
-
-    self.cart = try Cart.init(alloc, &self.memory, gbFile);
-    errdefer self.cart.deinit();
 
     // TODO: Consider either emulating DMG, or defining initial states for every possible DMG variant.
     // state after DMG Boot rom has run.
@@ -79,7 +81,6 @@ pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO, gbFile: ?[]const u
 
 pub fn deinit(self: *Self) void {
     self.allocator.free(self.memory);
-    self.cart.deinit();
 }
 
 /// User level read, 8bit unsigned. Has read protections for some hardware registers and memory regions.
@@ -135,6 +136,8 @@ pub fn readi8_usr(self: *const Self, addr: u16) i8 {
 
 /// User level write, 8bit unsigned. Has write protections for some hardware registers and memory regions.
 pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
+    self.write_record = WriteRecord{ .addr = addr, .val = val, .old_val = self.memory[addr]};
+
     // TODO: Branchless?
     // During DMA, only HRAM is writeable
     if(self.mmio.dmaIsRunning) {
@@ -145,8 +148,8 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
 
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH - 1 => {
-            // TODO: Maybe the MMU does not own the cart, but just like every other system, we inject the cart into the mmu?
-            self.cart.onWrite(self, addr, val);
+            // TODO: Use Read/Write flags for this!
+            return;
         },
         MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
             // TODO: Better if the subsystem makes sure of that?
@@ -254,4 +257,8 @@ pub fn setFlag(self: *const Self, addr: u16, value: u8) void {
 pub fn testFlag(self: *const Self, addr: u16, value: u8) bool {
     const flag: *u8 = &self.memory[addr];
     return flag.* & value == value;
+}
+
+pub fn clearWriteRecord(self: *Self) void {
+    self.write_record = null;
 }
