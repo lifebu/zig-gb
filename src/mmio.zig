@@ -37,7 +37,7 @@ pub fn onWrite(self: *Self, mmu: *MMU) void {
             self.dmaStartAddr = @as(u16, write_record.val) << 8;
             self.dmaCurrentOffset = 0;
             self.dmaCounter = 0;
-            mmu.setPermission(.DMA, MMU.Permission{.start_addr = MemMap.HRAM_LOW, .end_addr = MemMap.HRAM_HIGH - 1, .invert = true});
+            mmu.setPermission(.DMA);
         },
         else => {
             return;

@@ -51,27 +51,27 @@ const Object = packed struct {
     },
 };
 
-const LCDC = packed struct {
-    bg_window_enable: bool,
-    obj_enable: bool,
+pub const LCDC = packed struct {
+    bg_window_enable: bool = false,
+    obj_enable: bool = false,
     obj_size: enum(u1) {
         SINGLE_HEIGHT,
         DOUBLE_HEIGHT,
-    },
+    } = .SINGLE_HEIGHT,
     bg_map_area: enum(u1) {
         FIRST_MAP,
         SECOND_MAP,
-    },
+    } = .FIRST_MAP,
     bg_window_tile_data: enum(u1) {
         SECOND_TILE_DATA,
         FIRST_TILE_DATA,
-    },
-    window_enable: bool,
+    } = .SECOND_TILE_DATA,
+    window_enable: bool = false,
     window_map_area: enum(u1) {
         FIRST_MAP,
         SECOND_MAP,
-    },
-    lcd_enable: bool,
+    } = .FIRST_MAP,
+    lcd_enable: bool = false,
 };
 
 pub const LCDStat = packed struct {
@@ -174,6 +174,22 @@ fn updateState(self: *Self, mmu: *MMU) void {
             self.currPixelX = 0;
             self.linePixelWait = 0;
         }
+    }
+
+    // TODO: If you disable the ppu, the permissions must be lifted!
+    switch(lcd_stat.ppu_mode) {
+        .OAM_SCAN => {
+            mmu.setPermission(.OAM);
+        },
+        .DRAW => {
+            mmu.setPermission(.VRAM);
+        },
+        .H_BLANK => {
+            mmu.clearPermission(.OAM);
+            mmu.clearPermission(.VRAM);
+        },
+        .V_BLANK => {
+        },
     }
 
     mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));

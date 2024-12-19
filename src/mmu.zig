@@ -1,7 +1,6 @@
 const std = @import("std");
 
 const MemMap = @import("mem_map.zig");
-const PPU = @import("ppu.zig");
 
 const Self = @This();
 /// Record of the last write that the user (cpu) did.
@@ -11,15 +10,7 @@ pub const WriteRecord = struct {
     old_val: u8,
 };
 
-pub const PermissionType = enum(u8) {
-    DMA,
-    ROM,
-    SRAM,
-    VRAM,
-    OAM,
-};
-// TODO: While the permission system is better then the dependencies I had before it still needs a V2.
-// TODO: The permission that exists are known at compile time, so I can define them here statically?
+
 pub const Permission = struct {
     invert: bool = false,
     start_addr: u16,
@@ -28,6 +19,25 @@ pub const Permission = struct {
     // TODO: Maybe split into read and write permissions?
     read_enabled: bool = false,
     read_val: u8 = 0xFF,
+};
+
+pub const PermissionType = enum(u8) {
+    DMA = 0,
+    ROM,
+    VRAM,
+    OAM,
+    Length,
+};
+// TODO: While the permission system is better then the dependencies I had before it still needs a V2.
+// TODO: The permission that exists are known at compile time, so I can define them here statically?
+// TODO: Maybe a global config?
+// TODO: How to do that with an array of the types, that is typesafe?
+// TODO: With this global config we can get rid of the map?
+const PermissionConf = [@intFromEnum(PermissionType.Length)]Permission{
+    Permission{ .start_addr = MemMap.HRAM_LOW, .end_addr = MemMap.HRAM_HIGH - 1, .invert = true}, //DMA
+    Permission{ .start_addr = MemMap.ROM_LOW, .end_addr = MemMap.ROM_HIGH - 1, .read_enabled = true, .invert = false }, // ROM
+    Permission{ .start_addr = MemMap.VRAM_LOW, .end_addr = MemMap.VRAM_HIGH - 1 }, // VRAM
+    Permission{ .start_addr = MemMap.OAM_LOW, .end_addr = MemMap.OAM_HIGH - 1 }, // OAM
 };
 const PermissionMap = std.AutoHashMap(PermissionType, Permission);
 
@@ -95,7 +105,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     self.memory[MemMap.WINDOW_X] = 0x00;
     self.memory[MemMap.INTERRUPT_ENABLE] = 0x00;
 
-    self.setPermission(.ROM, Permission{ .start_addr = MemMap.ROM_LOW, .end_addr = MemMap.ROM_HIGH - 1, .read_enabled = true, .invert = false });
+    self.setPermission(.ROM);
 
     return self;
 }
@@ -118,28 +128,11 @@ pub fn read8_usr(self: *const Self, addr: u16) u8 {
         }
     } 
 
+    // TODO: Maybe use the permissions for this?
     switch(addr) {
-        MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
-            // TODO: Better if the subsystem makes sure of that?
-            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
-            if(lcd_stat.ppu_mode == .DRAW) {
-                return 0xFF; 
-            }
-
-            return self.memory[addr];
-        },
         MemMap.ECHO_LOW...MemMap.ECHO_HIGH - 1 => {
             const echo_diff: u16 = comptime MemMap.ECHO_LOW - MemMap.WRAM_LOW;
             return self.memory[addr - echo_diff]; 
-        },
-        MemMap.OAM_LOW...MemMap.OAM_HIGH - 1 => {
-            // TODO: Better if the subsystem makes sure of that?
-            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
-            if(lcd_stat.ppu_mode == .OAM_SCAN or lcd_stat.ppu_mode == .DRAW) {
-                return 0xFF; 
-            }
-
-            return self.memory[addr];
         },
         MemMap.UNUSED_LOW...MemMap.UNUSED_HIGH - 1 => {
             return 0x00;
@@ -173,28 +166,12 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
     } 
 
     switch(addr) {
-        MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
-            // TODO: Better if the subsystem makes sure of that?
-            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
-            if(lcd_stat.ppu_mode == .DRAW) {
-                return; 
-            }
-
-            self.memory[addr] = val;
-        },
+        // TODO: Maybe use the permissions for this?
         MemMap.ECHO_LOW...MemMap.ECHO_HIGH - 1 => {
             const echo_diff: u16 = comptime MemMap.ECHO_LOW - MemMap.WRAM_LOW;
             self.memory[addr - echo_diff] = val; 
         },
-        MemMap.OAM_LOW...MemMap.OAM_HIGH - 1 => {
-            // TODO: Better if the subsystem makes sure of that?
-            const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);
-            if(lcd_stat.ppu_mode == .OAM_SCAN or lcd_stat.ppu_mode == .DRAW) {
-                return; 
-            }
-
-            self.memory[addr] = val;
-        },
+        // TODO: Maybe use the permissions for this?
         MemMap.UNUSED_LOW...MemMap.UNUSED_HIGH - 1 => {
             return; // Read-Only
         },
@@ -272,8 +249,8 @@ pub fn clearWriteRecord(self: *Self) void {
     self.write_record = null;
 }
 
-pub fn setPermission(self: *Self, permission_type: PermissionType, permission: Permission) void {
-    self.permissions.put(permission_type, permission) catch unreachable;
+pub fn setPermission(self: *Self, permission_type: PermissionType) void {
+    self.permissions.put(permission_type, PermissionConf[@intFromEnum(permission_type)]) catch unreachable;
 }
 
 pub fn clearPermission(self: *Self, permission_type: PermissionType) void {

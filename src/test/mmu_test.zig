@@ -12,6 +12,13 @@ pub fn runWriteMemoryTests() !void {
     var mmu = try MMU.init(alloc);
     defer mmu.deinit();
     var mmio = MMIO{};
+    var ppu = PPU{};
+    var pixels = try alloc.alloc(Def.Color, Def.RESOLUTION_WIDTH * Def.RESOLUTION_HEIGHT);
+    defer alloc.free(pixels);
+
+    const lcd_contr = PPU.LCDC{ .lcd_enable = true };
+    mmu.write8_sys(MemMap.LCD_CONTROL, @bitCast(lcd_contr));
+    mmu.write8_sys(MemMap.LCD_Y, 9);
 
     // TODO: maybe combine those tests into an array of configs?
     // ROM: Cannot write.
@@ -37,8 +44,8 @@ pub fn runWriteMemoryTests() !void {
     }
 
     // PPU: Write VRAM during Mode 3 (DRAW):
-    var lcd_stat = PPU.LCDStat{ .ppu_mode = .DRAW };
-    mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
+    ppu.lyCounter = 81;
+    ppu.step(&mmu, &pixels);
     for(MemMap.VRAM_LOW..MemMap.VRAM_HIGH) |i| {
         const addr: u16 = @intCast(i);
         mmu.write8_sys(addr, 0x00);
@@ -50,8 +57,8 @@ pub fn runWriteMemoryTests() !void {
     }
 
     // PPU: Write OAM during Mode 2 (OAM_SCAN):
-    lcd_stat = PPU.LCDStat{ .ppu_mode = .OAM_SCAN };
-    mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
+    ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
+    ppu.step(&mmu, &pixels);
     for(MemMap.OAM_LOW..MemMap.OAM_HIGH) |i| {
         const addr: u16 = @intCast(i);
         mmu.write8_sys(addr, 0x00);
@@ -63,8 +70,8 @@ pub fn runWriteMemoryTests() !void {
     }
 
     // PPU: Write OAM during Mode 3 (DRAW):
-    lcd_stat = PPU.LCDStat{ .ppu_mode = .DRAW };
-    mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
+    ppu.lyCounter = 81;
+    ppu.step(&mmu, &pixels);
     for(MemMap.OAM_LOW..MemMap.OAM_HIGH) |i| {
         const addr: u16 = @intCast(i);
         mmu.write8_sys(addr, 0x00);
@@ -119,6 +126,13 @@ pub fn runReadMemoryTests() !void {
     var mmu = try MMU.init(alloc);
     defer mmu.deinit();
     var mmio = MMIO{};
+    var ppu = PPU{};
+    var pixels = try alloc.alloc(Def.Color, Def.RESOLUTION_WIDTH * Def.RESOLUTION_HEIGHT);
+    defer alloc.free(pixels);
+
+    const lcd_contr = PPU.LCDC{ .lcd_enable = true };
+    mmu.write8_sys(MemMap.LCD_CONTROL, @bitCast(lcd_contr));
+    mmu.write8_sys(MemMap.LCD_Y, 9);
 
     // Echo-RAM: Read: E000-FDFF <==> C000-DDFF
     for(0..(MemMap.ECHO_HIGH - MemMap.ECHO_LOW)) |i| {
@@ -132,6 +146,8 @@ pub fn runReadMemoryTests() !void {
     }
 
     // PPU: Read VRAM during Mode 3 (DRAW):
+    ppu.lyCounter = 81;
+    ppu.step(&mmu, &pixels);
     var lcd_stat = PPU.LCDStat{ .ppu_mode = .DRAW };
     mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
     for(MemMap.VRAM_LOW..MemMap.VRAM_HIGH) |i| {
@@ -144,6 +160,8 @@ pub fn runReadMemoryTests() !void {
     }
 
     // PPU: Read OAM during Mode 2 (OAM_SCAN):
+    ppu.lyCounter = PPU.DOTS_PER_LINE - 1;
+    ppu.step(&mmu, &pixels);
     lcd_stat = PPU.LCDStat{ .ppu_mode = .OAM_SCAN };
     mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
     for(MemMap.OAM_LOW..MemMap.OAM_HIGH) |i| {
@@ -156,6 +174,8 @@ pub fn runReadMemoryTests() !void {
     }
 
     // PPU: Read OAM during Mode 3 (DRAW):
+    ppu.lyCounter = 81;
+    ppu.step(&mmu, &pixels);
     lcd_stat = PPU.LCDStat{ .ppu_mode = .DRAW };
     mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
     for(MemMap.OAM_LOW..MemMap.OAM_HIGH) |i| {
