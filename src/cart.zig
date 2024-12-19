@@ -42,6 +42,8 @@ pub const RAM_SIZE_BYTE = [_]u32 {
     16 * RAM_BANK_SIZE_BYTE, 8 * RAM_BANK_SIZE_BYTE,
 };
 
+// TODO: Instead of just the MBC type we can define a feature set struct that has all the features and their configuration for the cartridge in one.
+// Example: Have an entry for the 00->01 Translation behavior in there and apply it if it is enabled!.
 const MBC = enum {
     NO_MBC,
     MBC_1,

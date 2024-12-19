@@ -106,6 +106,19 @@ C- 0xFFFF: Interrupt Enable.
 https://b13rg.github.io/Gameboy-MBC-Analysis/#usage-statistics
 https://gbhwdb.gekkio.fi/cartridges/gb.html
 - Most common MBCs are MBC1 and them MBC5.
+- None: 22
+- MBC1 (A, B, B1): 155
+- MBC2: 11
+- MBC3 (3, 30, 3A, 3B): 37
+- MBC5: 76
+- MBC6: 1
+- MBC7: 3
+- TAMA5: 2
+- MMM01: 1
+- HuC-1 (1, 1A): 4
+- HuC-3: 4
+Ges: 316
+- None + MBC1, MBC3, MBC5: 290 ~ 91%
 
 - Roms:
 None:

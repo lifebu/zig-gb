@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const blargg = @import("test/blargg_parser.zig");
+const cart_test = @import("test/cart_test.zig");
 const cpu_test = @import("test/cpu_test.zig");
 const ppu_test = @import("test/ppu_test.zig");
 const mmio_test = @import("test/mmio_test.zig");
@@ -9,6 +10,10 @@ const interrupt_test = @import("test/interrupt_test.zig");
 
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 // TODO: Maybe split up the tests?
+test "CARTTests" {
+    try cart_test.runCartTests();
+}
+
 test "CPU_SingleStepTest" {
     try cpu_test.runSingleStepTests();
 }

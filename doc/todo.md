@@ -32,6 +32,9 @@
 
 ## Testing
 - Cart: MBC, Header, ROM/RAM.
+    - MBC1: ROM+RAM+BAT.
+    - MBC3: ROM+TIMER(RTC)+RAM+BAT
+    - MBC5: ROM+RAM+BAT+RUMBLE
 - Test ROMS:
     - Blargg (CPU)
     - MealyBug (PPU)
@@ -169,6 +172,11 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
 - GBA
 
 # Maybe:
+- Cart:
+    - Alternative Wiring of MBC1.
+    - MBC1M (Multi cart).
+    - MBC5: Rumble.
+    - MBC3: RTC.
 - Infrared.
 - SGB.
 - CPU:
