@@ -6,7 +6,7 @@ const PPU = @import("ppu.zig");
 const Self = @This();
 /// Record of the last write that the user (cpu) did.
 pub const WriteRecord = struct {
-    addr: u32,
+    addr: u16,
     val: u8,
     old_val: u8,
 };
@@ -18,11 +18,16 @@ pub const PermissionType = enum(u8) {
     VRAM,
     OAM,
 };
+// TODO: While the permission system is better then the dependencies I had before it still needs a V2.
+// TODO: The permission that exists are known at compile time, so I can define them here statically?
 pub const Permission = struct {
     invert: bool = false,
     start_addr: u16,
     end_addr: u16,
-    read_val: u8,
+
+    // TODO: Maybe split into read and write permissions?
+    read_enabled: bool = false,
+    read_val: u8 = 0xFF,
 };
 const PermissionMap = std.AutoHashMap(PermissionType, Permission);
 
@@ -90,6 +95,8 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     self.memory[MemMap.WINDOW_X] = 0x00;
     self.memory[MemMap.INTERRUPT_ENABLE] = 0x00;
 
+    self.setPermission(.ROM, Permission{ .start_addr = MemMap.ROM_LOW, .end_addr = MemMap.ROM_HIGH - 1, .read_enabled = true, .invert = false });
+
     return self;
 }
 
@@ -102,8 +109,11 @@ pub fn deinit(self: *Self) void {
 pub fn read8_usr(self: *const Self, addr: u16) u8 {
     var iter = self.permissions.valueIterator();
     while(iter.next()) |permission| {
+        if(permission.read_enabled) {
+            continue;
+        }
         if((!permission.invert and addr >= permission.start_addr and addr <= permission.end_addr) or 
-           (permission.invert and addr < permission.start_addr or addr > permission.end_addr)) {
+           (permission.invert and (addr < permission.start_addr or addr > permission.end_addr))) {
             return permission.read_val;
         }
     } 
@@ -157,24 +167,12 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
     var iter = self.permissions.valueIterator();
     while(iter.next()) |permission| {
         if((!permission.invert and addr >= permission.start_addr and addr <= permission.end_addr) or 
-           (permission.invert and addr < permission.start_addr or addr > permission.end_addr)) {
+           (permission.invert and (addr < permission.start_addr or addr > permission.end_addr))) {
             return;
         }
     } 
 
-    // TODO: Branchless?
-    // During DMA, only HRAM is writeable
-    // if(self.mmio.dmaIsRunning) {
-    //     if(addr < MemMap.HRAM_LOW or addr >= MemMap.HRAM_HIGH) {
-    //         return;
-    //     }
-    // }
-
     switch(addr) {
-        MemMap.ROM_LOW...MemMap.ROM_HIGH - 1 => {
-            // TODO: Use Read/Write flags for this!
-            return;
-        },
         MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
             // TODO: Better if the subsystem makes sure of that?
             const lcd_stat: PPU.LCDStat = @bitCast(self.memory[MemMap.LCD_STAT]);

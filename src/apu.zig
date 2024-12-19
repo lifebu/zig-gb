@@ -150,6 +150,9 @@ pub fn onWrite(self: *Self, mmu: *MMU) void {
             const ch2_length: Ch12Length = @bitCast(mmu.read8_sys(MemMap.CH2_LENGTH));
             self.ch2_length_timer = ch2_length.initial_length;
         },
+        else => {
+
+        },
     }
 }
 
