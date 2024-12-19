@@ -4,7 +4,6 @@ const std = @import("std");
 const APU = @import("../apu.zig");
 const Cart = @import("../apu.zig");
 const Def = @import("../def.zig");
-const MMIO = @import("../mmio.zig");
 const MMU = @import("../mmu.zig");
 const MemMap = @import("../mem_map.zig");
 
@@ -12,8 +11,7 @@ pub fn runCartTests() !void {
     const alloc = std.testing.allocator;
 
     var apu = APU{};
-    var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio);
+    var mmu = try MMU.init(alloc, &apu);
     defer mmu.deinit();
 
     // TODO: Missing Tests:

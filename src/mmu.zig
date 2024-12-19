@@ -2,7 +2,6 @@ const std = @import("std");
 
 const APU = @import("apu.zig");
 const MemMap = @import("mem_map.zig");
-const MMIO = @import("mmio.zig");
 const PPU = @import("ppu.zig");
 
 const Self = @This();
@@ -13,17 +12,35 @@ pub const WriteRecord = struct {
     old_val: u8,
 };
 
+pub const PermissionType = enum(u8) {
+    DMA,
+    ROM,
+    SRAM,
+    VRAM,
+    OAM,
+};
+pub const Permission = struct {
+    invert: bool = false,
+    start_addr: u16,
+    end_addr: u16,
+    read_val: u8,
+};
+const PermissionMap = std.AutoHashMap(PermissionType, Permission);
+
 allocator: std.mem.Allocator,
 memory: []u8 = undefined,
-mmio: *MMIO,
 apu: *APU,
 /// Record of the last write that the user (cpu) did.
 write_record: ?WriteRecord = null,
+permissions: PermissionMap = undefined,
 
-pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO) !Self {
+pub fn init(alloc: std.mem.Allocator, apu: *APU) !Self {
     // which means the CPU needs to pass it to the read functions.
     // Maybe use singletons for this?
-    var self = Self{ .allocator = alloc, .apu = apu, .mmio = mmio };
+    var self = Self{ .allocator = alloc, .apu = apu };
+
+    self.permissions = PermissionMap.init(alloc);
+    errdefer self.permissions.deinit();
 
     self.memory = try alloc.alloc(u8, 0x10000);
     errdefer alloc.free(self.memory);
@@ -36,7 +53,6 @@ pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO) !Self {
     self.memory[MemMap.SERIAL_DATA] = 0xFF; // TODO: Stubbing serial communication, should be 0x00.
     self.memory[MemMap.SERIAL_CONTROL] = 0x7E;
     self.memory[MemMap.DIVIDER] = 0xAB;
-    self.mmio.dividerCounter = 0xAB00;
     self.memory[MemMap.TIMER] = 0x00;
     self.memory[MemMap.TIMER_MOD] = 0x00;
     self.memory[MemMap.TIMER_CONTROL] = 0xF8;
@@ -80,18 +96,19 @@ pub fn init(alloc: std.mem.Allocator, apu: *APU, mmio: *MMIO) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    self.permissions.deinit();
     self.allocator.free(self.memory);
 }
 
 /// User level read, 8bit unsigned. Has read protections for some hardware registers and memory regions.
 pub fn read8_usr(self: *const Self, addr: u16) u8 {
-    // TODO: Branchless?
-    // During DMA, only HRAM is writeable
-    if(self.mmio.dmaIsRunning) {
-        if(addr < MemMap.HRAM_LOW or addr >= MemMap.HRAM_HIGH) {
-            return 0xFF;
+    var iter = self.permissions.valueIterator();
+    while(iter.next()) |permission| {
+        if((!permission.invert and addr >= permission.start_addr and addr <= permission.end_addr) or 
+           (permission.invert and addr < permission.start_addr or addr > permission.end_addr)) {
+            return permission.read_val;
         }
-    }
+    } 
 
     switch(addr) {
         MemMap.VRAM_LOW...MemMap.VRAM_HIGH - 1 => {
@@ -134,17 +151,26 @@ pub fn readi8_usr(self: *const Self, addr: u16) i8 {
    return @bitCast(self.read8_usr(addr));
 }
 
+
 /// User level write, 8bit unsigned. Has write protections for some hardware registers and memory regions.
 pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
     self.write_record = WriteRecord{ .addr = addr, .val = val, .old_val = self.memory[addr]};
 
-    // TODO: Branchless?
-    // During DMA, only HRAM is writeable
-    if(self.mmio.dmaIsRunning) {
-        if(addr < MemMap.HRAM_LOW or addr >= MemMap.HRAM_HIGH) {
+    var iter = self.permissions.valueIterator();
+    while(iter.next()) |permission| {
+        if((!permission.invert and addr >= permission.start_addr and addr <= permission.end_addr) or 
+           (permission.invert and addr < permission.start_addr or addr > permission.end_addr)) {
             return;
         }
-    }
+    } 
+
+    // TODO: Branchless?
+    // During DMA, only HRAM is writeable
+    // if(self.mmio.dmaIsRunning) {
+    //     if(addr < MemMap.HRAM_LOW or addr >= MemMap.HRAM_HIGH) {
+    //         return;
+    //     }
+    // }
 
     switch(addr) {
         MemMap.ROM_LOW...MemMap.ROM_HIGH - 1 => {
@@ -182,10 +208,6 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
             const old_joyp: u8 = self.memory[MemMap.JOYPAD];
             self.memory[addr] = (val & 0xF0) | (old_joyp & 0x0F);
         },
-        MemMap.DIVIDER => {
-            self.memory[addr] = 0;
-            self.mmio.dividerCounter = 0;
-        },
         MemMap.LCD_Y => {
             // TODO: Better if the subsystem makes sure of that?
             return; // Read-Only
@@ -196,11 +218,6 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
             const old: u8 = self.memory[MemMap.LCD_STAT];
             const result: u8 = (val & 0xF8) | (old & 0x07);
             self.memory[addr] = result;
-        },
-        MemMap.DMA => {
-            // TODO: Disallow access to almost all memory, when a dma is running.
-            self.mmio.initiateDMA(val);
-            return;
         },
         MemMap.AUDIO_LOW...MemMap.AUDIO_HIGH - 1 => {
             self.apu.onAPUWrite(self, addr, val);
@@ -261,4 +278,12 @@ pub fn testFlag(self: *const Self, addr: u16, value: u8) bool {
 
 pub fn clearWriteRecord(self: *Self) void {
     self.write_record = null;
+}
+
+pub fn setPermission(self: *Self, permission_type: PermissionType, permission: Permission) void {
+    self.permissions.put(permission_type, permission) catch unreachable;
+}
+
+pub fn clearPermission(self: *Self, permission_type: PermissionType) void {
+    _ = self.permissions.remove(permission_type);
 }

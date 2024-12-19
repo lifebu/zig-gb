@@ -13,12 +13,37 @@ lastButtonState: u4 = 0xF,
 // last bit we tested for timer (used to detect falling edge).
 timerLastBit: bool = false,
 // TODO: Maybe rename to "systemCounter"? 
-dividerCounter: u16 = 0,
+// TODO: Default value is default value after dmg, for other boot roms I need other values.
+dividerCounter: u16 = 0xAB00,
 
 dmaIsRunning: bool = false,
 dmaStartAddr: u16 = 0x0000,
 dmaCurrentOffset: u16 = 0,
 dmaCounter: u3 = 0,
+
+pub fn onWrite(self: *Self, mmu: *MMU) void {
+    const write_record: MMU.WriteRecord = mmu.write_record orelse {
+        return;
+    };
+
+    switch(write_record.addr) {
+        MemMap.DIVIDER => {
+            mmu.memory[write_record.addr] = 0;
+            self.dividerCounter = 0;
+        },
+        MemMap.DMA => {
+            // Start DMA
+            self.dmaIsRunning = true;
+            self.dmaStartAddr = @as(u16, write_record.val) << 8;
+            self.dmaCurrentOffset = 0;
+            self.dmaCounter = 0;
+            mmu.setPermission(.DMA, MMU.Permission{.start_addr = MemMap.HRAM_LOW, .end_addr = MemMap.HRAM_HIGH, .invert = true, .read_val = 0xFF});
+        },
+        else => {
+            return;
+        }
+    }
+}
 
 pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
     // TODO: Maybe we can just update the joypad on write?
@@ -99,13 +124,6 @@ pub fn updateTimers(self: *Self, mmu: *MMU) void {
     self.timerLastBit = timerBit;
 }
 
-pub fn initiateDMA(self: *Self, offset: u16) void {
-    self.dmaIsRunning = true;
-    self.dmaStartAddr = offset << 8;
-    self.dmaCurrentOffset = 0;
-    self.dmaCounter = 0;
-}
-
 pub fn updateDMA(self: *Self, mmu: *MMU) void {
     // TODO: Branchless?
     if (!self.dmaIsRunning) {
@@ -126,4 +144,7 @@ pub fn updateDMA(self: *Self, mmu: *MMU) void {
 
     self.dmaCurrentOffset += 1;
     self.dmaIsRunning = (destAddr + 1) < MemMap.OAM_HIGH;
+    if(!self.dmaIsRunning) {
+        mmu.clearPermission(.DMA);
+    }
 }

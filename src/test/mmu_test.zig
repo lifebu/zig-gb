@@ -11,9 +11,9 @@ pub fn runWriteMemoryTests() !void {
     const alloc = std.testing.allocator;
 
     var apu = APU{};
-    var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio);
+    var mmu = try MMU.init(alloc, &apu);
     defer mmu.deinit();
+    var mmio = MMIO{};
 
     // TODO: maybe combine those tests into an array of configs?
     // ROM: Cannot write.
@@ -90,6 +90,7 @@ pub fn runWriteMemoryTests() !void {
 
     // OAM DMA Transfer: Can only write HRAM.
     mmu.write8_usr(MemMap.DMA, 0x03);
+    mmio.onWrite(&mmu);
     for(0..MemMap.HRAM_LOW) |i| {
         const addr: u16 = @intCast(i);
         mmu.write8_sys(addr, 0x00);
@@ -118,9 +119,9 @@ pub fn runReadMemoryTests() !void {
     const alloc = std.testing.allocator;
 
     var apu = APU{};
-    var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio);
+    var mmu = try MMU.init(alloc, &apu);
     defer mmu.deinit();
+    var mmio = MMIO{};
 
     // Echo-RAM: Read: E000-FDFF <==> C000-DDFF
     for(0..(MemMap.ECHO_HIGH - MemMap.ECHO_LOW)) |i| {
@@ -181,6 +182,7 @@ pub fn runReadMemoryTests() !void {
 
     // OAM DMA Transfer: Can only read HRAM.
     mmu.write8_usr(MemMap.DMA, 0x03);
+    mmio.onWrite(&mmu);
     for(0..MemMap.HRAM_LOW) |i| {
         const addr: u16 = @intCast(i);
         mmu.write8_sys(addr, 0x01);
@@ -209,8 +211,7 @@ pub fn runWriteIOTests() !void {
     const alloc = std.testing.allocator;
 
     var apu = APU{};
-    var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu, &mmio);
+    var mmu = try MMU.init(alloc, &apu);
     defer mmu.deinit();
 
     mmu.write8_sys(MemMap.LCD_Y, 0x00);

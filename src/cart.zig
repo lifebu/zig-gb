@@ -166,10 +166,9 @@ pub fn getCart(self: *Self) *[]u8 {
 }
 
 pub fn onWrite(self: *Self, mmu: *MMU) void {
-    if(mmu.write_record == null) {
+    const write_record: MMU.WriteRecord = mmu.write_record orelse {
         return;
-    }
-    const write_record: MMU.WriteRecord = mmu.write_record.?; 
+    };
 
     // TODO: I don't know if this code can be adapted well to other mbcs.
     const header: *align(1) CartHeader = @ptrCast(&self.rom[HEADER]);

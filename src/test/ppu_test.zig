@@ -3,7 +3,6 @@ const std = @import("std");
 const APU = @import("../apu.zig");
 const Def = @import("../def.zig");
 const MMU = @import("../mmu.zig");
-const MMIO = @import("../mmio.zig");
 const PPU = @import("../ppu.zig");
 
 const TestType = struct {
@@ -29,11 +28,9 @@ pub fn runStaticTest() !void {
     const json = try std.json.parseFromSlice([]TestType, alloc, testFile, .{ .ignore_unknown_fields = true });
     defer json.deinit();
 
-    var mmio = MMIO{};
-
     // TODO: Need a way to fill the mmu with a test memory dump.
     var apu = APU{};
-    var mmu = try MMU.init(alloc, &apu, &mmio);
+    var mmu = try MMU.init(alloc, &apu);
     defer mmu.deinit();
 
     const testConfig: []TestType = json.value;
