@@ -70,6 +70,7 @@ zero_ram_bank: []u8 = undefined,
 mbc: MBC = .NO_MBC,
 mbc_registers: MBCRegisters = undefined,
 
+// TODO: Should the direct dependency in the init function to the MMU be removed?
 pub fn init(alloc: std.mem.Allocator, mmu: *MMU, gbFile: ?[]const u8) !Self {
     var self = Self{ .allocator = alloc };
 

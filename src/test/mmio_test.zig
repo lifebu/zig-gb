@@ -1,7 +1,6 @@
 
 const std = @import("std");
 
-const APU = @import("../apu.zig");
 const Def = @import("../def.zig");
 const MMIO = @import("../mmio.zig");
 const MMU = @import("../mmu.zig");
@@ -11,9 +10,8 @@ const MemMap = @import("../mem_map.zig");
 pub fn runDividerTest() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     var expectedDIV: u8 = 0;
@@ -34,9 +32,8 @@ pub fn runDividerTest() !void {
 pub fn runTimerTest() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     mmu.write8_sys(MemMap.TIMER, 0x00);
@@ -143,9 +140,8 @@ pub fn runTimerTest() !void {
 pub fn runDMATest() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     for(0x0300..0x039F, 1..) |addr, i| {
@@ -211,9 +207,8 @@ const JoyState = packed struct(u8) {
 pub fn runJoypadTests() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     const TestCase = struct {

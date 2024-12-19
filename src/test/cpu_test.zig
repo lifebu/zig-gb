@@ -1,7 +1,5 @@
 const std = @import("std");
 
-
-const APU = @import("../apu.zig");
 const CPU = @import("../cpu.zig");
 const MMU = @import("../mmu.zig");
 const MemMap = @import("../mem_map.zig");
@@ -93,9 +91,7 @@ pub fn runSingleStepTests() !void {
         const json = try std.json.parseFromSlice([]TestType, alloc, testFile, .{ .ignore_unknown_fields = true });
         defer json.deinit();
 
-        var apu = APU{};
-
-        var mmu = try MMU.init(alloc, &apu);
+        var mmu = try MMU.init(alloc);
         defer mmu.deinit();
 
         var cpu = try CPU.init();
@@ -161,9 +157,7 @@ pub fn runSingleStepTests() !void {
 pub fn runHaltTests() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
-
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     var cpu = try CPU.init();

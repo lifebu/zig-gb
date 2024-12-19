@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const APU = @import("../apu.zig");
 const Def = @import("../def.zig");
 const MMU = @import("../mmu.zig");
 const PPU = @import("../ppu.zig");
@@ -29,8 +28,7 @@ pub fn runStaticTest() !void {
     defer json.deinit();
 
     // TODO: Need a way to fill the mmu with a test memory dump.
-    var apu = APU{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     const testConfig: []TestType = json.value;

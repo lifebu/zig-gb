@@ -82,12 +82,16 @@ sequencer_counter: u3 = 0,
 /// counter that is always updated. When this reaches 0, the apu generates a new sample.
 sample_counter: u10 = 0,
 
-pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
+pub fn onWrite(self: *Self, mmu: *MMU) void {
+    const write_record: MMU.WriteRecord = mmu.write_record orelse {
+        return;
+    };
+
     var curr_audio_ctrl: AudioControl = @bitCast(mmu.read8_sys(MemMap.SERIAL_CONTROL));
 
-    switch(addr) {
+    switch(write_record.addr) {
         MemMap.SOUND_CONTROL => {
-            var audio_ctrl: AudioControl = @bitCast(val);
+            var audio_ctrl: AudioControl = @bitCast(write_record.val);
             if(audio_ctrl.audio_enabled) {
                 // TODO: Clears wave channel buffer.
 
@@ -120,16 +124,16 @@ pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
                 mmu.write8_sys(MemMap.SERIAL_CONTROL, @bitCast(audio_ctrl));
             }
         },
-        // TODO: Audio is on ice for now, because in ducktales the actual CH2_LOW_PERIOD, which the game should set to a value is never touched.
+        // TODO: Audio is on ice for now, because in ducktales the actual CH2_LOW_PERIOD, which the game should set to a write_record.value is never touched.
         MemMap.CH2_LOW_PERIOD => {
             var a: u32 = 0;
             a += 1;
-            mmu.write8_sys(addr, val);
+            mmu.write8_sys(write_record.addr, write_record.val);
         },
         // TODO: Check the trigger bits for Channel 1, 2, 4 (HIGH_PERIOD)
         // TODO: Triggering Channel 3 and 4 resets them.
         MemMap.CH2_HIGH_PERIOD => {
-            const ch2_period_high: Ch12PeriodHigh = @bitCast(val);
+            const ch2_period_high: Ch12PeriodHigh = @bitCast(write_record.val);
             if(ch2_period_high.trigger) {
                 curr_audio_ctrl.ch2_running = true;
                 self.ch2_step_counter = 0;
@@ -145,9 +149,6 @@ pub fn onAPUWrite(self: *Self, mmu: *MMU, addr: u16, val: u8) void {
             // Gameboy Sound Emulation Blog is implemented completly differently.
             const ch2_length: Ch12Length = @bitCast(mmu.read8_sys(MemMap.CH2_LENGTH));
             self.ch2_length_timer = ch2_length.initial_length;
-        },
-        else => {
-            mmu.write8_sys(addr, val);
         },
     }
 }

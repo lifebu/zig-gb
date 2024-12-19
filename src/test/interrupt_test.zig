@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const APU = @import("../apu.zig");
 const CPU = @import("../cpu.zig");
 const Def = @import("../def.zig");
 const MMIO = @import("../mmio.zig");
@@ -11,9 +10,8 @@ const PPU = @import("../ppu.zig");
 pub fn runInterruptTests() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
     var mmio = MMIO{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     var cpu = try CPU.init();

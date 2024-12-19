@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const APU = @import("apu.zig");
 const MemMap = @import("mem_map.zig");
 const PPU = @import("ppu.zig");
 
@@ -29,15 +28,14 @@ const PermissionMap = std.AutoHashMap(PermissionType, Permission);
 
 allocator: std.mem.Allocator,
 memory: []u8 = undefined,
-apu: *APU,
 /// Record of the last write that the user (cpu) did.
 write_record: ?WriteRecord = null,
 permissions: PermissionMap = undefined,
 
-pub fn init(alloc: std.mem.Allocator, apu: *APU) !Self {
+pub fn init(alloc: std.mem.Allocator) !Self {
     // which means the CPU needs to pass it to the read functions.
     // Maybe use singletons for this?
-    var self = Self{ .allocator = alloc, .apu = apu };
+    var self = Self{ .allocator = alloc };
 
     self.permissions = PermissionMap.init(alloc);
     errdefer self.permissions.deinit();
@@ -218,10 +216,6 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
             const old: u8 = self.memory[MemMap.LCD_STAT];
             const result: u8 = (val & 0xF8) | (old & 0x07);
             self.memory[addr] = result;
-        },
-        MemMap.AUDIO_LOW...MemMap.AUDIO_HIGH - 1 => {
-            self.apu.onAPUWrite(self, addr, val);
-            return;
         },
         else => {
             self.memory[addr] = val; 

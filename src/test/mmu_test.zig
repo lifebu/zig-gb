@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const APU = @import("../apu.zig");
 const Def = @import("../def.zig");
 const MMIO = @import("../mmio.zig");
 const MMU = @import("../mmu.zig");
@@ -10,8 +9,7 @@ const PPU = @import("../ppu.zig");
 pub fn runWriteMemoryTests() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
     var mmio = MMIO{};
 
@@ -118,8 +116,7 @@ pub fn runWriteMemoryTests() !void {
 pub fn runReadMemoryTests() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
     var mmio = MMIO{};
 
@@ -210,8 +207,7 @@ pub fn runReadMemoryTests() !void {
 pub fn runWriteIOTests() !void {
     const alloc = std.testing.allocator;
 
-    var apu = APU{};
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     mmu.write8_sys(MemMap.LCD_Y, 0x00);

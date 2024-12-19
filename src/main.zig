@@ -29,9 +29,7 @@ pub fn main() !void {
 
     var mmio = MMIO{};
 
-    // TODO: Passing all the subsystems to the mmu just so that it can call them on writes (so they can handle writes), creates nasty dependencies.
-    // Especially annoying for writing tests. Can I do that better?
-    var mmu = try MMU.init(alloc, &apu);
+    var mmu = try MMU.init(alloc);
     defer mmu.deinit();
 
     var cart = try CART.init(alloc, &mmu, conf.gbFile);
@@ -48,6 +46,7 @@ pub fn main() !void {
         while(cycles < cyclesPerFrame) : (cycles += cpu.cycles_ahead) {
             try cpu.step(&mmu); 
 
+            apu.onWrite(&mmu);
             cart.onWrite(&mmu);
             mmio.onWrite(&mmu);
 
