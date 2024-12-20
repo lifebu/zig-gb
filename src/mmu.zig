@@ -19,6 +19,7 @@ pub const Permission = struct {
     // TODO: Maybe split into read and write permissions?
     read_enabled: bool = false,
     read_val: u8 = 0xFF,
+
 };
 
 pub const PermissionType = enum(u8) {
@@ -26,18 +27,22 @@ pub const PermissionType = enum(u8) {
     ROM,
     VRAM,
     OAM,
+    UNUSED,
+    LCD_Y,
     Length,
 };
 // TODO: While the permission system is better then the dependencies I had before it still needs a V2.
-// TODO: The permission that exists are known at compile time, so I can define them here statically?
-// TODO: Maybe a global config?
 // TODO: How to do that with an array of the types, that is typesafe?
 // TODO: With this global config we can get rid of the map?
+// TODO: Maybe we need an order for the permissions? DMA is higher then the rest.
+// TODO: Maybe remove this permission system (which is quite complicated) and just use OnWriteBehavior. MMU has OnWrite as well.
 const PermissionConf = [@intFromEnum(PermissionType.Length)]Permission{
     Permission{ .start_addr = MemMap.HRAM_LOW, .end_addr = MemMap.HRAM_HIGH - 1, .invert = true}, //DMA
     Permission{ .start_addr = MemMap.ROM_LOW, .end_addr = MemMap.ROM_HIGH - 1, .read_enabled = true, .invert = false }, // ROM
     Permission{ .start_addr = MemMap.VRAM_LOW, .end_addr = MemMap.VRAM_HIGH - 1 }, // VRAM
     Permission{ .start_addr = MemMap.OAM_LOW, .end_addr = MemMap.OAM_HIGH - 1 }, // OAM
+    Permission{ .start_addr = MemMap.UNUSED_LOW, .end_addr = MemMap.UNUSED_HIGH - 1, }, // UNUSED
+    Permission{ .start_addr = MemMap.LCD_Y, .end_addr = MemMap.LCD_Y, .read_enabled = true }, // LCD_Y
 };
 const PermissionMap = std.AutoHashMap(PermissionType, Permission);
 
@@ -48,8 +53,6 @@ write_record: ?WriteRecord = null,
 permissions: PermissionMap = undefined,
 
 pub fn init(alloc: std.mem.Allocator) !Self {
-    // which means the CPU needs to pass it to the read functions.
-    // Maybe use singletons for this?
     var self = Self{ .allocator = alloc };
 
     self.permissions = PermissionMap.init(alloc);
@@ -106,6 +109,8 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     self.memory[MemMap.INTERRUPT_ENABLE] = 0x00;
 
     self.setPermission(.ROM);
+    self.setPermission(.UNUSED);
+    self.setPermission(.LCD_Y);
 
     return self;
 }
@@ -128,20 +133,9 @@ pub fn read8_usr(self: *const Self, addr: u16) u8 {
         }
     } 
 
-    // TODO: Maybe use the permissions for this?
-    switch(addr) {
-        MemMap.ECHO_LOW...MemMap.ECHO_HIGH - 1 => {
-            const echo_diff: u16 = comptime MemMap.ECHO_LOW - MemMap.WRAM_LOW;
-            return self.memory[addr - echo_diff]; 
-        },
-        MemMap.UNUSED_LOW...MemMap.UNUSED_HIGH - 1 => {
-            return 0x00;
-        },
-        else => {
-            return self.memory[addr]; 
-        }
-    }
+    return self.memory[addr];
 }
+
 /// System level read, 8bit unsigned. No read protections
 pub fn read8_sys(self: *const Self, addr: u16) u8 {
    return self.memory[addr];
@@ -165,38 +159,9 @@ pub fn write8_usr(self: *Self, addr: u16, val: u8) void {
         }
     } 
 
-    switch(addr) {
-        // TODO: Maybe use the permissions for this?
-        MemMap.ECHO_LOW...MemMap.ECHO_HIGH - 1 => {
-            const echo_diff: u16 = comptime MemMap.ECHO_LOW - MemMap.WRAM_LOW;
-            self.memory[addr - echo_diff] = val; 
-        },
-        // TODO: Maybe use the permissions for this?
-        MemMap.UNUSED_LOW...MemMap.UNUSED_HIGH - 1 => {
-            return; // Read-Only
-        },
-        MemMap.JOYPAD => {
-            // TODO: Better if the subsystem makes sure of that?
-            // Only the lower nibble can be written to!
-            const old_joyp: u8 = self.memory[MemMap.JOYPAD];
-            self.memory[addr] = (val & 0xF0) | (old_joyp & 0x0F);
-        },
-        MemMap.LCD_Y => {
-            // TODO: Better if the subsystem makes sure of that?
-            return; // Read-Only
-        },
-        MemMap.LCD_STAT => {
-            // TODO: Better if the subsystem makes sure of that?
-            // low 3 bits are read only.
-            const old: u8 = self.memory[MemMap.LCD_STAT];
-            const result: u8 = (val & 0xF8) | (old & 0x07);
-            self.memory[addr] = result;
-        },
-        else => {
-            self.memory[addr] = val; 
-        }
-    }
+    self.memory[addr] = val; 
 }
+
 /// System level write, 8bit unsigned. No write protections
 pub fn write8_sys(self: *Self, addr: u16, val: u8) void {
     self.memory[addr] = val;

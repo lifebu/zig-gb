@@ -49,6 +49,7 @@ pub fn main() !void {
             apu.onWrite(&mmu);
             cart.onWrite(&mmu);
             mmio.onWrite(&mmu);
+            ppu.onWrite(&mmu);
 
             // TODO: This can be an onWrite behaviour.
             mmio.updateJoypad(&mmu, platform.getInputState());

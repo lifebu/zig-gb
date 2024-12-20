@@ -172,6 +172,8 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
 - GBA
 
 # Maybe:
+- MMU:
+    - ECHO-RAM: Not used by any licenced game (forbidden by nintendo).
 - Cart:
     - Alternative Wiring of MBC1.
     - MBC1M (Multi cart).

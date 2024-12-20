@@ -32,17 +32,6 @@ pub fn runWriteMemoryTests() !void {
         };
     }
 
-    // Echo-RAM: Write: E000-FDFF <==> C000-DDFF
-    for(0..(MemMap.ECHO_HIGH - MemMap.ECHO_LOW)) |i| {
-        const iCast: u16 = @intCast(i);
-        mmu.write8_sys(MemMap.WRAM_LOW + iCast, 0x00);
-        mmu.write8_usr(MemMap.ECHO_LOW + iCast, 0xFF);
-        std.testing.expectEqual(0xFF, mmu.read8_sys(MemMap.WRAM_LOW + iCast)) catch |err| {
-            std.debug.print("Failed: Echo-RAM writes to Work-RAM: {d}\n", .{i});
-            return err;
-        };
-    }
-
     // PPU: Write VRAM during Mode 3 (DRAW):
     ppu.lyCounter = 81;
     ppu.step(&mmu, &pixels);
@@ -116,6 +105,8 @@ pub fn runWriteMemoryTests() !void {
     }
 
     // TODO: Missing Tests:
+    // ECHO-RAM: Read: E000-FDFF <==> C000-DDFF
+        // Forbidden to be used by Nintendo. 
     // Cannot access CGB palettes during PPU Mode 3 (DRAW).
     // CGB: WRAM and Cart ar on seperate memory busses => depending on start address of dma, writes might be allowed.
 }
@@ -133,17 +124,6 @@ pub fn runReadMemoryTests() !void {
     const lcd_contr = PPU.LCDC{ .lcd_enable = true };
     mmu.write8_sys(MemMap.LCD_CONTROL, @bitCast(lcd_contr));
     mmu.write8_sys(MemMap.LCD_Y, 9);
-
-    // Echo-RAM: Read: E000-FDFF <==> C000-DDFF
-    for(0..(MemMap.ECHO_HIGH - MemMap.ECHO_LOW)) |i| {
-        const iCast: u16 = @intCast(i);
-        mmu.write8_sys(MemMap.WRAM_LOW + iCast, 0xFF);
-        mmu.write8_sys(MemMap.ECHO_LOW + iCast, 0x00);
-        std.testing.expectEqual(0xFF, mmu.read8_usr(MemMap.ECHO_LOW + iCast)) catch |err| {
-            std.debug.print("Failed: Echo-RAM reads from Work-RAM: {d}\n", .{i});
-            return err;
-        };
-    }
 
     // PPU: Read VRAM during Mode 3 (DRAW):
     ppu.lyCounter = 81;
@@ -191,8 +171,8 @@ pub fn runReadMemoryTests() !void {
     for(MemMap.UNUSED_LOW..MemMap.UNUSED_HIGH) |i| {
         const addr: u16 = @intCast(i);
         mmu.write8_sys(addr, 0xFF);
-        std.testing.expectEqual(0x00, mmu.read8_usr(addr)) catch |err| {
-            std.debug.print("Failed: UNUSED Region sould return 0x00: {d}\n", .{i});
+        std.testing.expectEqual(0xFF, mmu.read8_usr(addr)) catch |err| {
+            std.debug.print("Failed: UNUSED Region sould return 0xFF: {d}\n", .{i});
             return err;
         };
     }
@@ -218,6 +198,8 @@ pub fn runReadMemoryTests() !void {
     }
 
     // TODO: Missing Tests:
+    // ECHO-RAM: Read: E000-FDFF <==> C000-DDFF
+        // Forbidden to be used by Nintendo. 
     // Unused (FEA0-FEFF)
         // 0xFF when OAM is blocked.
     // CGB: WRAM and Cart ar on seperate memory busses => depending on start address of dma, reads might be allowed.
@@ -229,6 +211,7 @@ pub fn runWriteIOTests() !void {
 
     var mmu = try MMU.init(alloc);
     defer mmu.deinit();
+    var ppu = PPU{};
 
     mmu.write8_sys(MemMap.LCD_Y, 0x00);
     mmu.write8_usr(MemMap.LCD_Y, 0xFF);
@@ -239,6 +222,7 @@ pub fn runWriteIOTests() !void {
 
     mmu.write8_sys(MemMap.LCD_STAT, 0x00);
     mmu.write8_usr(MemMap.LCD_STAT, 0xFF);
+    ppu.onWrite(&mmu);
     std.testing.expectEqual(0xFF - 0b111, mmu.read8_usr(MemMap.LCD_STAT)) catch |err| {
         std.debug.print("Failed: Low 3 bits of LCD_STAT are read-only\n", .{});
         return err;

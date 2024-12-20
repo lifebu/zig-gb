@@ -106,6 +106,23 @@ lyCounter: u16 = 0,
 lastSTATLine: bool = false,
 pub const DOTS_PER_LINE: u16 = 456;
 
+pub fn onWrite(_: *Self, mmu: *MMU) void {
+    const write_record: MMU.WriteRecord = mmu.write_record orelse {
+        return;
+    };
+
+    switch(write_record.addr) {
+        MemMap.LCD_STAT => {
+            const lcd_stat: u8 = (write_record.val & 0xF8) | (write_record.old_val & 0x07);
+            mmu.write8_sys(MemMap.LCD_STAT, lcd_stat);
+        },
+        else => {
+            return;
+        }
+    }
+}
+
+
 pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
     const lcdc: LCDC = @bitCast(mmu.read8_sys(MemMap.LCD_CONTROL));
     if(!lcdc.lcd_enable) {

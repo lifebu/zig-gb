@@ -27,6 +27,10 @@ pub fn onWrite(self: *Self, mmu: *MMU) void {
     };
 
     switch(write_record.addr) {
+        MemMap.JOYPAD => {
+            const joyp: u8 = (write_record.val & 0xF0) | (write_record.old_val & 0x0F);
+            mmu.write8_sys(MemMap.JOYPAD, joyp);
+        },
         MemMap.DIVIDER => {
             mmu.memory[write_record.addr] = 0;
             self.dividerCounter = 0;
