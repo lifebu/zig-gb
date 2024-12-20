@@ -153,6 +153,7 @@ pub fn runDMATest() !void {
 
     // correct address calculation.
     mmu.write8_usr(MemMap.DMA, 0x03);
+    mmio.onWrite(&mmu);
     try std.testing.expectEqual(true, mmio.dmaIsRunning);
     try std.testing.expectEqual(0x0300, mmio.dmaStartAddr);
     try std.testing.expectEqual(0, mmio.dmaCurrentOffset);
@@ -344,8 +345,9 @@ pub fn runJoypadTests() !void {
             var val: u32 = 0;
             val += 1;
         }
-        mmu.write8_sys(MemMap.JOYPAD, testCase.write);
-        mmio.updateJoypad(&mmu, testCase.input);
+        mmu.write8_usr(MemMap.JOYPAD, testCase.write);
+        mmio.updateInputState(&mmu, testCase.input);
+        mmio.onWrite(&mmu);
         std.testing.expectEqual(testCase.expected, mmu.read8_sys(MemMap.JOYPAD)) catch |err| {
             std.debug.print("Failed {d}: {s}\n", .{ i, testCase.name });
             return err;
@@ -355,6 +357,7 @@ pub fn runJoypadTests() !void {
     // Lower nibble is read-only to cpu.
     mmu.write8_sys(MemMap.JOYPAD, 0b1111_1111);
     mmu.write8_usr(MemMap.JOYPAD, 0b1111_0000);
+    mmio.onWrite(&mmu);
     std.testing.expectEqual(0b1111_1111, mmu.read8_sys(MemMap.JOYPAD)) catch |err| {
         std.debug.print("Failed {d}: {s}\n", .{ testCases.len, "Lower nibble is ready-only to cpu" });
         return err;

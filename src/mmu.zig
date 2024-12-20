@@ -11,7 +11,7 @@ pub const WriteRecord = struct {
 };
 
 
-pub const Permission = struct {
+const Permission = struct {
     invert: bool = false,
     start_addr: u16,
     end_addr: u16,
@@ -108,6 +108,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     self.memory[MemMap.WINDOW_X] = 0x00;
     self.memory[MemMap.INTERRUPT_ENABLE] = 0x00;
 
+    // TODO: Some better way so that permanent permissions are set by their respective systems? (ROM => CART, UNUSED => MMU, LCD_Y => PPU). Requires init functions?
     self.setPermission(.ROM);
     self.setPermission(.UNUSED);
     self.setPermission(.LCD_Y);

@@ -7,8 +7,8 @@ const MemMap = @import("mem_map.zig");
 const Self = @This();
 
 // Used to trigger interrupts from high->low transitions.
-lastDpadState: u4 = 0xF,
-lastButtonState: u4 = 0xF,
+dpadState: u4 = 0xF,
+buttonState: u4 = 0xF,
 
 // last bit we tested for timer (used to detect falling edge).
 timerLastBit: bool = false,
@@ -30,6 +30,7 @@ pub fn onWrite(self: *Self, mmu: *MMU) void {
         MemMap.JOYPAD => {
             const joyp: u8 = (write_record.val & 0xF0) | (write_record.old_val & 0x0F);
             mmu.write8_sys(MemMap.JOYPAD, joyp);
+            self.updateJoypad(mmu);
         },
         MemMap.DIVIDER => {
             mmu.memory[write_record.addr] = 0;
@@ -49,48 +50,41 @@ pub fn onWrite(self: *Self, mmu: *MMU) void {
     }
 }
 
-pub fn updateJoypad(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
-    // TODO: Maybe we can just update the joypad on write?
-    // And store the last InputState in the mmio? 
-    // This would also allow that we move the code that disallows changing the lower nibble to here!
-    // Also update when the actual input changed from platform (sfml events: key_pressed, key_released)
-    // Or just: Update once per frame (before cycle loop) and once on every write.
+pub fn updateInputState(self: *Self, mmu: *MMU, inputState: Def.InputState) void {
+    const lastDpadState: u4 = self.dpadState;
+    const lastButtonState: u4 = self.buttonState;
 
-    // 0 means pressed for gameboy => 0xF nothing is pressed
-    var dpad: u4 = 0xF; 
-    // disable phsysically impossible inputs: Left and Right, Up and Down
-    dpad &= ~(@as(u4, @intFromBool(inputState.isRightPressed and !inputState.isLeftPressed)) << 0);
-    dpad &= ~(@as(u4, @intFromBool(inputState.isLeftPressed and !inputState.isRightPressed)) << 1);
-    dpad &= ~(@as(u4, @intFromBool(inputState.isUpPressed and !inputState.isDownPressed)) << 2);
-    dpad &= ~(@as(u4, @intFromBool(inputState.isDownPressed and !inputState.isUpPressed)) << 3);
+    self.dpadState = 0xF; 
+    // disable physically impossible inputs: Left and Right, Up and Down
+    self.dpadState &= ~(@as(u4, @intFromBool(inputState.isRightPressed and !inputState.isLeftPressed)) << 0);
+    self.dpadState &= ~(@as(u4, @intFromBool(inputState.isLeftPressed and !inputState.isRightPressed)) << 1);
+    self.dpadState &= ~(@as(u4, @intFromBool(inputState.isUpPressed and !inputState.isDownPressed)) << 2);
+    self.dpadState &= ~(@as(u4, @intFromBool(inputState.isDownPressed and !inputState.isUpPressed)) << 3);
     
-    var buttons: u4 = 0xF;
-    buttons &= ~(@as(u4, @intFromBool(inputState.isAPressed)) << 0);
-    buttons &= ~(@as(u4, @intFromBool(inputState.isBPressed)) << 1);
-    buttons &= ~(@as(u4, @intFromBool(inputState.isSelectPressed)) << 2);
-    buttons &= ~(@as(u4, @intFromBool(inputState.isStartPressed)) << 3);
+    self.buttonState = 0xF;
+    self.buttonState &= ~(@as(u4, @intFromBool(inputState.isAPressed)) << 0);
+    self.buttonState &= ~(@as(u4, @intFromBool(inputState.isBPressed)) << 1);
+    self.buttonState &= ~(@as(u4, @intFromBool(inputState.isSelectPressed)) << 2);
+    self.buttonState &= ~(@as(u4, @intFromBool(inputState.isStartPressed)) << 3);
 
+    // Interrupts
+    if (self.dpadState < lastDpadState or self.buttonState < lastButtonState) {
+        mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_JOYPAD);
+    }
+}
+
+pub fn updateJoypad(self: *Self, mmu: *MMU) void {
     var joyp: u8 = mmu.read8_sys(MemMap.JOYPAD); 
     const selectDpad: bool = (joyp & 0x10) != 0x10;
     const selectButtons: bool = (joyp & 0x20) != 0x20;
-    if(selectDpad and selectButtons)  { 
-        joyp = (joyp & 0xF0) | (dpad & buttons); 
-    } else if(selectDpad) { 
-        joyp = (joyp & 0xF0) | dpad; 
-    } else if(selectButtons) { 
-        joyp = (joyp & 0xF0) | buttons; 
-    } else { 
-        joyp = (joyp & 0xF0) | 0x0F; 
-    }
-    mmu.write8_sys(MemMap.JOYPAD, joyp);
+    const nibble: u4 = 
+        if(selectDpad and selectButtons) self.dpadState & self.buttonState 
+        else if (selectDpad) self.dpadState 
+        else if (selectButtons) self.buttonState
+        else 0x0F;
 
-    // TODO: Can we do this branchless?
-    // Interrupts
-    if (dpad < self.lastDpadState or buttons < self.lastButtonState) {
-        mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_JOYPAD);
-    }
-    self.lastDpadState = dpad;
-    self.lastButtonState = buttons;
+    joyp = (joyp & 0xF0) | nibble; 
+    mmu.write8_sys(MemMap.JOYPAD, joyp);
 }
 
 const TIMER_MASK_TABLE = [4]u10{ 1024 / 2, 16 / 2, 64 / 2, 256 / 2 };

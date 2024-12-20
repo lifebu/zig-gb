@@ -38,6 +38,8 @@ pub fn main() !void {
     var ppu = PPU{};
 
     while(try platform.update()) {
+        mmio.updateInputState(&mmu, platform.getInputState());
+
         var cyclesPerFrame: u32 = @intFromFloat(platform.targetDeltaMS * Def.CYCLES_PER_MS); 
         // TODO: Dynamic cycles per frame do not work. The window wants to show ~60FPS but the gameboy has ~59.7FPS. This discrepency lead to uggly lines crossing the screen.
         cyclesPerFrame = 70224;
@@ -50,9 +52,6 @@ pub fn main() !void {
             cart.onWrite(&mmu);
             mmio.onWrite(&mmu);
             ppu.onWrite(&mmu);
-
-            // TODO: This can be an onWrite behaviour.
-            mmio.updateJoypad(&mmu, platform.getInputState());
 
             for(cpu.cycles_ahead) |_| {
                 mmio.updateTimers(&mmu);

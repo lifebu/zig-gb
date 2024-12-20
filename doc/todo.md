@@ -55,16 +55,15 @@
     - Add a bunch of logs of a game does something it should not do (like accessing ROM during OAM DMA Transfer).
 - CPU: Instructions, HALT, Halt-Bug.
 - Cart: MBC, Header, ROM/RAM.
-- Input
 - Interrupts:
     cpu.IsInterruptRunning(): currentlyRunning: bool, 
     cpu.ExecInterrupt(): State machine: BLANK, SAVE_PC_LOW, SAVE_PC_HIGH, JUMP 
         - runs for multiple cycles
     https://mgba.io/2018/03/09/holy-grail-bugs-revisited/#the-phantom-of-pinball-fantasies
-- MMU: OAM-BUG, Read/Write Behavior, Access Rights (DMA, VRAM, OAM).
 - PPU:
 - Timer and Divider.
 
+- Platform
 - Platform Timing (window fps, vs gb fps).
 - Testsetup:
     - Allow to run single test and all tests.
