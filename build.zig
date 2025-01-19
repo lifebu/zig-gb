@@ -2,6 +2,8 @@ const std = @import("std");
 const sfml = @import("sfml");
 
 pub fn build(b: *std.Build) void {
+    const src_folder = "src2/";
+
     // exe
     // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
     const target = b.standardTargetOptions(.{});
@@ -9,7 +11,7 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "zig-gb",
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path(src_folder ++ "main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -25,19 +27,28 @@ pub fn build(b: *std.Build) void {
     exe.addLibraryPath(b.path("csfml/lib/msvc"));
     sfml.link(exe);
 
+    // zigglgen (opengl zig)
+    const gl_bindings = @import("zigglgen").generateBindingsModule(b, .{
+        .api = .gl,
+        .version = .@"4.1",
+        .profile = .core,
+        .extensions = &.{ .ARB_clip_control, .NV_scissor_exclusive },
+    });
+    exe.root_module.addImport("gl", gl_bindings);
+
+    // run
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
 
-    // run
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
     // tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/test.zig"),
+        .root_source_file = b.path(src_folder ++ "test.zig"),
         .target = target,
         .optimize = optimize,
     });
