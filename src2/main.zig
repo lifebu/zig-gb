@@ -24,6 +24,8 @@ pub fn main() !void {
         sf.window.Style.titlebar | sf.window.Style.resize | sf.window.Style.close, null);
     defer window.destroy();
 
+    window.setFramerateLimit(60);
+
     // initialize openGL
     if(sf.c.sfRenderWindow_setActive(window._ptr, @intFromBool(true)) == @intFromBool(false)) unreachable;
     var glProc: gl.ProcTable = undefined;
@@ -31,18 +33,15 @@ pub fn main() !void {
     gl.makeProcTableCurrent(&glProc);
     defer gl.makeProcTableCurrent(null);
 
-
     var clock: sf.system.Clock = try sf.system.Clock.create();
     defer clock.destroy();
-
-    window.setFramerateLimit(60);
 
     var shader: sf.graphics.Shader = try sf.graphics.Shader.createFromFile(null, null, "shaders/frag.glsl");
     defer shader.destroy();
 
     const windowX: f32 = @floatFromInt(window.getSize().x);
     const windowY: f32 = @floatFromInt(window.getSize().x);
-    shader.setUniform("u_resolution", sf.system.Vector2f{ .x = windowX, .y = windowY });
+    shader.setUniform("u_Resolution", sf.system.Vector2f{ .x = windowX, .y = windowY });
 
     const colors = [_]sf.graphics.glsl.FVec4{
         HARDWARE_COLORS[0].toFVec4(),
@@ -50,7 +49,29 @@ pub fn main() !void {
         HARDWARE_COLORS[2].toFVec4(),
         HARDWARE_COLORS[3].toFVec4(),
     };
-    sf.c.sfShader_setVec4UniformArray(shader._ptr, "u_lut", @as(*const sf.c.sfGlslVec4, @ptrCast(&colors)), colors.len);
+    sf.c.sfShader_setVec4UniformArray(shader._ptr, "u_HwColors", @as(*const sf.c.sfGlslVec4, @ptrCast(&colors)), colors.len);
+
+    // TODO: Get more proper error handling for this to find the issues.
+    // https://www.khronos.org/opengl/wiki/OpenGL_Error
+    // Define an error callback to get the messages!
+    // Maybe use shader.setUniform with a float array for now? 
+    //sf.c.sfShader_bind(shader._ptr);
+    // gl.GetError()
+    const shader_prog: c_uint = sf.c.sfShader_getNativeHandle(shader._ptr);
+    if(shader_prog == 0) {
+        std.debug.print("{d} is not a valid shader!\n", .{ shader_prog });
+    }
+
+    const data_loc = gl.GetUniformLocation(shader_prog, "u_ColorIds");
+    if(data_loc == -1) {
+        std.debug.print("{d} is not a valid unform location for u_ColorIds!\n", .{ data_loc });
+    }
+    // const data = [_]u8{ 
+    //     0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
+    // } ** 144;
+    const data = [_]u8{ 0, 0 } ** 20 ** 144;
+    const len = data.len;
+    gl.Uniform1uiv(data_loc, len, @alignCast(@ptrCast(&data)));
 
     var quad: sf.graphics.VertexArray = try sf.graphics.VertexArray.create();
     quad.setPrimitiveType(.triangle_strip);
