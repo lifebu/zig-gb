@@ -6,7 +6,7 @@ const gl = @import("gl");
 
 const RESOLUTION_WIDTH = 160;
 const RESOLUTION_HEIGHT = 144;
-const SCALING = 4;
+const SCALING = 7;
 
 const HARDWARE_COLORS = [4]sf.graphics.Color{ 
     sf.graphics.Color{ .r = 244, .g = 248, .b = 208, .a = 255 },  // white
@@ -40,7 +40,7 @@ pub fn main() !void {
     defer shader.destroy();
 
     const windowX: f32 = @floatFromInt(window.getSize().x);
-    const windowY: f32 = @floatFromInt(window.getSize().x);
+    const windowY: f32 = @floatFromInt(window.getSize().y);
     shader.setUniform("u_Resolution", sf.system.Vector2f{ .x = windowX, .y = windowY });
 
     const colors = [_]sf.graphics.glsl.FVec4{
@@ -51,27 +51,25 @@ pub fn main() !void {
     };
     sf.c.sfShader_setVec4UniformArray(shader._ptr, "u_HwColors", @as(*const sf.c.sfGlslVec4, @ptrCast(&colors)), colors.len);
 
+
     // TODO: Get more proper error handling for this to find the issues.
     // https://www.khronos.org/opengl/wiki/OpenGL_Error
     // Define an error callback to get the messages!
-    // Maybe use shader.setUniform with a float array for now? 
-    //sf.c.sfShader_bind(shader._ptr);
-    // gl.GetError()
+
+    sf.c.sfShader_bind(shader._ptr);
     const shader_prog: c_uint = sf.c.sfShader_getNativeHandle(shader._ptr);
-    if(shader_prog == 0) {
-        std.debug.print("{d} is not a valid shader!\n", .{ shader_prog });
-    }
+    if(shader_prog == 0) { std.debug.print("{d} is not a valid shader!\n", .{ shader_prog }); }
 
     const data_loc = gl.GetUniformLocation(shader_prog, "u_ColorIds");
-    if(data_loc == -1) {
-        std.debug.print("{d} is not a valid unform location for u_ColorIds!\n", .{ data_loc });
-    }
-    // const data = [_]u8{ 
-    //     0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
-    // } ** 144;
-    const data = [_]u8{ 0, 0 } ** 20 ** 144;
-    const len = data.len;
-    gl.Uniform1uiv(data_loc, len, @alignCast(@ptrCast(&data)));
+    var data = [_]gl.int{ 
+        // 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
+           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
+    } ** 144;
+    data[0] = 0;
+    const lenCast: gl.sizei = data.len;
+    const dataCast: [*]const gl.int = &data;
+    gl.Uniform1iv(data_loc, lenCast, dataCast);
+    std.debug.print("SetUniform: GLError: {x}\n", .{gl.GetError() });
 
     var quad: sf.graphics.VertexArray = try sf.graphics.VertexArray.create();
     quad.setPrimitiveType(.triangle_strip);
