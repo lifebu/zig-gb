@@ -1,3 +1,10 @@
+# Runtime Library.
+- Test out the sokol: https://github.com/floooh/sokol
+- It has ImGUI, OpenGL, Window Framework, args passing and audio subsystem.
+- And official and automatically generated zig binding!
+- especially the audio system seems way nicer, because I can decide if I want a callback system or a push system (the latter sounds easier for my purposes).
+
+
 # Version 1.0:
 ## Define 1.0:
 - Move everything not "required" to 2.0?

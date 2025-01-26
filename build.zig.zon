@@ -31,6 +31,14 @@
             .url = "git+https://github.com/castholm/zigglgen#1c901bef6d312ef1814b8fce3c5a9e9e8e61ac2d",
             .hash = "12209d8a018832bee15d9da29a12fa753d89b56cd843cdf1f39501546c6467e38ba1",
         },
+        .sokol = .{
+            .url = "https://github.com/floooh/sokol-zig/archive/refs/heads/zig-0.13.0.tar.gz",
+            .hash = "1220b23309471165b60f40ba6a0979feecb9cbc110b512d7b30e02cd64909847aab5",
+        },
+        .cimgui = .{
+            .url = "git+https://github.com/floooh/dcimgui.git#9356c08eb4d1d320e79e418a36d59a427627634a",
+            .hash = "1220c640ad23d8800437166865e54f172c612fcfe6e000149a2b2af631c37b605f50",
+        },    
     },
     .paths = .{
         "build.zig",

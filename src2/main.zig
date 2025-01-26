@@ -8,12 +8,22 @@ const RESOLUTION_WIDTH = 160;
 const RESOLUTION_HEIGHT = 144;
 const SCALING = 7;
 
-const HARDWARE_COLORS = [4]sf.graphics.Color{ 
-    sf.graphics.Color{ .r = 244, .g = 248, .b = 208, .a = 255 },  // white
-    sf.graphics.Color{ .r = 136, .g = 192, .b = 112, .a = 255 },   // lgrey
-    sf.graphics.Color{ .r = 52,  .g = 104, .b = 86, .a = 255 },    // dgray
-    sf.graphics.Color{ .r = 8,   .g = 24,  .b = 32, .a = 255 },     // black
-};
+const IS_GREY_SCALE = true;
+const HARDWARE_COLORS = if(IS_GREY_SCALE) 
+    [4]sf.graphics.Color{ 
+        sf.graphics.Color{ .r = 232, .g = 232, .b = 232, .a = 255 }, // white
+        sf.graphics.Color{ .r = 160, .g = 160, .b = 160, .a = 255 }, // lgrey
+        sf.graphics.Color{ .r = 88,  .g = 88,  .b = 88,  .a = 255 }, // dgray
+        sf.graphics.Color{ .r = 16,  .g = 16,  .b = 16,  .a = 255 }, // black
+    }
+else
+    [4]sf.graphics.Color{ 
+        sf.graphics.Color{ .r = 244, .g = 248, .b = 208, .a = 255 }, // white
+        sf.graphics.Color{ .r = 136, .g = 192, .b = 112, .a = 255 }, // lgrey
+        sf.graphics.Color{ .r = 52,  .g = 104, .b = 86,  .a = 255 }, // dgray
+        sf.graphics.Color{ .r = 8,   .g = 24,  .b = 32,  .a = 255 }, // black
+    }
+;
 
 pub fn main() !void {
     var window_title: [64]u8 = undefined;
@@ -62,8 +72,8 @@ pub fn main() !void {
 
     const data_loc = gl.GetUniformLocation(shader_prog, "u_ColorIds");
     var data = [_]gl.int{ 
-        // 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
-           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
+        0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
+        // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
     } ** 144;
     data[0] = 0;
     const lenCast: gl.sizei = data.len;

@@ -24,12 +24,11 @@ void main() {
     vec2 pixelLinePos = vec2( pixelPos.x / TILE_WIDTH,  pixelPos.y); 
     // This can access out of the color index, do we need modulo?
     // TODO: This actually access outside of the array! 
-    // int colorIdx = int(pixelLinePos.x * BYTE_PER_LINE) + int((pixelLinePos.y) * RESOLUTION_TILE_WIDTH * BYTE_PER_LINE);
-    int colorIdx = 36;
+    int colorIdx = int(pixelLinePos.x * BYTE_PER_LINE) + int((pixelLinePos.y) * RESOLUTION_TILE_WIDTH * BYTE_PER_LINE);
     // gl_FragColor = vec4(float(colorIdx) / len, float(colorIdx) / len, float(colorIdx) / len, 1.0);
 
     int firstBitplane = u_ColorIds[colorIdx];
-    int secondBitplane = u_ColorIds[colorIdx + 1];
+    int secondBitplane = u_ColorIds[colorIdx];
     int tilePixelX = int(pixelPos.x) % TILE_WIDTH;
     int pixelOffset = TILE_WIDTH - tilePixelX - 1;
     // gl_FragColor = vec4(pixelOffset / 8.0, pixelOffset / 8.0, pixelOffset / 8.0, 1.0);

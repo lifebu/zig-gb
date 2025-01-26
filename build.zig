@@ -2,7 +2,7 @@ const std = @import("std");
 const sfml = @import("sfml");
 
 pub fn build(b: *std.Build) void {
-    const src_folder = "src2/";
+    const src_folder = "src3/";
 
     // exe
     // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
@@ -35,6 +35,15 @@ pub fn build(b: *std.Build) void {
         .extensions = &.{ .ARB_clip_control, .NV_scissor_exclusive },
     });
     exe.root_module.addImport("gl", gl_bindings);
+
+    // sokol
+    const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .gl = true, .with_sokol_imgui = true });
+    exe.root_module.addImport("sokol", sokol.module("sokol"));
+
+    // cimgui
+    const cimgui = b.dependency("cimgui", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("cimgui", cimgui.module("cimgui"));
+    sokol.artifact("sokol_clib").addIncludePath(cimgui.path("src"));
 
     // run
     const run_cmd = b.addRunArtifact(exe);
