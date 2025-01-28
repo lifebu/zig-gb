@@ -1,9 +1,10 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const sfml = @import("sfml");
 
-pub fn build(b: *std.Build) void {
-    const src_folder = "src3/";
+const src_folder = "src3/";
 
+pub fn build(b: *std.Build) void {
     // exe
     // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
     const target = b.standardTargetOptions(.{});
@@ -45,6 +46,9 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("cimgui", cimgui.module("cimgui"));
     sokol.artifact("sokol_clib").addIncludePath(cimgui.path("src"));
 
+    // shader
+    buildShader(b);
+
     // run
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
@@ -63,7 +67,38 @@ pub fn build(b: *std.Build) void {
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
-
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+}
+
+fn buildShader(b: *std.Build) void {
+    const tool_dir = "tools/sokol-shdc/";
+    const shaders_in = src_folder ++ "shaders/";
+    const shaders_out = src_folder ++ "shaders/";
+    const shaders = .{
+        "gb.glsl",
+    };
+    
+    const sdhc_platform: ?[:0]const u8 = comptime switch(builtin.os.tag) {
+        .windows => "win32/sokol-shdc.exe",
+        .linux => if (builtin.cpu.arch.isX86()) "linux/sokol-shdc" else "linux_arm64/sokol-shdc",
+        .macos => if (builtin.cpu.arch.isX86()) "osx/sokol-shdc" else "osx_arm64/sokol-shdc",
+        else => null,
+    };
+    if(sdhc_platform == null) {
+        std.log.warn("unsupported host platform, skipping shader compiler step", .{});
+        return;
+    }
+    const sdhc_path = tool_dir ++ sdhc_platform.?;
+    const sdhc_step = b.step("shaders", "Compile shaders using sokol-shdc");
+    const shader_lang = "glsl430:metal_macos:hlsl5:glsl300es";
+    inline for (shaders) |shader| {
+        const cmd = b.addSystemCommand(&.{ sdhc_path, 
+            "-i", shaders_in ++ shader, 
+            "-o", shaders_out ++ shader ++ ".zig",
+            "-l", shader_lang,
+            "-f", "sokol_zig", "--reflection",
+        });
+        sdhc_step.dependOn(&cmd.step);
+    }
 }

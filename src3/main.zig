@@ -1,17 +1,26 @@
 const std = @import("std");
 const sokol = @import("sokol");
 const imgui = @import("cimgui");
+const shader = @import("shaders/gb.glsl.zig");
+const shaderTypes = @import("shaders/shader_types.zig");
 
 const RESOLUTION_WIDTH = 160;
 const RESOLUTION_HEIGHT = 144;
 const SCALING = 5;
 
+const WINDOW_WIDTH = RESOLUTION_WIDTH * SCALING;
+const WINDOW_HEIGHT = RESOLUTION_HEIGHT * SCALING;
+
 const NUM_SAMPLES = 32;
 
 const state = struct {
+    // render
     var bind: sokol.gfx.Bindings = .{};
     var pip: sokol.gfx.Pipeline = .{};
     var pass_action: sokol.gfx.PassAction = .{};
+    var ub_shader_init: shader.Init = undefined;
+
+    // audio
     var samples: [NUM_SAMPLES]f32 = [_]f32{ 0.0 } ** NUM_SAMPLES;
     var sample_pos: usize = 0;
     var even_odd: i32 = 0;
@@ -45,55 +54,32 @@ export fn init() void {
         .data = sokol.gfx.asRange(&[_]u16{ 0, 1, 2, 0, 2, 3 }),
     });
 
-    const attrib_position = 0;
-    const attrib_color0 = 1;
-    const vertex_source = 
-        \\#version 410
-        \\
-        \\layout(location = 0) in vec4 position;
-        \\layout(location = 0) out vec4 color;
-        \\layout(location = 1) in vec4 color0;
-        \\
-        \\void main()
-        \\{
-        \\    gl_Position = position;
-        \\    color = color0;
-        \\}
-    ;
-    const fragment_source =
-        \\#version 410
-        \\
-        \\layout(location = 0) out vec4 frag_color;
-        \\layout(location = 0) in vec4 color;
-        \\
-        \\void main()
-        \\{
-        \\    frag_color = color;
-        \\}
-    ;
-
-    var shader_desc: sokol.gfx.ShaderDesc = .{ 
-        .label = "gb",
-        .vertex_func = .{ .source = vertex_source, .entry = "main" },
-        .fragment_func = .{ .source = fragment_source, .entry = "main" },
-    };
-    shader_desc.attrs[attrib_position].glsl_name = "position";
-    shader_desc.attrs[attrib_color0].glsl_name = "color0";
-
     state.pip = sokol.gfx.makePipeline(.{
-        .shader = sokol.gfx.makeShader(shader_desc),
+        .shader = sokol.gfx.makeShader(shader.gbShaderDesc(sokol.gfx.queryBackend())),
         .layout = init: {
             var l = sokol.gfx.VertexLayoutState{};
-            l.attrs[attrib_position].format = .FLOAT3;
-            l.attrs[attrib_color0].format = .FLOAT4;
+            l.attrs[shader.ATTR_gb_position].format = .FLOAT3;
+            l.attrs[shader.ATTR_gb_color0].format = .FLOAT4;
             break :init l;
         },
         .index_type = .UINT16,
     });
 
+
     state.pass_action.colors[0] = .{
         .load_action = .CLEAR,
         .clear_value = .{ .r = 0, .g = 0, .b = 0, .a = 1 },
+    };
+
+    // initialize shader:
+    state.ub_shader_init = .{
+        .hw_colors = [4]shaderTypes.Color{
+            shaderTypes.Color.fromU8(232, 232, 232, 255),
+            shaderTypes.Color.fromU8(160, 160, 160, 255),
+            shaderTypes.Color.fromU8(88,  88,  88,  255),
+            shaderTypes.Color.fromU8(16,  16,  16,  255),
+        },
+        .resolution = shaderTypes.Vec2{ .x = @floatFromInt(WINDOW_WIDTH), .y = @floatFromInt(WINDOW_HEIGHT) },
     };
 
     // audio
@@ -142,6 +128,18 @@ export fn frame() void {
     sokol.gfx.beginPass(.{ .swapchain = sokol.glue.swapchain() });
     sokol.gfx.applyPipeline(state.pip);
     sokol.gfx.applyBindings(state.bind);
+
+    sokol.gfx.applyUniforms(shader.UB_init, sokol.gfx.asRange(&state.ub_shader_init));
+
+    // const color2bpp = [_]u8{  
+    //     0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
+    //     // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
+    // } ** 144; 
+    // const shader_update: shader.Update = .{
+    //     .color_2bpp = shaderTypes.Color2bppToShader(&color2bpp),
+    // };
+    // sokol.gfx.applyUniforms(shader.UB_params, sokol.gfx.asRange(&shader_update));
+
     sokol.gfx.draw(0, 6, 1);
     sokol.imgui.render();
     sokol.gfx.endPass();
@@ -171,8 +169,8 @@ pub fn main() void {
         .frame_cb = frame,
         .cleanup_cb = cleanup,
         .event_cb = event,
-        .width = RESOLUTION_WIDTH * SCALING,
-        .height = RESOLUTION_HEIGHT * SCALING,
+        .width = WINDOW_WIDTH,
+        .height = WINDOW_HEIGHT,
         .icon = .{ .sokol_default = true },
         .window_title = "Zig GB Emulator",
         .logger = .{ .func = sokol.log.func },
