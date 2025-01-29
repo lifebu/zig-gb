@@ -6,7 +6,7 @@ const shaderTypes = @import("shaders/shader_types.zig");
 
 const RESOLUTION_WIDTH = 160;
 const RESOLUTION_HEIGHT = 144;
-const SCALING = 5;
+const SCALING = 6;
 
 const WINDOW_WIDTH = RESOLUTION_WIDTH * SCALING;
 const WINDOW_HEIGHT = RESOLUTION_HEIGHT * SCALING;
@@ -73,13 +73,16 @@ export fn init() void {
 
     // initialize shader:
     state.ub_shader_init = .{
-        .hw_colors = [4]shaderTypes.Color{
-            shaderTypes.Color.fromU8(232, 232, 232, 255),
-            shaderTypes.Color.fromU8(160, 160, 160, 255),
-            shaderTypes.Color.fromU8(88,  88,  88,  255),
-            shaderTypes.Color.fromU8(16,  16,  16,  255),
+        .hw_colors = [4]shaderTypes.Vec4{
+            shaderTypes.shaderRGBA(232, 232, 232, 255),
+            shaderTypes.shaderRGBA(160, 160, 160, 255),
+            shaderTypes.shaderRGBA(88,  88,  88,  255),
+            shaderTypes.shaderRGBA(16,  16,  16,  255),
         },
-        .resolution = shaderTypes.Vec2{ .x = @floatFromInt(WINDOW_WIDTH), .y = @floatFromInt(WINDOW_HEIGHT) },
+        .resolution = shaderTypes.Vec2{ 
+            .x = @floatFromInt(WINDOW_WIDTH), 
+            .y = @floatFromInt(WINDOW_HEIGHT) 
+        },
     };
 
     // audio
@@ -131,14 +134,13 @@ export fn frame() void {
 
     sokol.gfx.applyUniforms(shader.UB_init, sokol.gfx.asRange(&state.ub_shader_init));
 
-    // const color2bpp = [_]u8{  
-    //     0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
-    //     // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
-    // } ** 144; 
-    // const shader_update: shader.Update = .{
-    //     .color_2bpp = shaderTypes.Color2bppToShader(&color2bpp),
-    // };
-    // sokol.gfx.applyUniforms(shader.UB_params, sokol.gfx.asRange(&shader_update));
+    const color2bpp = [40]u8{  
+        0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
+        // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
+    } ** 144;
+    sokol.gfx.applyUniforms(shader.UB_update, sokol.gfx.asRange(&.{ 
+        .color_2bpp = shaderTypes.shader2BPPCompress(color2bpp), 
+    }));
 
     sokol.gfx.draw(0, 6, 1);
     sokol.imgui.render();
