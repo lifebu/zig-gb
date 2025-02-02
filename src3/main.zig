@@ -37,9 +37,6 @@ export fn init() void {
         .logger = .{ .func = sokol.log.func },
     });
 
-    // We only support opengl, which is forced by the build script.
-    std.debug.assert(sokol.gfx.queryBackend() == .GLCORE);
-
     state.bind.vertex_buffers[0] = sokol.gfx.makeBuffer(.{
         .data = sokol.gfx.asRange(&[_]f32{
             // positions      colors
@@ -136,7 +133,6 @@ export fn frame() void {
 
     const color2bpp = [40]u8{  
         0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
-        // 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  255,  255, 
     } ** 144;
     sokol.gfx.applyUniforms(shader.UB_update, sokol.gfx.asRange(&.{ 
         .color_2bpp = shaderTypes.shader2BPPCompress(color2bpp), 
