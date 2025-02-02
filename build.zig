@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    // TODO: This entire build process is bad, this requires that the user first installs csfml (libcsfml) on their system.
+    // TODO: Remove sfml once we moved completly to sokol.
     // sfml
     const sfmlDep = b.dependency("sfml", .{}).module("sfml");
     exe.root_module.addImport("sfml", sfmlDep);
@@ -27,15 +27,6 @@ pub fn build(b: *std.Build) void {
     sfmlDep.addIncludePath(b.path("csfml/include"));
     exe.addLibraryPath(b.path("csfml/lib/msvc"));
     sfml.link(exe);
-
-    // zigglgen (opengl zig)
-    const gl_bindings = @import("zigglgen").generateBindingsModule(b, .{
-        .api = .gl,
-        .version = .@"4.1",
-        .profile = .core,
-        .extensions = &.{ .ARB_clip_control, .NV_scissor_exclusive },
-    });
-    exe.root_module.addImport("gl", gl_bindings);
 
     // sokol
     const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .gl = true, .with_sokol_imgui = true });

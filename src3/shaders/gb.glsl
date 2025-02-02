@@ -5,24 +5,22 @@
 
 @vs vs
 layout(location = 0) in vec4 position;
-layout(location = 0) out vec4 color;
-layout(location = 1) in vec4 color0;
 
 void main()
 {
     gl_Position = position;
-    color = color0;
 }
 @end
 
 @fs fs
 
-const int BYTE_PER_LINE = 2;
-const int TILE_WIDTH = 8;
 const int RESOLUTION_WIDTH = 160;
-const int RESOLUTION_TILE_WIDTH = RESOLUTION_WIDTH / TILE_WIDTH;
 const int RESOLUTION_HEIGHT = 144;
 
+const int TILE_WIDTH = 8;
+const int RESOLUTION_TILE_WIDTH = RESOLUTION_WIDTH / TILE_WIDTH;
+
+const int BYTE_PER_LINE = 2;
 const int NUM_BYTES = RESOLUTION_TILE_WIDTH * BYTE_PER_LINE * RESOLUTION_HEIGHT;
 const int NUM_IVEC4 = NUM_BYTES / 4;
 
@@ -35,11 +33,9 @@ layout(binding = 1) uniform update {
 };
 
 layout(location = 0) out vec4 frag_color;
-layout(location = 0) in vec4 color;
 
 void main()
 {
-    frag_color = color * color_2bpp[0].x * resolution.x;
     vec2 screen_pos = gl_FragCoord.xy / resolution;
     screen_pos.y = 1.0 - screen_pos.y;
     

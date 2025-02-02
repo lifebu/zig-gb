@@ -1,17 +1,10 @@
 const std = @import("std");
 const sokol = @import("sokol");
 const imgui = @import("cimgui");
+
+const def = @import("defines.zig");
 const shader = @import("shaders/gb.glsl.zig");
 const shaderTypes = @import("shaders/shader_types.zig");
-
-const RESOLUTION_WIDTH = 160;
-const RESOLUTION_HEIGHT = 144;
-const SCALING = 6;
-
-const WINDOW_WIDTH = RESOLUTION_WIDTH * SCALING;
-const WINDOW_HEIGHT = RESOLUTION_HEIGHT * SCALING;
-
-const NUM_SAMPLES = 32;
 
 const state = struct {
     // render
@@ -21,7 +14,7 @@ const state = struct {
     var ub_shader_init: shader.Init = undefined;
 
     // audio
-    var samples: [NUM_SAMPLES]f32 = [_]f32{ 0.0 } ** NUM_SAMPLES;
+    var samples: [def.NUM_SAMPLES]f32 = [_]f32{ 0.0 } ** def.NUM_SAMPLES;
     var sample_pos: usize = 0;
     var even_odd: i32 = 0;
 };
@@ -39,11 +32,11 @@ export fn init() void {
 
     state.bind.vertex_buffers[0] = sokol.gfx.makeBuffer(.{
         .data = sokol.gfx.asRange(&[_]f32{
-            // positions      colors
-            -1.0, 1.0,  0.5, 1.0, 0.0, 0.0, 1.0, // top-left
-            1.0,  1.0,  0.5, 0.0, 1.0, 0.0, 1.0, // top-right
-            1.0,  -1.0, 0.5, 0.0, 0.0, 1.0, 1.0, // bottom-right
-            -1.0, -1.0, 0.5, 1.0, 1.0, 0.0, 1.0, // bottom-left
+            // positions
+            -1.0, 1.0,  0.5, // top-left
+            1.0,  1.0,  0.5, // top-right
+            1.0,  -1.0, 0.5,  // bottom-right
+            -1.0, -1.0, 0.5, // bottom-left
         }),
     });
     state.bind.index_buffer = sokol.gfx.makeBuffer(.{
@@ -56,7 +49,6 @@ export fn init() void {
         .layout = init: {
             var l = sokol.gfx.VertexLayoutState{};
             l.attrs[shader.ATTR_gb_position].format = .FLOAT3;
-            l.attrs[shader.ATTR_gb_color0].format = .FLOAT4;
             break :init l;
         },
         .index_type = .UINT16,
@@ -77,8 +69,8 @@ export fn init() void {
             shaderTypes.shaderRGBA(16,  16,  16,  255),
         },
         .resolution = shaderTypes.Vec2{ 
-            .x = @floatFromInt(WINDOW_WIDTH), 
-            .y = @floatFromInt(WINDOW_HEIGHT) 
+            .x = @floatFromInt(def.WINDOW_WIDTH), 
+            .y = @floatFromInt(def.WINDOW_HEIGHT) 
         },
     };
 
@@ -93,9 +85,9 @@ export fn init() void {
 export fn frame() void {
     // audio
     for(0..@intCast(sokol.audio.expect())) |_| {
-        if (state.sample_pos == NUM_SAMPLES) {
+        if (state.sample_pos == def.NUM_SAMPLES) {
             state.sample_pos = 0;
-            _ = sokol.audio.push(&state.samples[0], NUM_SAMPLES);
+            _ = sokol.audio.push(&state.samples[0], def.NUM_SAMPLES);
         }
         const amplitude = 0.001;
         state.samples[state.sample_pos] = if(0 != (state.even_odd & 0x20)) amplitude else -amplitude;
@@ -130,7 +122,6 @@ export fn frame() void {
     sokol.gfx.applyBindings(state.bind);
 
     sokol.gfx.applyUniforms(shader.UB_init, sokol.gfx.asRange(&state.ub_shader_init));
-
     const color2bpp = [40]u8{  
         0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
     } ** 144;
@@ -167,8 +158,8 @@ pub fn main() void {
         .frame_cb = frame,
         .cleanup_cb = cleanup,
         .event_cb = event,
-        .width = WINDOW_WIDTH,
-        .height = WINDOW_HEIGHT,
+        .width = def.WINDOW_WIDTH,
+        .height = def.WINDOW_HEIGHT,
         .icon = .{ .sokol_default = true },
         .window_title = "Zig GB Emulator",
         .logger = .{ .func = sokol.log.func },

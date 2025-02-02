@@ -27,10 +27,6 @@
             .url = "https://github.com/Guigui220D/zig-sfml-wrapper/archive/bf012025c70be4c101717a9041ce55c776b58d4d.tar.gz",
             .hash = "1220711bf931da6bb89b3fa695f56dd938a749de9830fa479d850c279e3f739388db",
         },
-        .zigglgen = .{
-            .url = "git+https://github.com/castholm/zigglgen#1c901bef6d312ef1814b8fce3c5a9e9e8e61ac2d",
-            .hash = "12209d8a018832bee15d9da29a12fa753d89b56cd843cdf1f39501546c6467e38ba1",
-        },
         .sokol = .{
             .url = "https://github.com/floooh/sokol-zig/archive/refs/heads/zig-0.13.0.tar.gz",
             .hash = "1220b23309471165b60f40ba6a0979feecb9cbc110b512d7b30e02cd64909847aab5",
