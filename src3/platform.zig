@@ -7,16 +7,10 @@ const shader = @import("shaders/gb.glsl.zig");
 const shaderTypes = @import("shaders/shader_types.zig");
 
 pub const State = struct {
-    // render
     bind: sokol.gfx.Bindings = .{},
     pip: sokol.gfx.Pipeline = .{},
     pass_action: sokol.gfx.PassAction = .{},
     ub_shader_init: shader.Init = undefined,
-
-    // audio
-    samples: [def.NUM_SAMPLES]f32 = [_]f32{ 0.0 } ** def.NUM_SAMPLES,
-    sample_pos: usize = 0,
-    even_odd: i32 = 0,
 };
 
 pub fn init(state: *State) void {
@@ -35,7 +29,7 @@ pub fn init(state: *State) void {
             // positions
             -1.0, 1.0,  0.5, // top-left
             1.0,  1.0,  0.5, // top-right
-            1.0,  -1.0, 0.5,  // bottom-right
+            1.0,  -1.0, 0.5, // bottom-right
             -1.0, -1.0, 0.5, // bottom-left
         }),
     });
@@ -54,13 +48,12 @@ pub fn init(state: *State) void {
         .index_type = .UINT16,
     });
 
-
     state.pass_action.colors[0] = .{
         .load_action = .CLEAR,
         .clear_value = .{ .r = 0, .g = 0, .b = 0, .a = 1 },
     };
 
-    // initialize shader:
+    // shader
     state.ub_shader_init = .{
         .hw_colors = [4]shaderTypes.Vec4{
             shaderTypes.shaderRGBA(232, 232, 232, 255),
@@ -77,23 +70,14 @@ pub fn init(state: *State) void {
     // audio
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        // .num_channels = 2,
-        // .sample_rate = 48_000
+        .num_channels = def.NUM_CHANNELS,
+        .sample_rate = def.SAMPLE_RATE,
     });
 }
 
-pub fn frame(state: *State, color2bpp: [def.NUM_2BPP]u8) void {
-    // audio
-    for(0..@intCast(sokol.audio.expect())) |_| {
-        if (state.sample_pos == def.NUM_SAMPLES) {
-            state.sample_pos = 0;
-            _ = sokol.audio.push(&state.samples[0], def.NUM_SAMPLES);
-        }
-        const amplitude = 0.001;
-        state.samples[state.sample_pos] = if(0 != (state.even_odd & 0x20)) amplitude else -amplitude;
-        state.sample_pos += 1;
-        state.even_odd += 1;
-    } 
+pub fn frame(state: *State, color2bpp: [def.NUM_2BPP]u8, _: [def.NUM_GB_SAMPLES]f32) void {
+    // TODO: To avoid popping we might need to dynamically adjust the number of samples we write.
+    //_ = sokol.audio.push(&samples[0], samples.len);
 
     // ui
     sokol.imgui.newFrame(.{
@@ -120,7 +104,6 @@ pub fn frame(state: *State, color2bpp: [def.NUM_2BPP]u8) void {
     sokol.gfx.beginPass(.{ .swapchain = sokol.glue.swapchain() });
     sokol.gfx.applyPipeline(state.pip);
     sokol.gfx.applyBindings(state.bind);
-
     sokol.gfx.applyUniforms(shader.UB_init, sokol.gfx.asRange(&state.ub_shader_init));
     sokol.gfx.applyUniforms(shader.UB_update, sokol.gfx.asRange(&.{ 
         .color_2bpp = shaderTypes.shader2BPPCompress(color2bpp), 
