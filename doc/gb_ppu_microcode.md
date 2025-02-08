@@ -35,7 +35,29 @@ VBLANK:
 		- ADVANCE_MODE(ppu_mode, new_mode)
 
 DRAW:
-	- Pixel fetcher is uOps, Pixel Pushing is tried every frame.
+    - Drawing Windows and Objects:
+        - "The Ultimate Game Boy Talk": Using window and object comparitors.
+        - Can I load the entire line of pixels as uOps assuming that we don't have any window?
+        - And then overlay instructions where we are triggering the window and obj code that will reset the fetch and the fifo?
+        - So we have a static part (render all backgrounds for that line) and a dynamic part of the uOps buffer that we create depending on the actual content of that line!
+        - So we can define the entire line rendering when we enter draw mode!
+    - When is WY and WX actuall checked and triggered?
+        - WY is only checked once during OAM_SCAN. If the check succeeds, the window is active for this scanline.
+        - WX seems to be read multiple time per scanline.
+    - Drawing Objects:
+        - Y Coordinate is only checked once per scanline.
+        - X Coordinate is stored once per scanline in a sprite store.
+    - Pixel fetcher and and pixel pusher are running at the same time in draw mode. How to handle that best?
+        - 1. Pixel fetcher is uOps, Pixel Pushing is tried every frame.
+        - 2. Have a second machine for the pixel pusher?
+        - 3. Microcode is split between pixel code and fetcher code?
+            - split byte into both nibble?
+            - stil requires two "machines".
+        !- 4. Having more special instructions.
+            - All FETCH instructions also try a pixel push?
+            - => Requires a "FETCH_NOP".
+        => Problem: We do not know through the uOps itself which mode we are in.
+        => Because NOP is used outside of draw!
     - When is pixel pushing suspended:
         - When backgroud FIFO is empty (Window)
 	- uOps:
@@ -43,13 +65,12 @@ DRAW:
 		- NOP
 		- PUSH_PIXEL
 		- FETCH_TILE
-		- FETCH_DATA_LOW
-		- FETCH_DATA_HIGH
+		- FETCH_DATA
         - FETCH_CONSTRUCT
 		- FETCH_PUSH:
 			If it fails, adds itself into queue.
 	- So Pixel fetcher is:
-		- FETCH_TILE, NOP, FETCH_DATA_LOW, NOP, FET_DATA_HIGH, FETCH_CONSTRUCT, FETCH_PUSH
+		- FETCH_TILE, NOP_DRAW, FETCH_DATA, NOP_DRAW, FET_DATA, FETCH_CONSTRUCT, FETCH_PUSH
 
 # uOps 
 NOP 
@@ -67,4 +88,5 @@ FETCH_DATA_HIGH
     - Use tile address to get second bitplane
 FETCH_CONSTRUCT:
     - Construct Fifo info from 2bpp data.
+    - This is slightly different for objects and background pixels
 FETCH_PUSH

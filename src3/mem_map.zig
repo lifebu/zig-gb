@@ -82,3 +82,10 @@ pub const INTERRUPT_LCD: u8     = 0x02;
 pub const INTERRUPT_TIMER: u8   = 0x04; 
 pub const INTERRUPT_SERIAL: u8  = 0x08; 
 pub const INTERRUPT_JOYPAD: u8  = 0x10; 
+
+// VRAM
+pub const FIRST_TILE_MAP_ADDRESS = 0x9800;
+pub const SECOND_TILE_MAP_ADDRESS = 0x9C00;
+
+pub const FIRST_TILE_ADDRESS = 0x8000;
+pub const SECOND_TILE_ADDRESS = 0x8800;
