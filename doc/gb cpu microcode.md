@@ -23,6 +23,10 @@
 	- IDU outputs into register file (16-bit register, or register pair).
 	- can work in parallel to ALU.
 
+# CPU Variant Decoding.
+- I can decode the variant faster If I define a zig packed struct of size u8 with the corresponding relevant bits (for example 3) combined into a type that immediately gives me the variant.
+- Then I do not need to do some bit-twiddling.
+
 # Timing:
 - CPU can only do one memory access per M-cycle
 - CPU cannot use the data during the same M-cycle.
