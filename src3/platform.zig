@@ -56,10 +56,10 @@ pub fn init(state: *State) void {
     // shader
     state.ub_shader_init = .{
         .hw_colors = [4]shaderTypes.Vec4{
-            shaderTypes.shaderRGBA(232, 232, 232, 255),
-            shaderTypes.shaderRGBA(160, 160, 160, 255),
-            shaderTypes.shaderRGBA(88,  88,  88,  255),
-            shaderTypes.shaderRGBA(16,  16,  16,  255),
+            shaderTypes.shaderRGBA(224, 248, 208, 255),
+            shaderTypes.shaderRGBA(136, 192, 112, 255),
+            shaderTypes.shaderRGBA(52,  104,  86,  255),
+            shaderTypes.shaderRGBA(8,  24,  32,  255),
         },
         .resolution = shaderTypes.Vec2{ 
             .x = @floatFromInt(def.window_width), 

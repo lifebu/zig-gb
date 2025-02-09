@@ -3,7 +3,6 @@ const std = @import("std");
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
-
 const tile_size_x = 8;
 const tile_size_y = 8;
 const tile_size_byte = 16;
@@ -61,14 +60,14 @@ const Object = packed struct {
         cgb_palette: u3,
         vram_bank: u1,
         dmg_palette: enum(u1) {
-            OBP0,
-            OBP1,
+            obp0,
+            obp1,
         },
         x_flip: bool,
         y_flip: bool,
         priority: enum(u1) {
-            OBJ_OVER_BG,
-            OBJ_UNDER_BG,
+            obj_over_bg,
+            obj_under_bg,
         },
     },
 
@@ -88,14 +87,14 @@ const Object = packed struct {
 };
 
 const BackgroundFifoPixel = packed struct(u5) {
-    palleteID: u3 = 0,
-    colorID: u2 = 0,
+    palette_id: u3 = 0,
+    color_id: u2 = 0,
 };
 
 const ObjectFifoPixel = packed struct(u12) {
     obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
-    palleteID: u3 = 0,
-    colorID: u2 = 0, 
+    palette_id: u3 = 0,
+    color_id: u2 = 0, 
     bg_prio: u1 = 0,
 };
 
@@ -203,19 +202,10 @@ pub const State = struct {
     // https://www.reddit.com/r/EmuDev/comments/1bpxuwp/gameboy_ppu_mode_2_oam_scan/ => X-Pos (8-bits), Tile-Row 0-15 (4 bits), sprite-num 0-39 (6 bits)
     oam_line_list: std.BoundedArray(u6, 10) = std.BoundedArray(u6, 10).init(0) catch unreachable,
 
-    color2bpp: [def.num_2bpp]u8 = [40]u8{  
-        //0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    } ** 144,
+    color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** 40 ** 144,
 };
 
 pub fn init(state: *State) void {
-    // TODO: Todo this id dublicate to the .advance_mode_oam_scan function.
-    state.oam_line_list.resize(0) catch unreachable;
-    state.oam_scan_idx = 0;
-    state.uop_pc = 0;
-    state.mode = .oam_scan;
-    state.lcd_y = 0;
     std.mem.copyForwards(MicroOp, state.uop_buf[0..oam_scan_uops.len], &oam_scan_uops);
 }
 
@@ -267,7 +257,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_pc = 0;
         },
         .advance_mode_vblank => {
-            // if(state.lcd_y >= 0) unreachable;
             state.lcd_y += 1;
             state.mode = .v_blank;
             // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
@@ -300,32 +289,24 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const bit_offset: u3 = 7 - @as(u3, @intCast(bit_idx));
                 const one: u8 = 1;
                 const mask: u8 = one << bit_offset;
-                const firstBit: u8 = (state.fetcher_data_low & mask) >> bit_offset;
-                const secondBit: u8 = (state.fetcher_data_high & mask) >> bit_offset;
-                const colorID: u2 = @intCast(firstBit + (secondBit << 1)); // LSB first
-                const palleteID: u3 = 0; // Only for objects
-                state.fetcher_bg_data[bit_idx] = .{ .colorID = colorID, .palleteID = palleteID };
+                const first_bit: u8 = (state.fetcher_data_low & mask) >> bit_offset;
+                const second_bit: u8 = (state.fetcher_data_high & mask) >> bit_offset;
+                const color_id: u2 = @intCast(first_bit + (second_bit << 1)); // LSB first
+                const palette_id: u3 = 0; // Only for objects
+                state.fetcher_bg_data[bit_idx] = .{ .color_id = color_id, .palette_id = palette_id };
             }
             // TODO: If we fail to push we need to try again (dynamic!).
             state.background_fifo.pushSlice(&state.fetcher_bg_data) catch {};
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
-            const bgWindowTileBaseAddress: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
-            const signedAdressing: bool = bgWindowTileBaseAddress == mem_map.second_tile_address;
-            var tileAddressOffset: u16 = memory[state.fetcher_tilemap_addr];
-            // TODO: This feels like something that can be done better.
-            if(signedAdressing) {
-                if(tileAddressOffset < 128) {
-                    tileAddressOffset += 128;
-                } else {
-                    tileAddressOffset -= 128;
-                }
-            }
+            const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
+            const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
+            const tile_value: u16 = memory[state.fetcher_tilemap_addr];
+            const tile_addr_offset: u16 = if(signed_mode) (tile_value + 128) % 256 else tile_value;
 
-            const tile_base_addr: u16 = bgWindowTileBaseAddress + tileAddressOffset * tile_size_byte;
+            const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
             state.fetcher_tile_addr = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
-            // std.debug.print("M: {X}, T: {X}\n", .{ state.fetcher_tilemap_addr, state.fetcher_tile_addr });
             state.fetcher_tilemap_addr += 1;
             tryPushPixel(state, memory);
         },
@@ -334,8 +315,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .oam_check => {
-            // const object_address: u16 = mem_map.oam_low + (@as(u16, state.oam_scan_idx) * obj_size_byte);
-            // const object: *align(1) Object = @ptrCast(&memory[object_address]);
             const object = Object.fromOAM(memory, state.oam_scan_idx);
             const object_height: u8 = if(lcd_control.obj_size == .double_height) tile_size_y * 2 else tile_size_y;
             if(state.lcd_y + 16 >= object.y_position and state.lcd_y + 16 < object.y_position + object_height) {
@@ -352,9 +331,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
 }
 
 // TODO: Can we have an easier way of reinterpreting the u8 as an array of u2?
-// TODO: Find out why colorID0 is LSB?
+// TODO: Find out why color_id0 is LSB?
 fn getPalette(paletteByte: u8) [4]u2 {
-    //https://gbdev.io/pandocs/Palettes.html
+    // https://gbdev.io/pandocs/Palettes.html
     const color_id3: u2 = @intCast((paletteByte & (3 << 6)) >> 6);
     const color_id2: u2 = @intCast((paletteByte & (3 << 4)) >> 4);
     const color_id1: u2 = @intCast((paletteByte & (3 << 2)) >> 2);
@@ -371,7 +350,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
 
     const pixel: BackgroundFifoPixel = state.background_fifo.pop() catch unreachable;
     const bg_palette = getPalette(memory[mem_map.bg_palette]);
-    const color_id = bg_palette[pixel.colorID];
+    const color_id = bg_palette[pixel.color_id];
     const first_color_bit: u8 = color_id & 0b01;
     const second_color_bit: u8 = (color_id & 0b10) >> 1;
 
@@ -385,8 +364,6 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     var second_bitplane = state.color2bpp[bitplane_idx + 1];
     first_bitplane |= first_color_bit << shift;
     second_bitplane |= second_color_bit << shift;
-
-    // std.debug.print("({d}, {d}): {d}: ({d}, {d})\n", .{ state.lcd_x, state.lcd_y, color_id, bitplane_idx, bitplane_idx + 1 });
 
     state.color2bpp[bitplane_idx] = first_bitplane;
     state.color2bpp[bitplane_idx + 1] = second_bitplane;
