@@ -52,6 +52,29 @@ const LcdControl = packed struct {
     } 
 };
 
+pub const LcdStat = packed struct {
+    mode: enum(u2) {
+        h_blank,
+        v_blank,
+        oam_scan,
+        draw,
+    },
+    ly_is_lyc: bool = false,
+    mode_0_select: bool = false,
+    mode_1_select: bool = false,
+    mode_2_select: bool = false,
+    lyc_select: bool = false,
+    _: u1 = 0,
+
+    pub fn fromMem(memory: *[def.addr_space]u8) LcdStat {
+        return @bitCast(memory[mem_map.lcd_stat]);
+    } 
+
+    pub fn toMem(self: LcdStat, memory: *[def.addr_space]u8) void {
+        memory[mem_map.lcd_stat] = @bitCast(self);
+    } 
+};
+
 const Object = packed struct {
     y_position: u8,
     x_position: u8,
@@ -90,6 +113,7 @@ const BackgroundFifoPixel = packed struct(u5) {
     palette_id: u3 = 0,
     color_id: u2 = 0,
 };
+const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifoPixel, .{ .Static = def.tile_width * 2 });
 
 const ObjectFifoPixel = packed struct(u12) {
     obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
@@ -97,69 +121,7 @@ const ObjectFifoPixel = packed struct(u12) {
     color_id: u2 = 0, 
     bg_prio: u1 = 0,
 };
-
-// TODO: uOps Buffer could also use this, so we can move it into it's own file and generalize it? 
-/// Static size version of std.RingBuffer
-pub fn Fifo(comptime T: type, comptime capacity: usize) type {
-   return struct {
-        const Self = @This();
-
-        pub const Error = error{ Full };
-
-        data: [capacity]T = undefined,
-        write_idx: usize = 0,
-        read_idx: usize = 0,
-
-        fn mask(index: usize) usize {
-            return index % capacity;
-        }
-        fn mask2(index: usize) usize {
-            return index % (2 * capacity);
-        }
-
-        pub fn pop(self: *Self) Error!T {
-            const is_empty: bool = self.write_idx == self.read_idx;
-            if(is_empty) {
-                return Error.Full;
-            }
-
-            const value = self.data[mask(self.read_idx)];
-            self.read_idx = mask2(self.read_idx + 1);
-            return value;
-        }
-
-        pub fn push(self: *Self, value: T) Error!void {
-            const is_full: bool = mask2(self.write_idx + self.data.len) == self.read_idx;
-            if(is_full) {
-                return error.Full;
-            }
-
-            self.data[mask(self.write_idx)] = value;
-            self.write_idx = mask2(self.write_idx + 1);
-        } 
-
-        pub fn pushSlice(self: *Self, values: []const T) Error!void {
-            if (self.len() + values.len > self.data.len) {
-                return error.Full;
-            }
-
-            for (0..values.len) |i| {
-                self.push(values[i]) catch unreachable;
-            }
-        }
-
-        pub fn len(self: Self) usize {
-            const wrap_offset = 2 * self.data.len * @intFromBool(self.write_idx < self.read_idx);
-            const adjusted_write_idx = self.write_idx + wrap_offset;
-            return adjusted_write_idx - self.read_idx;
-        }
-
-        pub fn clear(self: *Self) void {
-            self.read_idx = 0; 
-            self.write_idx = 0;
-        }
-    };
-}
+const ObjectFiFo = std.fifo.LinearFifo(ObjectFifoPixel, .{ .Static = def.tile_width * 2 });
 
 const MicroOp = enum {
     advance_mode_draw,
@@ -179,11 +141,9 @@ const MicroOp = enum {
 };
 
 pub const State = struct {
-    background_fifo: Fifo(BackgroundFifoPixel, def.tile_width * 2) = .{}, 
-    object_fifo: Fifo(ObjectFifoPixel, def.tile_width * 2) = .{},
-    // TODO: std.BoundedArray? Because we sometimes only want to use part of the buffer and loop!
-    // TODO: std.BoundedArray allows to pop one element from the back. 
-    // TODO: But it would be convenient if we had a BoundedArray as a FIFO (new use case for the pixel fifo type? only requires tryPushSlice() instead of tryPush8().
+    background_fifo: BackgroundFifo = BackgroundFifo.init(), 
+    object_fifo: ObjectFiFo = ObjectFiFo.init(),
+    // TODO: Try to use std.fifo.LinearFifo?
     // TODO: Have a way to know where a MicroOp came from to debug this! (add a second byte with runtime information and advance pc by two?)
     uop_buf: [cycles_per_line]MicroOp = [1]MicroOp{ .nop } ** cycles_per_line,
     uop_pc: u16 = 0,
@@ -194,10 +154,7 @@ pub const State = struct {
     fetcher_data_low: u8 = 0,
     fetcher_data_high: u8 = 0,
     fetcher_bg_data: [def.tile_width]BackgroundFifoPixel = undefined,
-    // TODO: This can exist implicitly in the gb memory later.
-    mode: Mode = .oam_scan,
     oam_scan_idx: u6 = 0,
-    // TODO: can also be filled partially, do we use a zig's BoundedArray? write_idx? invalid_oam_index?
     // TODO: What data do we store here, what is easiest for the draw function? a list of indices into OAM? A copy of the object? Pre-digested data?
     // https://www.reddit.com/r/EmuDev/comments/1bpxuwp/gameboy_ppu_mode_2_oam_scan/ => X-Pos (8-bits), Tile-Row 0-15 (4 bits), sprite-num 0-39 (6 bits)
     oam_line_list: std.BoundedArray(u6, 10) = std.BoundedArray(u6, 10).init(0) catch unreachable,
@@ -222,16 +179,18 @@ const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
+    var lcd_stat = LcdStat.fromMem(memory);
     const lcd_control = LcdControl.fromMem(memory);
+
     const uop: MicroOp = state.uop_buf[state.uop_pc];
     state.uop_pc += 1;
     switch(uop) {
         .advance_mode_draw => {
-            state.mode = .draw;
+            lcd_stat.mode = .draw;
             std.debug.assert(draw_uops.len == 172);
             std.mem.copyForwards(MicroOp, state.uop_buf[0..draw_uops.len], &draw_uops);
-            state.background_fifo.clear();
-            state.object_fifo.clear();
+            state.background_fifo.discard(state.background_fifo.readableLength());
+            state.object_fifo.discard(state.object_fifo.readableLength());
             const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             state.fetcher_tilemap_addr = tile_map_base_addr + tile_map_size_x * @as(u16, state.lcd_y / tile_size_y);
             std.debug.assert(state.fetcher_tilemap_addr >= tile_map_base_addr and state.fetcher_tilemap_addr <= tile_map_base_addr + tile_map_size_byte);
@@ -240,7 +199,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_mode_hblank => {
             state.lcd_y += 1;
-            state.mode = .h_blank;
+            lcd_stat.mode = .h_blank;
             std.debug.assert(hblank_uops.len == 203);
             // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
             std.mem.copyForwards(MicroOp, state.uop_buf[0..hblank_uops.len], &hblank_uops);
@@ -248,7 +207,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_pc = 0;
         },
         .advance_mode_oam_scan => {
-            state.mode = .oam_scan;
+            lcd_stat.mode = .oam_scan;
             // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
             std.mem.copyForwards(MicroOp, state.uop_buf[0..oam_scan_uops.len], &oam_scan_uops);
             state.uop_pc = 0;
@@ -258,7 +217,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_mode_vblank => {
             state.lcd_y += 1;
-            state.mode = .v_blank;
+            lcd_stat.mode = .v_blank;
             // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
             std.debug.assert(vblank_uops.len == 455);
             std.mem.copyForwards(MicroOp, state.uop_buf[0..vblank_uops.len], &vblank_uops);
@@ -285,6 +244,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .fetch_push_bg => {
             // TODO: this is no longer in 2bp, which I assumed would be best to be pushed to the shader. A better way to do this?
             // TODO: Maybe we split the data in the fetcher_bg_data into 2bpp color and palette_data? 
+            // TODO: struct of arrays?
             for(0..state.fetcher_bg_data.len) |bit_idx| {
                 const bit_offset: u3 = 7 - @as(u3, @intCast(bit_idx));
                 const one: u8 = 1;
@@ -296,7 +256,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 state.fetcher_bg_data[bit_idx] = .{ .color_id = color_id, .palette_id = palette_id };
             }
             // TODO: If we fail to push we need to try again (dynamic!).
-            state.background_fifo.pushSlice(&state.fetcher_bg_data) catch {};
+            state.background_fifo.write(&state.fetcher_bg_data) catch {};
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
@@ -328,6 +288,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             unreachable; 
         },
     }
+
+    lcd_stat.toMem(memory);
 }
 
 // TODO: Can we have an easier way of reinterpreting the u8 as an array of u2?
@@ -344,11 +306,11 @@ fn getPalette(paletteByte: u8) [4]u2 {
 // TODO: unpacking 2bpp earlier to pack it here again is very bad!
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     // pixel mixing requires at least 8 pixels.
-    if(state.background_fifo.len() <= def.tile_width) {
+    if(state.background_fifo.readableLength() <= def.tile_width) {
         return;
     }
 
-    const pixel: BackgroundFifoPixel = state.background_fifo.pop() catch unreachable;
+    const pixel: BackgroundFifoPixel = state.background_fifo.readItem().?;
     const bg_palette = getPalette(memory[mem_map.bg_palette]);
     const color_id = bg_palette[pixel.color_id];
     const first_color_bit: u8 = color_id & 0b01;
