@@ -205,7 +205,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const hblank_len = 455 - state.line_cycles - 1;
             state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
             state.lcd_y += 1;
-            state.line_cycles = 0;
             const advance: MicroOp = if(state.lcd_y >= 144) .advance_mode_vblank else .advance_mode_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
@@ -214,9 +213,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_fifo.write(&oam_scan_uops) catch unreachable;
             state.oam_line_list.resize(0) catch unreachable;
             state.oam_scan_idx = 0;
+            state.line_cycles = 0;
         },
         .advance_mode_vblank => {
             lcd_stat.mode = .v_blank;
+            state.line_cycles = 0;
             state.uop_fifo.write(&vblank_uops) catch unreachable;
             state.lcd_y = (state.lcd_y + 1) % 154;
             const advance: MicroOp = if(state.lcd_y == 0) .advance_mode_oam_scan else .advance_mode_vblank;

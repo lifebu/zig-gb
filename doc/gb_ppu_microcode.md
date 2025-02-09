@@ -5,9 +5,10 @@
         - On push you shift out the two bits, construct them into colorID, 
         - convert them via the palette and then deconstruct both bits and shift them into the shader buffer.
     - Version 2:
-        - For each pixel we also push the entire u8 of the pallete id to the shader.
+        - For each 2bpp we also push the entire u8 of the pallete id to the shader.
         - The shader has do deconstruct the 2bpp format anyway!
         - 23.040 Bytes of extra data.
+        - With RLE you can get this down to 1.080 Bytes of data in the best case (no objects or windows)
 - Allow for the uOps in DRAW-mode to be composed dynamically (in preperation for the windows and objects).  
     - Base: [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, }
     - fetch_push_bg can add itself to the uops_fifo.
