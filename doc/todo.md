@@ -3,6 +3,7 @@
     => Errors in the emulator do not crash software (logs with errors).
     => You can re-run emulator at crash (dll hot-reload)!
     => You can have a breakpoint for debugger?
+    => The thread itself runs at the exact gb frame-rate (59.7Hz) using sleeps!
 - Use platform to have a set if initialization options for emulator (config menu, etc).
 - Add more debugging tools using imgui.
 - Once we have cgb support, it can just switch out a different cpu-core for the emulator!

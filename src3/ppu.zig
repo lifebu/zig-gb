@@ -109,6 +109,14 @@ const Object = packed struct {
     }
 };
 
+// TODO: Think about what data structure is best for the draw function.
+const BackgroundFifo2bpp = struct {
+    first_bitplane: u8,
+    second_bitplane: u8,
+    pallete_addr: u16,
+    /// Used to incrementally shift out a pixel out of the bitplanes.
+    current_shift: u3 = 0,
+};
 const BackgroundFifoPixel = packed struct(u5) {
     palette_id: u3 = 0,
     color_id: u2 = 0,
@@ -147,6 +155,7 @@ pub const State = struct {
     uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
+    line_cycles: u9 = 0,
     fetcher_tilemap_addr: u16 = 0,
     fetcher_tile_addr: u16 = 0,
     fetcher_data: std.BoundedArray(u8, 2) = std.BoundedArray(u8, 2).init(0) catch unreachable,
@@ -171,7 +180,7 @@ const draw_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .f
                ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, .fetch_push_bg, .fetch_push_bg } ** 19
                ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, .fetch_push_bg, .advance_mode_hblank };
 
-// TODO: The length of this is dynamic!
+// Note: Maximum length for hblank. Penalties make this shorter.
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
@@ -193,8 +202,10 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_mode_hblank => {
             lcd_stat.mode = .h_blank;
-            state.uop_fifo.write(&hblank_uops) catch unreachable;
+            const hblank_len = 455 - state.line_cycles - 1;
+            state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
             state.lcd_y += 1;
+            state.line_cycles = 0;
             const advance: MicroOp = if(state.lcd_y >= 144) .advance_mode_vblank else .advance_mode_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
@@ -219,10 +230,14 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .fetch_push_bg => {
             // TODO: this is no longer in 2bp, which I assumed would be best to be pushed to the shader. A better way to do this?
             // TODO: Maybe we split the data in the fetcher_bg_data into 2bpp color and palette_data? 
-            // TODO: struct of arrays?
+            // TODO: struct of arrays? 
+            // TODO: Can I remove this conditional here?
             if(state.fetcher_data.len > 0) {
                 const second_bitplane: u8 = state.fetcher_data.pop();
                 const first_bitplane: u8 = state.fetcher_data.pop();
+                // TODO: write this into background_fifo
+                const data = BackgroundFifo2bpp{ .first_bitplane = first_bitplane, .second_bitplane = second_bitplane, .pallete_addr = mem_map.bg_palette, .current_shift = 0, };
+                if(data.pallete_addr == 0) {}
                 for(0..state.fetcher_bg_data.len) |bit_idx| {
                     const bit_offset: u3 = 7 - @as(u3, @intCast(bit_idx));
                     const one: u8 = 1;
@@ -234,6 +249,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                     state.fetcher_bg_data[bit_idx] = .{ .color_id = color_id, .palette_id = palette_id };
                 }
             }
+            // TODO: pushing data failed? => write a fetch_push_bg into uops fifo!
             state.background_fifo.write(&state.fetcher_bg_data) catch {};
             tryPushPixel(state, memory);
         },
@@ -267,6 +283,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
     }
 
+    state.line_cycles += 1;
     lcd_stat.toMem(memory);
 }
 

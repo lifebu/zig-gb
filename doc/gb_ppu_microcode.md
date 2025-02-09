@@ -1,3 +1,21 @@
+# ToDo:
+- Don't convert from 2bpp to []colorIds (fetch_push_bg) back to 2bpp (tryPushPixel).
+    - The pixel fifos store: 2 structs. Each struct has two bitplanes and the address of their palette. 
+    - Version 1:
+        - On push you shift out the two bits, construct them into colorID, 
+        - convert them via the palette and then deconstruct both bits and shift them into the shader buffer.
+    - Version 2:
+        - For each pixel we also push the entire u8 of the pallete id to the shader.
+        - The shader has do deconstruct the 2bpp format anyway!
+        - 23.040 Bytes of extra data.
+- Allow for the uOps in DRAW-mode to be composed dynamically (in preperation for the windows and objects).  
+    - Base: [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, }
+    - fetch_push_bg can add itself to the uops_fifo.
+    - How do I add the advance_mode_hblank at the correct location? 
+    - Because of scrolling it might override an arbitrary point in the 6-8 uOps (without penalties!) long pixel-fetcher code.
+        - Everytime we add all 6-8 ups, check how far we are until we will reach 160 lcd_x.
+        - If it is smaller then the next set of steps => override one step with the advance_mode? (sounds hacky!).
+
 # PPU Microcode:
 - Instead of a huge switch-case with sub-functions I can define a microcode for the PPU just like the CPU that does all of the ppu state management and logic implicitly.
 - For repeated operations (like OAMScan), do I define one 80-cycle uOps buffer or do I create looping operations?
