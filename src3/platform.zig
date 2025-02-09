@@ -62,20 +62,26 @@ pub fn init(state: *State) void {
             shaderTypes.shaderRGBA(16,  16,  16,  255),
         },
         .resolution = shaderTypes.Vec2{ 
-            .x = @floatFromInt(def.WINDOW_WIDTH), 
-            .y = @floatFromInt(def.WINDOW_HEIGHT) 
+            .x = @floatFromInt(def.window_width), 
+            .y = @floatFromInt(def.window_height) 
         },
     };
 
     // audio
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = def.NUM_CHANNELS,
-        .sample_rate = def.SAMPLE_RATE,
+        .num_channels = def.num_channels,
+        .sample_rate = def.sample_rate,
     });
 }
 
-pub fn frame(state: *State, color2bpp: [def.NUM_2BPP]u8, _: [def.NUM_GB_SAMPLES]f32) void {
+pub fn deinit() void {
+    sokol.imgui.shutdown();
+    sokol.gfx.shutdown();
+    sokol.audio.shutdown();
+}
+
+pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]f32) void {
     // TODO: To avoid popping we might need to dynamically adjust the number of samples we write.
     //_ = sokol.audio.push(&samples[0], samples.len);
 
@@ -115,12 +121,6 @@ pub fn frame(state: *State, color2bpp: [def.NUM_2BPP]u8, _: [def.NUM_GB_SAMPLES]
     sokol.gfx.commit();
 }
 
-pub fn cleanup() void {
-    sokol.imgui.shutdown();
-    sokol.gfx.shutdown();
-    sokol.audio.shutdown();
-}
-
 pub export fn event(ev: ?*const sokol.app.Event) void {
     if(ev) |e| {
         _ = sokol.imgui.handleEvent(e.*);
@@ -135,14 +135,14 @@ pub export fn event(ev: ?*const sokol.app.Event) void {
 pub fn run(
     init_cb: ?*const fn () callconv(.C) void, 
     frame_cb: ?*const fn () callconv(.C) void,
-    cleanup_cb: ?*const fn () callconv(.C) void) void {
+    deinit_cb: ?*const fn () callconv(.C) void) void {
     sokol.app.run(.{
         .init_cb = init_cb,
         .frame_cb = frame_cb,
-        .cleanup_cb = cleanup_cb,
+        .cleanup_cb = deinit_cb,
         .event_cb = event,
-        .width = def.WINDOW_WIDTH,
-        .height = def.WINDOW_HEIGHT,
+        .width = def.window_width,
+        .height = def.window_height,
         .icon = .{ .sokol_default = true },
         .window_title = "Zig GB Emulator",
         .logger = .{ .func = sokol.log.func },

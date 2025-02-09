@@ -1,27 +1,27 @@
 // graphics
-pub const RESOLUTION_WIDTH = 160;
-pub const RESOLUTION_HEIGHT = 144;
-pub const SCALING = 6;
+pub const resolution_width = 160;
+pub const resolution_height = 144;
+pub const scaling = 6;
 
-pub const WINDOW_WIDTH = RESOLUTION_WIDTH * SCALING;
-pub const WINDOW_HEIGHT = RESOLUTION_HEIGHT * SCALING;
+pub const window_width = resolution_width * scaling;
+pub const window_height = resolution_height * scaling;
 
-pub const TILE_WIDTH = 8;
-pub const RESOLUTION_TILE_WIDTH = RESOLUTION_WIDTH / TILE_WIDTH;
+pub const tile_width = 8;
+pub const resolution_tile_width = resolution_width / tile_width;
 
-pub const BYTE_PER_LINE = 2;
-pub const NUM_2BPP = RESOLUTION_TILE_WIDTH * BYTE_PER_LINE * RESOLUTION_HEIGHT;
+pub const byte_per_line = 2;
+pub const num_2bpp = resolution_tile_width * byte_per_line * resolution_height;
 
 // system
-pub const SYSTEM_FREQ = 4 * 1_024 * 1_024;
-pub const T_CYCLES_IN_60FPS = SYSTEM_FREQ / 60;
+pub const system_freq = 4 * 1_024 * 1_024;
+pub const t_cycles_in_60fps = system_freq / 60;
 
 // audio
 // TODO: When I try to push stereo to sokol, i get super loud garbage data out? 
-pub const NUM_CHANNELS = 1; 
-pub const SAMPLE_RATE = 48_000;
-pub const T_CYCLES_PER_SAMPLE = (SYSTEM_FREQ / SAMPLE_RATE);
-pub const NUM_GB_SAMPLES = (T_CYCLES_IN_60FPS / T_CYCLES_PER_SAMPLE) * NUM_CHANNELS;
+pub const num_channels = 1; 
+pub const sample_rate = 48_000;
+pub const t_cycles_per_sample = (system_freq / sample_rate);
+pub const num_gb_samples = (t_cycles_in_60fps / t_cycles_per_sample) * num_channels;
 
 // memory
-pub const ADDR_SPACE = 0x1_0000;
+pub const addr_space = 0x1_0000;

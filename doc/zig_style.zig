@@ -3,7 +3,7 @@ const namespace_name = @import("dir_name/file_name.zig"); // NameSpace = set of 
 const TypeName = @import("dir_name/TypeName.zig"); // TypeName = top-level fields (@This, struct).
 // snake_case_variable_name
 var global_var: i32 = undefined;
-const CONST_NAME = 42;
+const const_name = 42;
 const primitive_type_alias = f32;
 const string_alias = []u8;
 
