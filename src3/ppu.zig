@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
@@ -17,7 +18,6 @@ const obj_per_line = 10;
 
 const cycles_per_line = 456;
 
-// TODO: Maybe move general ppu constructs into it's own source file?
 const Mode = enum(u2) {
     h_blank,
     v_blank,
@@ -129,8 +129,7 @@ const MicroOp = enum {
     advance_mode_oam_scan,
     advance_mode_vblank,
     clear_fifo,
-    fetch_data_high,
-    fetch_data_low,
+    fetch_data,
     fetch_push_bg,
     fetch_tile,
     inc_lcd_y,
@@ -139,7 +138,6 @@ const MicroOp = enum {
     oam_check,
     push_pixel,
 };
-
 const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
 
 pub const State = struct {
@@ -151,8 +149,7 @@ pub const State = struct {
     lcd_y: u8 = 0, 
     fetcher_tilemap_addr: u16 = 0,
     fetcher_tile_addr: u16 = 0,
-    fetcher_data_low: u8 = 0,
-    fetcher_data_high: u8 = 0,
+    fetcher_data: std.BoundedArray(u8, 2) = std.BoundedArray(u8, 2).init(0) catch unreachable,
     fetcher_bg_data: [def.tile_width]BackgroundFifoPixel = undefined,
     oam_scan_idx: u6 = 0,
     // TODO: What data do we store here, what is easiest for the draw function? a list of indices into OAM? A copy of the object? Pre-digested data?
@@ -170,9 +167,9 @@ const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1)
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
 // TODO: Add override uOps in this buffer to enable window and objects!
 // TODO: Try to dynamically generate the buffer from the parts. The 19 parts are basically the same if you allow fetch_push_bg to reinsert itself at the end.
-const draw_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, } ** 2
-               ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, .fetch_push_bg, .fetch_push_bg } ** 19
-               ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, .fetch_push_bg, .advance_mode_hblank };
+const draw_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, } ** 2
+               ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, .fetch_push_bg, .fetch_push_bg } ** 19
+               ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, .fetch_push_bg, .advance_mode_hblank };
 
 // TODO: The length of this is dynamic!
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
@@ -191,13 +188,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.object_fifo.discard(state.object_fifo.readableLength());
             const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             state.fetcher_tilemap_addr = tile_map_base_addr + tile_map_size_x * @as(u16, state.lcd_y / tile_size_y);
-            std.debug.assert(state.fetcher_tilemap_addr >= tile_map_base_addr and state.fetcher_tilemap_addr <= tile_map_base_addr + tile_map_size_byte);
+            assert(state.fetcher_tilemap_addr >= tile_map_base_addr and state.fetcher_tilemap_addr <= tile_map_base_addr + tile_map_size_byte);
             state.lcd_x = 0;
         },
         .advance_mode_hblank => {
             lcd_stat.mode = .h_blank;
-            state.lcd_y += 1;
             state.uop_fifo.write(&hblank_uops) catch unreachable;
+            state.lcd_y += 1;
             const advance: MicroOp = if(state.lcd_y >= 144) .advance_mode_vblank else .advance_mode_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
@@ -209,24 +206,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_mode_vblank => {
             lcd_stat.mode = .v_blank;
-            state.lcd_y += 1;
             state.uop_fifo.write(&vblank_uops) catch unreachable;
-            // TODO: Really not nice!
-            if(state.lcd_y >= 153) {
-                state.uop_fifo.writeItem(.advance_mode_oam_scan) catch unreachable;
-                state.lcd_y = 0;
-            } else {
-                state.uop_fifo.writeItem(.advance_mode_vblank) catch unreachable;
-            }
+            state.lcd_y = (state.lcd_y + 1) % 154;
+            const advance: MicroOp = if(state.lcd_y == 0) .advance_mode_oam_scan else .advance_mode_vblank;
+            state.uop_fifo.writeItem(advance) catch unreachable;
         },
-        // TODO: Try to combine fetch_data_high and fetch_data_low 
-        .fetch_data_high => {
-            state.fetcher_data_high = memory[state.fetcher_tile_addr];
-            state.fetcher_tile_addr += 1;
-            tryPushPixel(state, memory);
-        },
-        .fetch_data_low => {
-            state.fetcher_data_low = memory[state.fetcher_tile_addr];
+        .fetch_data => {
+            state.fetcher_data.append(memory[state.fetcher_tile_addr]) catch unreachable;
             state.fetcher_tile_addr += 1;
             tryPushPixel(state, memory);
         },
@@ -234,17 +220,20 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             // TODO: this is no longer in 2bp, which I assumed would be best to be pushed to the shader. A better way to do this?
             // TODO: Maybe we split the data in the fetcher_bg_data into 2bpp color and palette_data? 
             // TODO: struct of arrays?
-            for(0..state.fetcher_bg_data.len) |bit_idx| {
-                const bit_offset: u3 = 7 - @as(u3, @intCast(bit_idx));
-                const one: u8 = 1;
-                const mask: u8 = one << bit_offset;
-                const first_bit: u8 = (state.fetcher_data_low & mask) >> bit_offset;
-                const second_bit: u8 = (state.fetcher_data_high & mask) >> bit_offset;
-                const color_id: u2 = @intCast(first_bit + (second_bit << 1)); // LSB first
-                const palette_id: u3 = 0; // Only for objects
-                state.fetcher_bg_data[bit_idx] = .{ .color_id = color_id, .palette_id = palette_id };
+            if(state.fetcher_data.len > 0) {
+                const second_bitplane: u8 = state.fetcher_data.pop();
+                const first_bitplane: u8 = state.fetcher_data.pop();
+                for(0..state.fetcher_bg_data.len) |bit_idx| {
+                    const bit_offset: u3 = 7 - @as(u3, @intCast(bit_idx));
+                    const one: u8 = 1;
+                    const mask: u8 = one << bit_offset;
+                    const first_bit: u8 = (first_bitplane & mask) >> bit_offset;
+                    const second_bit: u8 = (second_bitplane & mask) >> bit_offset;
+                    const color_id: u2 = @intCast(first_bit + (second_bit << 1)); // LSB first
+                    const palette_id: u3 = 0; // Only for objects
+                    state.fetcher_bg_data[bit_idx] = .{ .color_id = color_id, .palette_id = palette_id };
+                }
             }
-            // TODO: If we fail to push we need to try again (dynamic!).
             state.background_fifo.write(&state.fetcher_bg_data) catch {};
             tryPushPixel(state, memory);
         },

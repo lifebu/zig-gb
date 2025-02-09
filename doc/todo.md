@@ -7,6 +7,7 @@
 - Add more debugging tools using imgui.
 - Once we have cgb support, it can just switch out a different cpu-core for the emulator!
 - Add .dll hot-reloading of emulator code.
+- Some of the data that I need to create with the uOps i could do with a memory arena scratch space (like the fetcher_data_low, fetcher_data_high).
 
 # Runtime Library.
 - Test out the sokol: https://github.com/floooh/sokol

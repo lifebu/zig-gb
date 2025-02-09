@@ -81,8 +81,6 @@ CLEAR_FIFO
 PUSH_PIXEL
 FETCH_TILE(tileMapPos):
     - Calculates tile address.
-FETCH_DATA_LOW
-    - Use tile address to get first bitplane
-FETCH_DATA_HIGH
-    - Use tile address to get second bitplane
+FETCH_DATA
+    - Use tile address to get first/second bitplane
 FETCH_PUSH
