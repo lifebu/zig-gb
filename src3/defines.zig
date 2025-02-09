@@ -1,7 +1,7 @@
 // graphics
 pub const resolution_width = 160;
 pub const resolution_height = 144;
-pub const scaling = 6;
+pub const scaling = 4;
 
 pub const window_width = resolution_width * scaling;
 pub const window_height = resolution_height * scaling;
@@ -10,6 +10,8 @@ pub const tile_width = 8;
 pub const resolution_tile_width = resolution_width / tile_width;
 
 pub const byte_per_line = 2;
+pub const resolution_2bpp_width = resolution_tile_width * byte_per_line;
+
 pub const num_2bpp = resolution_tile_width * byte_per_line * resolution_height;
 
 // system

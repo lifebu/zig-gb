@@ -94,11 +94,11 @@ pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]
     });
 
     // Imgui
-    imgui.igSetNextWindowPos(.{ .x = 10, .y = 10 }, imgui.ImGuiCond_Once);
-    imgui.igSetNextWindowSize(.{ .x = 400, .y = 100 }, imgui.ImGuiCond_Once);
-    _ = imgui.igBegin("Hello Dear ImGui!", 0, imgui.ImGuiWindowFlags_None);
-    _ = imgui.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, imgui.ImGuiColorEditFlags_None);
-    imgui.igEnd();
+    // imgui.igSetNextWindowPos(.{ .x = 10, .y = 10 }, imgui.ImGuiCond_Once);pla
+    // imgui.igSetNextWindowSize(.{ .x = 400, .y = 100 }, imgui.ImGuiCond_Once);
+    // _ = imgui.igBegin("Hello Dear ImGui!", 0, imgui.ImGuiWindowFlags_None);
+    // _ = imgui.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, imgui.ImGuiColorEditFlags_None);
+    // imgui.igEnd();
     // Imgui
 
     // graphics

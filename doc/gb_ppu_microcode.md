@@ -66,7 +66,6 @@ DRAW:
 		- PUSH_PIXEL
 		- FETCH_TILE
 		- FETCH_DATA
-        - FETCH_CONSTRUCT
 		- FETCH_PUSH:
 			If it fails, adds itself into queue.
 	- So Pixel fetcher is:
@@ -86,7 +85,4 @@ FETCH_DATA_LOW
     - Use tile address to get first bitplane
 FETCH_DATA_HIGH
     - Use tile address to get second bitplane
-FETCH_CONSTRUCT:
-    - Construct Fifo info from 2bpp data.
-    - This is slightly different for objects and background pixels
 FETCH_PUSH

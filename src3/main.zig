@@ -25,7 +25,7 @@ export fn frame() void {
     for(0..cycles_in_60fps) |_| {
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
-        PPU.cycle(&state.ppu, state.mmu.memory);
+        PPU.cycle(&state.ppu, &state.mmu.memory);
     }
 
     Platform.frame(&state.platform, state.ppu.color2bpp, state.apu.gb_sample_buffer);
