@@ -140,13 +140,13 @@ const MicroOp = enum {
     push_pixel,
 };
 
+const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
+
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
-    // TODO: Try to use std.fifo.LinearFifo?
     // TODO: Have a way to know where a MicroOp came from to debug this! (add a second byte with runtime information and advance pc by two?)
-    uop_buf: [cycles_per_line]MicroOp = [1]MicroOp{ .nop } ** cycles_per_line,
-    uop_pc: u16 = 0,
+    uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
     fetcher_tilemap_addr: u16 = 0,
@@ -163,7 +163,7 @@ pub const State = struct {
 };
 
 pub fn init(state: *State) void {
-    std.mem.copyForwards(MicroOp, state.uop_buf[0..oam_scan_uops.len], &oam_scan_uops);
+    state.uop_fifo.write(&oam_scan_uops) catch unreachable;
 }
 
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
@@ -182,53 +182,42 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     var lcd_stat = LcdStat.fromMem(memory);
     const lcd_control = LcdControl.fromMem(memory);
 
-    const uop: MicroOp = state.uop_buf[state.uop_pc];
-    state.uop_pc += 1;
+    const uop: MicroOp = state.uop_fifo.readItem().?;
     switch(uop) {
         .advance_mode_draw => {
             lcd_stat.mode = .draw;
-            std.debug.assert(draw_uops.len == 172);
-            std.mem.copyForwards(MicroOp, state.uop_buf[0..draw_uops.len], &draw_uops);
+            state.uop_fifo.write(&draw_uops) catch unreachable;
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             state.fetcher_tilemap_addr = tile_map_base_addr + tile_map_size_x * @as(u16, state.lcd_y / tile_size_y);
             std.debug.assert(state.fetcher_tilemap_addr >= tile_map_base_addr and state.fetcher_tilemap_addr <= tile_map_base_addr + tile_map_size_byte);
-            state.uop_pc = 0;
             state.lcd_x = 0;
         },
         .advance_mode_hblank => {
-            state.lcd_y += 1;
             lcd_stat.mode = .h_blank;
-            std.debug.assert(hblank_uops.len == 203);
-            // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
-            std.mem.copyForwards(MicroOp, state.uop_buf[0..hblank_uops.len], &hblank_uops);
-            state.uop_buf[hblank_uops.len] = if(state.lcd_y >= 144) .advance_mode_vblank else .advance_mode_oam_scan;
-            state.uop_pc = 0;
+            state.lcd_y += 1;
+            state.uop_fifo.write(&hblank_uops) catch unreachable;
+            const advance: MicroOp = if(state.lcd_y >= 144) .advance_mode_vblank else .advance_mode_oam_scan;
+            state.uop_fifo.writeItem(advance) catch unreachable;
         },
         .advance_mode_oam_scan => {
             lcd_stat.mode = .oam_scan;
-            // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
-            std.mem.copyForwards(MicroOp, state.uop_buf[0..oam_scan_uops.len], &oam_scan_uops);
-            state.uop_pc = 0;
+            state.uop_fifo.write(&oam_scan_uops) catch unreachable;
             state.oam_line_list.resize(0) catch unreachable;
             state.oam_scan_idx = 0;
-            state.uop_pc = 0;
         },
         .advance_mode_vblank => {
-            state.lcd_y += 1;
             lcd_stat.mode = .v_blank;
-            // TODO: This copying is very unsafe and can easily lead to issues. A fifo-style feels better!
-            std.debug.assert(vblank_uops.len == 455);
-            std.mem.copyForwards(MicroOp, state.uop_buf[0..vblank_uops.len], &vblank_uops);
+            state.lcd_y += 1;
+            state.uop_fifo.write(&vblank_uops) catch unreachable;
             // TODO: Really not nice!
             if(state.lcd_y >= 153) {
-                state.uop_buf[vblank_uops.len] = .advance_mode_oam_scan;
+                state.uop_fifo.writeItem(.advance_mode_oam_scan) catch unreachable;
                 state.lcd_y = 0;
             } else {
-                state.uop_buf[vblank_uops.len] = .advance_mode_vblank;
+                state.uop_fifo.writeItem(.advance_mode_vblank) catch unreachable;
             }
-            state.uop_pc = 0;
         },
         // TODO: Try to combine fetch_data_high and fetch_data_low 
         .fetch_data_high => {

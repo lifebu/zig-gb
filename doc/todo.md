@@ -1,3 +1,13 @@
+# src3:
+- Run emulator itself in thread. Use double-buffer to communicate audio and video data to platform.
+    => Errors in the emulator do not crash software (logs with errors).
+    => You can re-run emulator at crash (dll hot-reload)!
+    => You can have a breakpoint for debugger?
+- Use platform to have a set if initialization options for emulator (config menu, etc).
+- Add more debugging tools using imgui.
+- Once we have cgb support, it can just switch out a different cpu-core for the emulator!
+- Add .dll hot-reloading of emulator code.
+
 # Runtime Library.
 - Test out the sokol: https://github.com/floooh/sokol
 - It has ImGUI, OpenGL, Window Framework, args passing and audio subsystem.
