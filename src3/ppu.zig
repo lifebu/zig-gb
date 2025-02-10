@@ -18,13 +18,6 @@ const obj_per_line = 10;
 
 const cycles_per_line = 456;
 
-const Mode = enum(u2) {
-    h_blank,
-    v_blank,
-    oam_scan,
-    draw,
-};
-
 const LcdControl = packed struct {
     bg_window_enable: bool = false,
     obj_enable: bool = false,
@@ -117,13 +110,14 @@ const BackgroundFifo2bpp = struct {
 };
 const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 });
 
-const ObjectFifoPixel = packed struct(u12) {
+const ObjectFifo2bpp = packed struct(u12) {
+    first_bitplane: u8 = 0, 
+    second_bitplane: u8 = 0, 
+    pallete_addr: u16,
     obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
-    palette_id: u3 = 0,
-    color_id: u2 = 0, 
     bg_prio: u1 = 0,
 };
-const ObjectFiFo = std.fifo.LinearFifo(ObjectFifoPixel, .{ .Static = def.tile_width * 2 });
+const ObjectFiFo = std.fifo.LinearFifo(ObjectFifo2bpp, .{ .Static = 2 });
 
 const MicroOp = enum {
     advance_mode_draw,
