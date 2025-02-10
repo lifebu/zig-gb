@@ -12,6 +12,7 @@ const state = struct {
     var mmu: MMU.State = .{};
     var ppu: PPU.State = .{};
 };
+
 export fn init() void {
     Platform.init(&state.platform);
     APU.init(&state.apu);

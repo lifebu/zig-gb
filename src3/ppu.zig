@@ -110,7 +110,7 @@ const BackgroundFifo2bpp = struct {
 };
 const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 });
 
-const ObjectFifo2bpp = packed struct(u12) {
+const ObjectFifo2bpp = struct {
     first_bitplane: u8 = 0, 
     second_bitplane: u8 = 0, 
     pallete_addr: u16,
@@ -162,13 +162,7 @@ pub fn init(state: *State) void {
 
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
-// TODO: Add override uOps in this buffer to enable window and objects!
-// TODO: Try to dynamically generate the buffer from the parts. The 19 parts are basically the same if you allow fetch_push_bg to reinsert itself at the end.
-const draw_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, } ** 2
-               ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, .fetch_push_bg, .fetch_push_bg } ** 19
-               ++ [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, .fetch_push_bg, .advance_mode_hblank };
-
-// Note: Maximum length for hblank. Penalties make this shorter.
+const draw_tile_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, };
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
@@ -180,7 +174,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     switch(uop) {
         .advance_mode_draw => {
             lcd_stat.mode = .draw;
-            state.uop_fifo.write(&draw_uops) catch unreachable;
+            state.uop_fifo.write(&draw_tile_uops) catch unreachable;
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -228,8 +222,25 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                     .used_pixels = 0,
                 };
             }
-            // TODO: pushing data failed? => write a fetch_push_bg into uops fifo!
-            state.background_fifo.writeItem(state.fetcher_bg_data) catch {};
+
+            // TODO: Consider generating the entire uops for this line once when we advance into draw-mode.
+            // This works, because WY, ObjX and ObjY are only checked once at the start of a line.
+            // WX is checked multiple times in a scanline. But it is not required to be 100% accurate.
+            const does_fit: bool = state.background_fifo.writableLength() > 0;
+            if(does_fit) {
+                state.background_fifo.writeItem(state.fetcher_bg_data) catch unreachable;
+                state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+            } else {
+                state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
+            }
+            
+            const cycles_remaining = def.resolution_width - state.lcd_x - 1;
+            if(cycles_remaining <= state.uop_fifo.readableLength()) {
+                // TODO: This is very bad and hacky!
+                const write_idx = (state.uop_fifo.head + cycles_remaining) % state.uop_fifo.buf.len;
+                state.uop_fifo.buf[write_idx] = .advance_mode_hblank;
+            }
+
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
@@ -266,14 +277,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     lcd_stat.toMem(memory);
 }
 
-// TODO: Can we have an easier way of reinterpreting the u8 as an array of u2?
-// TODO: Find out why color_id0 is LSB?
 fn getPalette(paletteByte: u8) [4]u2 {
     // https://gbdev.io/pandocs/Palettes.html
-    const color_id3: u2 = @intCast((paletteByte & (3 << 6)) >> 6);
-    const color_id2: u2 = @intCast((paletteByte & (3 << 4)) >> 4);
-    const color_id1: u2 = @intCast((paletteByte & (3 << 2)) >> 2);
-    const color_id0: u2 = @intCast((paletteByte & (3 << 0)) >> 0);
+    const color_id3: u2 = @intCast((paletteByte & (0b11 << 6)) >> 6);
+    const color_id2: u2 = @intCast((paletteByte & (0b11 << 4)) >> 4);
+    const color_id1: u2 = @intCast((paletteByte & (0b11 << 2)) >> 2);
+    const color_id0: u2 = @intCast((paletteByte & (0b11 << 0)) >> 0);
     return [4]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
