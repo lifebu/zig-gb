@@ -109,19 +109,13 @@ const Object = packed struct {
     }
 };
 
-// TODO: Think about what data structure is best for the draw function.
 const BackgroundFifo2bpp = struct {
     first_bitplane: u8,
     second_bitplane: u8,
     pallete_addr: u16,
-    /// Used to incrementally shift out a pixel out of the bitplanes.
-    current_shift: u3 = 0,
+    used_pixels: u4 = 0,
 };
-const BackgroundFifoPixel = packed struct(u5) {
-    palette_id: u3 = 0,
-    color_id: u2 = 0,
-};
-const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifoPixel, .{ .Static = def.tile_width * 2 });
+const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 });
 
 const ObjectFifoPixel = packed struct(u12) {
     obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
@@ -159,7 +153,7 @@ pub const State = struct {
     fetcher_tilemap_addr: u16 = 0,
     fetcher_tile_addr: u16 = 0,
     fetcher_data: std.BoundedArray(u8, 2) = std.BoundedArray(u8, 2).init(0) catch unreachable,
-    fetcher_bg_data: [def.tile_width]BackgroundFifoPixel = undefined,
+    fetcher_bg_data: BackgroundFifo2bpp = undefined,
     oam_scan_idx: u6 = 0,
     // TODO: What data do we store here, what is easiest for the draw function? a list of indices into OAM? A copy of the object? Pre-digested data?
     // https://www.reddit.com/r/EmuDev/comments/1bpxuwp/gameboy_ppu_mode_2_oam_scan/ => X-Pos (8-bits), Tile-Row 0-15 (4 bits), sprite-num 0-39 (6 bits)
@@ -229,29 +223,19 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_push_bg => {
-            // TODO: this is no longer in 2bp, which I assumed would be best to be pushed to the shader. A better way to do this?
-            // TODO: Maybe we split the data in the fetcher_bg_data into 2bpp color and palette_data? 
-            // TODO: struct of arrays? 
             // TODO: Can I remove this conditional here?
             if(state.fetcher_data.len > 0) {
                 const second_bitplane: u8 = state.fetcher_data.pop();
                 const first_bitplane: u8 = state.fetcher_data.pop();
-                // TODO: write this into background_fifo
-                const data = BackgroundFifo2bpp{ .first_bitplane = first_bitplane, .second_bitplane = second_bitplane, .pallete_addr = mem_map.bg_palette, .current_shift = 0, };
-                if(data.pallete_addr == 0) {}
-                for(0..state.fetcher_bg_data.len) |bit_idx| {
-                    const bit_offset: u3 = 7 - @as(u3, @intCast(bit_idx));
-                    const one: u8 = 1;
-                    const mask: u8 = one << bit_offset;
-                    const first_bit: u8 = (first_bitplane & mask) >> bit_offset;
-                    const second_bit: u8 = (second_bitplane & mask) >> bit_offset;
-                    const color_id: u2 = @intCast(first_bit + (second_bit << 1)); // LSB first
-                    const palette_id: u3 = 0; // Only for objects
-                    state.fetcher_bg_data[bit_idx] = .{ .color_id = color_id, .palette_id = palette_id };
-                }
+                state.fetcher_bg_data = .{ 
+                    .first_bitplane = first_bitplane, 
+                    .second_bitplane = second_bitplane, 
+                    .pallete_addr = mem_map.bg_palette, 
+                    .used_pixels = 0,
+                };
             }
             // TODO: pushing data failed? => write a fetch_push_bg into uops fifo!
-            state.background_fifo.write(&state.fetcher_bg_data) catch {};
+            state.background_fifo.writeItem(state.fetcher_bg_data) catch {};
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
@@ -299,32 +283,41 @@ fn getPalette(paletteByte: u8) [4]u2 {
     return [4]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
-// TODO: unpacking 2bpp earlier to pack it here again is very bad!
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
+    var pixel_count: u5 = 0;
+    for(0..state.background_fifo.readableLength()) |i| {
+        const data = state.background_fifo.peekItem(i); 
+        pixel_count += 8 - @as(u5, data.used_pixels);
+    }
     // pixel mixing requires at least 8 pixels.
-    if(state.background_fifo.readableLength() <= def.tile_width) {
+    if(pixel_count <= 8) {
         return;
     }
-
-    const pixel: BackgroundFifoPixel = state.background_fifo.readItem().?;
-    const bg_palette = getPalette(memory[mem_map.bg_palette]);
-    const color_id = bg_palette[pixel.color_id];
-    const first_color_bit: u8 = color_id & 0b01;
-    const second_color_bit: u8 = (color_id & 0b10) >> 1;
-
-    const tile_pixel_x = state.lcd_x % 8;
-    // TODO: This breaks when we introduce scrolling!
-    const shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
+    
+    const pixel2bpp: *BackgroundFifo2bpp = &state.background_fifo.buf[state.background_fifo.head];
+    pixel2bpp.used_pixels += 1;
+    pixel2bpp.first_bitplane, const first_color_bit = @shlWithOverflow(pixel2bpp.first_bitplane, 1);
+    pixel2bpp.second_bitplane, const second_color_bit = @shlWithOverflow(pixel2bpp.second_bitplane, 1);
+    const color_id: u2 = @as(u2, first_color_bit) + (@as(u2, second_color_bit) << 1); // LSB first
+    
+    const palette = getPalette(memory[pixel2bpp.pallete_addr]);
+    const hw_color_id: u2 = palette[color_id];
+    const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
+    const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);
 
     const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
+    const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
+    const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
 
-    var first_bitplane = state.color2bpp[bitplane_idx];
-    var second_bitplane = state.color2bpp[bitplane_idx + 1];
-    first_bitplane |= first_color_bit << shift;
-    second_bitplane |= second_color_bit << shift;
+    // TODO: This breaks when we introduce scrolling!
+    const tile_pixel_x = state.lcd_x % 8;
+    const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
+    first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
+    second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
 
-    state.color2bpp[bitplane_idx] = first_bitplane;
-    state.color2bpp[bitplane_idx + 1] = second_bitplane;
-
+    if(pixel2bpp.used_pixels > 7) {
+        // Pop it if there is now more pixel data to get!
+        _ = state.background_fifo.readItem();
+    }
     state.lcd_x += 1;
 }
