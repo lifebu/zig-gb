@@ -166,6 +166,7 @@ fn genMicroCodeDrawAndHBlank(state: *State) void {
 
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
+    fifo_pixel_count: u8 = 0,
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
     // TODO: Have a way to know where a MicroOp came from to debug this! (add a second byte with runtime information and advance pc by two?)
     uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
@@ -198,6 +199,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             genMicroCodeDrawAndHBlank(state);
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
+            state.fifo_pixel_count = 0;
             const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             state.fetcher_tilemap_addr = tile_map_base_addr + tile_map_size_x * @as(u16, state.lcd_y / tile_size_y);
             assert(state.fetcher_tilemap_addr >= tile_map_base_addr and state.fetcher_tilemap_addr <= tile_map_base_addr + tile_map_size_byte);
@@ -234,7 +236,10 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_push_bg => {
+            const length_before: u8 = @intCast(state.background_fifo.readableLength());
             state.background_fifo.writeItem(state.fetcher_bg_data) catch {};
+            const length_after: u8 = @intCast(state.background_fifo.readableLength());
+            state.fifo_pixel_count += (length_after - length_before) * tile_size_x; 
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
@@ -281,14 +286,8 @@ fn getPalette(paletteByte: u8) [4]u2 {
 }
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
-    // TODO: consider just having this value stored instead of calculating it each time in a strange way!
-    var pixel_count: u5 = 0;
-    for(0..state.background_fifo.readableLength()) |i| {
-        const data = state.background_fifo.peekItem(i); 
-        pixel_count += 8 - @as(u5, data.used_pixels);
-    }
     // pixel mixing requires at least 8 pixels.
-    if(pixel_count <= 8) {
+    if(state.fifo_pixel_count <= 8) {
         return;
     }
     
@@ -318,4 +317,5 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
         _ = state.background_fifo.readItem();
     }
     state.lcd_x += 1;
+    state.fifo_pixel_count -= 1;
 }
