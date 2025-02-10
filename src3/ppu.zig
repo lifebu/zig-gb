@@ -125,7 +125,8 @@ const MicroOp = enum {
     advance_mode_oam_scan,
     advance_mode_vblank,
     clear_fifo,
-    fetch_data,
+    fetch_data_low,
+    fetch_data_high,
     fetch_push_bg,
     fetch_tile,
     inc_lcd_y,
@@ -135,6 +136,33 @@ const MicroOp = enum {
     push_pixel,
 };
 const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
+
+const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
+                   ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
+const draw_tile_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
+const hblank_uops = [_]MicroOp{ .nop } ** 203;
+const vblank_uops = [_]MicroOp{ .nop } ** 455;
+
+/// Generates all uops needed for the draw mode and hblank mode of the current line.
+fn genMicroCodeDrawAndHBlank(state: *State) void {
+    // TODO: Add support for objects and window!
+    // draw
+    for(0..2) |_| {
+        state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+    }
+    for(0..19) |_| {
+        state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+        state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .fetch_push_bg }) catch unreachable;
+    }
+    state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+    state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .advance_mode_hblank }) catch unreachable;
+
+    // hblank
+    const hblank_len = 455 - 80 - state.uop_fifo.readableLength();
+    state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
+    const advance: MicroOp = if(state.lcd_y >= 143) .advance_mode_vblank else .advance_mode_oam_scan;
+    state.uop_fifo.writeItem(advance) catch unreachable;
+}
 
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
@@ -146,7 +174,6 @@ pub const State = struct {
     line_cycles: u9 = 0,
     fetcher_tilemap_addr: u16 = 0,
     fetcher_tile_addr: u16 = 0,
-    fetcher_data: std.BoundedArray(u8, 2) = std.BoundedArray(u8, 2).init(0) catch unreachable,
     fetcher_bg_data: BackgroundFifo2bpp = undefined,
     oam_scan_idx: u6 = 0,
     // TODO: What data do we store here, what is easiest for the draw function? a list of indices into OAM? A copy of the object? Pre-digested data?
@@ -160,12 +187,6 @@ pub fn init(state: *State) void {
     state.uop_fifo.write(&oam_scan_uops) catch unreachable;
 }
 
-const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
-                   ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
-const draw_tile_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, };
-const hblank_uops = [_]MicroOp{ .nop } ** 203;
-const vblank_uops = [_]MicroOp{ .nop } ** 455;
-
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     var lcd_stat = LcdStat.fromMem(memory);
     const lcd_control = LcdControl.fromMem(memory);
@@ -174,7 +195,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     switch(uop) {
         .advance_mode_draw => {
             lcd_stat.mode = .draw;
-            state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+            genMicroCodeDrawAndHBlank(state);
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -184,11 +205,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_mode_hblank => {
             lcd_stat.mode = .h_blank;
-            const hblank_len = 455 - state.line_cycles - 1;
-            state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
             state.lcd_y += 1;
-            const advance: MicroOp = if(state.lcd_y >= 144) .advance_mode_vblank else .advance_mode_oam_scan;
-            state.uop_fifo.writeItem(advance) catch unreachable;
         },
         .advance_mode_oam_scan => {
             lcd_stat.mode = .oam_scan;
@@ -205,42 +222,19 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const advance: MicroOp = if(state.lcd_y == 0) .advance_mode_oam_scan else .advance_mode_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
-        .fetch_data => {
-            state.fetcher_data.append(memory[state.fetcher_tile_addr]) catch unreachable;
+        .fetch_data_low => {
+            state.fetcher_bg_data.first_bitplane = memory[state.fetcher_tile_addr];
             state.fetcher_tile_addr += 1;
             tryPushPixel(state, memory);
         },
+        .fetch_data_high => {
+            state.fetcher_bg_data.second_bitplane = memory[state.fetcher_tile_addr];
+            state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
+            state.fetcher_bg_data.used_pixels = 0;
+            tryPushPixel(state, memory);
+        },
         .fetch_push_bg => {
-            // TODO: Can I remove this conditional here?
-            if(state.fetcher_data.len > 0) {
-                const second_bitplane: u8 = state.fetcher_data.pop();
-                const first_bitplane: u8 = state.fetcher_data.pop();
-                state.fetcher_bg_data = .{ 
-                    .first_bitplane = first_bitplane, 
-                    .second_bitplane = second_bitplane, 
-                    .pallete_addr = mem_map.bg_palette, 
-                    .used_pixels = 0,
-                };
-            }
-
-            // TODO: Consider generating the entire uops for this line once when we advance into draw-mode.
-            // This works, because WY, ObjX and ObjY are only checked once at the start of a line.
-            // WX is checked multiple times in a scanline. But it is not required to be 100% accurate.
-            const does_fit: bool = state.background_fifo.writableLength() > 0;
-            if(does_fit) {
-                state.background_fifo.writeItem(state.fetcher_bg_data) catch unreachable;
-                state.uop_fifo.write(&draw_tile_uops) catch unreachable;
-            } else {
-                state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
-            }
-            
-            const cycles_remaining = def.resolution_width - state.lcd_x - 1;
-            if(cycles_remaining <= state.uop_fifo.readableLength()) {
-                // TODO: This is very bad and hacky!
-                const write_idx = (state.uop_fifo.head + cycles_remaining) % state.uop_fifo.buf.len;
-                state.uop_fifo.buf[write_idx] = .advance_mode_hblank;
-            }
-
+            state.background_fifo.writeItem(state.fetcher_bg_data) catch {};
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
@@ -287,6 +281,7 @@ fn getPalette(paletteByte: u8) [4]u2 {
 }
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
+    // TODO: consider just having this value stored instead of calculating it each time in a strange way!
     var pixel_count: u5 = 0;
     for(0..state.background_fifo.readableLength()) |i| {
         const data = state.background_fifo.peekItem(i); 

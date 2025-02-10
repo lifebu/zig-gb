@@ -1,5 +1,8 @@
 # ToDo:
 - Allow for the uOps in DRAW-mode to be composed dynamically (in preperation for the windows and objects).  
+    - Solution:
+        - Generate the code for the entire draw+hblank in the scanline once.
+        - This makes it easier, but it is slightly inaccurate, if a game disables the window mid scanline, or changes WX mid scanline!.
     - Base: [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data, .nop_draw, .fetch_data, .fetch_push_bg, }
     - fetch_push_bg can add itself to the uops_fifo.
     - How do I add the advance_mode_hblank at the correct location? 
