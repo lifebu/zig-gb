@@ -144,8 +144,9 @@ const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
 /// Generates all uops needed for the draw mode and hblank mode of the current line.
-fn genMicroCodeDrawAndHBlank(state: *State) void {
+fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
     // TODO: Add support for objects and window!
+    // TODO: I need to rethink how to generate this code better in a dynamic way.
     // draw
     for(0..2) |_| {
         state.uop_fifo.write(&draw_tile_uops) catch unreachable;
@@ -155,7 +156,13 @@ fn genMicroCodeDrawAndHBlank(state: *State) void {
         state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .fetch_push_bg }) catch unreachable;
     }
     state.uop_fifo.write(&draw_tile_uops) catch unreachable;
-    state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .advance_mode_hblank }) catch unreachable;
+    state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg }) catch unreachable;
+    // TODO: pretty hacky!
+    const initial_shift_uops = [_]MicroOp{ .fetch_push_bg } ++ draw_tile_uops ++ [_]MicroOp{ .fetch_push_bg, .fetch_push_bg };
+    for(0..line_initial_shift) |i| {
+        state.uop_fifo.writeItem(initial_shift_uops[i]) catch unreachable;
+    }
+    state.uop_fifo.write(&[_]MicroOp{ .advance_mode_hblank }) catch unreachable;
 
     // hblank
     const hblank_len = 455 - 80 - state.uop_fifo.readableLength();
@@ -172,6 +179,7 @@ pub const State = struct {
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
     line_cycles: u9 = 0,
+    line_initial_shift: u3 = 0,
     fetcher_tilemap_addr: u16 = 0,
     fetcher_tile_addr: u16 = 0,
     fetcher_bg_data: BackgroundFifo2bpp = undefined,
@@ -195,13 +203,16 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     switch(uop) {
         .advance_mode_draw => {
             lcd_stat.mode = .draw;
-            genMicroCodeDrawAndHBlank(state);
+            const scroll_x: u8 = memory[mem_map.scroll_x];
+            state.line_initial_shift = @intCast(scroll_x % 8);
+            genMicroCodeDrawAndHBlank(state, state.line_initial_shift);
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.fifo_pixel_count = 0;
             state.lcd_x = 0;
         },
         .advance_mode_hblank => {
+            assert(state.lcd_x == 160); // Must reach the end of the screen before entering hblank
             lcd_stat.mode = .h_blank;
             state.lcd_y += 1;
         },
@@ -304,27 +315,33 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     pixel2bpp.used_pixels += 1;
     pixel2bpp.first_bitplane, const first_color_bit = @shlWithOverflow(pixel2bpp.first_bitplane, 1);
     pixel2bpp.second_bitplane, const second_color_bit = @shlWithOverflow(pixel2bpp.second_bitplane, 1);
-    const color_id: u2 = @as(u2, first_color_bit) + (@as(u2, second_color_bit) << 1); // LSB first
-    
-    const palette = getPalette(memory[pixel2bpp.pallete_addr]);
-    const hw_color_id: u2 = palette[color_id];
-    const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
-    const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);
+    // TODO: Maybe we can make this behaviour clearer if we had discard pixel function that is also microcoded?
+    if(state.line_initial_shift > 0) {
+        state.line_initial_shift -= 1;
+    } else {
+        const color_id: u2 = @as(u2, first_color_bit) + (@as(u2, second_color_bit) << 1); // LSB first
 
-    const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
-    const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
-    const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
+        const palette = getPalette(memory[pixel2bpp.pallete_addr]);
+        const hw_color_id: u2 = palette[color_id];
+        const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
+        const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);
 
-    // TODO: This breaks when we introduce scrolling!
-    const tile_pixel_x = state.lcd_x % 8;
-    const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
-    first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
-    second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
+        const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
+        const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
+        const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
+
+        // TODO: This breaks when we introduce scrolling!
+        const tile_pixel_x = state.lcd_x % 8;
+        const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
+        first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
+        second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
+
+        state.lcd_x += 1;
+        state.fifo_pixel_count -= 1;
+    }
 
     if(pixel2bpp.used_pixels > 7) {
         // Pop it if there is now more pixel data to get!
         _ = state.background_fifo.readItem();
     }
-    state.lcd_x += 1;
-    state.fifo_pixel_count -= 1;
 }
