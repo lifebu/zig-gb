@@ -1,4 +1,12 @@
 # ToDo:
+- Window drawing:
+    - This can only happen when we still have 8 pixels in the fifo.
+    - This would be the point where the pixel fetcher would be able to put it's data into the buffer.
+    - We then reset the pixel fetcher and do the normal 6-dot pixel fetching for the window (pixel pushing is delayed).
+    - I think this must be the reason why you subtract 7 from WX.
+    - uOps:
+        - fetch_tile_window
+
 - Allow for the uOps in DRAW-mode to be composed dynamically (in preperation for the windows and objects).  
     - Solution:
         - Generate the code for the entire draw+hblank in the scanline once.

@@ -128,7 +128,8 @@ const MicroOp = enum {
     fetch_data_low,
     fetch_data_high,
     fetch_push_bg,
-    fetch_tile,
+    fetch_tile_bg,
+    fetch_tile_window,
     inc_lcd_y,
     nop,
     nop_draw,
@@ -139,7 +140,7 @@ const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line })
 
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
-const draw_tile_uops = [_]MicroOp{ .fetch_tile, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
+const draw_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
@@ -238,7 +239,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_data_high => {
             state.fetcher_bg_data.second_bitplane = memory[state.fetcher_tile_addr];
-            state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
             state.fetcher_bg_data.used_pixels = 0;
             tryPushPixel(state, memory);
         },
@@ -249,15 +249,27 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fifo_pixel_count += (length_after - length_before) * tile_size_x; 
             tryPushPixel(state, memory);
         },
-        .fetch_tile => {
-            state.fetcher_tilemap_addr = getTileMapAddr(lcd_control, state, memory);
+        .fetch_tile_bg => {
+            const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
+            const scroll_x: u8 = memory[mem_map.scroll_x];
+            const scroll_y: u8 = memory[mem_map.scroll_y];
+            state.fetcher_tilemap_addr = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
+
             const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
             const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
             const tile_value: u16 = memory[state.fetcher_tilemap_addr];
             const tile_addr_offset: u16 = if(signed_mode) (tile_value + 128) % 256 else tile_value;
             const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
             state.fetcher_tile_addr = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
+            state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
             tryPushPixel(state, memory);
+        },
+        .fetch_tile_window => {
+            const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
+            const win_pos_x: u8 = memory[mem_map.window_x] - 7;
+            const win_pos_y: u8 = memory[mem_map.window_y];
+            state.fetcher_tilemap_addr = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
+
         },
         .nop => {},
         .nop_draw => {
@@ -282,12 +294,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     lcd_stat.toMem(memory);
 }
 
-fn getTileMapAddr(lcd_control: LcdControl, state: *State, memory: *[def.addr_space]u8) u16 {
-    const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
-    const scroll_x: u8 = memory[mem_map.scroll_x];
-    const scroll_y: u8 = memory[mem_map.scroll_y];
-    const pixel_x: u16 = @as(u16, state.lcd_x) + scroll_x + state.fifo_pixel_count; 
-    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y;
+fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
+    const pixel_x: u16 = @as(u16, state.lcd_x) + pixel_offset_x  + state.fifo_pixel_count; 
+    const pixel_y: u16 = @as(u16, state.lcd_y) + pixel_offset_y;
 
     const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
     const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
