@@ -168,7 +168,6 @@ pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     fifo_pixel_count: u8 = 0,
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
-    // TODO: Have a way to know where a MicroOp came from to debug this! (add a second byte with runtime information and advance pc by two?)
     uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
@@ -200,9 +199,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.fifo_pixel_count = 0;
-            const tile_map_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
-            state.fetcher_tilemap_addr = tile_map_base_addr + tile_map_size_x * @as(u16, state.lcd_y / tile_size_y);
-            assert(state.fetcher_tilemap_addr >= tile_map_base_addr and state.fetcher_tilemap_addr <= tile_map_base_addr + tile_map_size_byte);
             state.lcd_x = 0;
         },
         .advance_mode_hblank => {
@@ -243,14 +239,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_tile => {
+            state.fetcher_tilemap_addr = getTileMapAddr(lcd_control, state, memory);
             const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
             const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
             const tile_value: u16 = memory[state.fetcher_tilemap_addr];
             const tile_addr_offset: u16 = if(signed_mode) (tile_value + 128) % 256 else tile_value;
-
             const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
             state.fetcher_tile_addr = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
-            state.fetcher_tilemap_addr += 1;
             tryPushPixel(state, memory);
         },
         .nop => {},
@@ -275,6 +270,20 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     state.line_cycles += 1;
     lcd_stat.toMem(memory);
 }
+
+fn getTileMapAddr(lcd_control: LcdControl, state: *State, memory: *[def.addr_space]u8) u16 {
+    const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
+    const scroll_x: u8 = memory[mem_map.scroll_x];
+    const scroll_y: u8 = memory[mem_map.scroll_y];
+    const pixel_x: u16 = @as(u16, state.lcd_x) + scroll_x + state.fifo_pixel_count; 
+    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y;
+
+    const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
+    const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
+    assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
+    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
+    return tilemap_addr;
+} 
 
 fn getPalette(paletteByte: u8) [4]u2 {
     // https://gbdev.io/pandocs/Palettes.html
