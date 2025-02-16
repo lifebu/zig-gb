@@ -108,18 +108,33 @@ const BackgroundFifo2bpp = struct {
     first_bitplane: u8,
     second_bitplane: u8,
     pallete_addr: u16,
-    used_pixels: u4 = 0,
+    used_pixels: u4,
 };
 const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 });
 
 const ObjectFifo2bpp = struct {
-    first_bitplane: u8 = 0, 
-    second_bitplane: u8 = 0, 
+    first_bitplane: u8, 
+    second_bitplane: u8, 
     pallete_addr: u16,
-    obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
-    bg_prio: u1 = 0,
+    used_pixels: u4,
+
+    obj_prio: u6, // CGB: OAM index, DMG: Unused
+    // TODO: use the enum from the object or u1?
+    bg_prio: u1,
 };
 const ObjectFiFo = std.fifo.LinearFifo(ObjectFifo2bpp, .{ .Static = 2 });
+
+const ObjectLineEntry = struct {
+    // TODO: actuall u8, but we can have negative screen_pos for partially visible objects because they also count to the object limit!
+    screen_pos_x: i9, // to compose uOps.
+    tile_row: u4, // single_height: [0, 7], double_height: [0, 15]
+    tile_index: u8,
+    palette_addr: u16,
+    obj_prio: u6, // CGB: OAM index, DMG: Unused
+    // TODO: use the enum from the object or u1?
+    bg_prio: u1,
+};
+const ObjectLineList = std.BoundedArray(ObjectLineEntry, 10);
 
 const MicroOp = enum {
     advance_mode_draw,
@@ -130,7 +145,9 @@ const MicroOp = enum {
     fetch_data_low,
     fetch_data_high,
     fetch_push_bg,
+    fetch_push_obj,
     fetch_tile_bg,
+    fetch_tile_obj,
     fetch_tile_window,
     inc_lcd_y,
     nop,
@@ -179,20 +196,17 @@ fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     fifo_pixel_count: u8 = 0,
+    fifo_is_suspended: bool = false,
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
     uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
     line_cycles: u9 = 0,
     line_initial_shift: u3 = 0,
-    fetcher_tilemap_addr: u16 = 0,
     fetcher_tile_addr: u16 = 0,
-    fetcher_bg_data: BackgroundFifo2bpp = undefined,
+    fetcher_data: ObjectFifo2bpp = undefined,
     oam_scan_idx: u6 = 0,
-    // TODO: What data do we store here, what is easiest for the draw function? a list of indices into OAM? A copy of the object? Pre-digested data?
-    // https://www.reddit.com/r/EmuDev/comments/1bpxuwp/gameboy_ppu_mode_2_oam_scan/ => X-Pos (8-bits) (to compose uOps), Tile-Row 0-15 (which object row to draw) (4 bits), tile_index 0-255 (8 bits)
-    // I can save the tile_index!
-    oam_line_list: std.BoundedArray(u6, 10) = std.BoundedArray(u6, 10).init(0) catch unreachable,
+    oam_line_list: ObjectLineList = ObjectLineList.init(0) catch unreachable,
 
     color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** 40 ** 144,
 };
@@ -238,50 +252,83 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
         .fetch_data_low => {
-            state.fetcher_bg_data.first_bitplane = memory[state.fetcher_tile_addr];
+            state.fetcher_data.first_bitplane = memory[state.fetcher_tile_addr];
             state.fetcher_tile_addr += 1;
             tryPushPixel(state, memory);
         },
         .fetch_data_high => {
-            state.fetcher_bg_data.second_bitplane = memory[state.fetcher_tile_addr];
-            state.fetcher_bg_data.used_pixels = 0;
+            state.fetcher_data.second_bitplane = memory[state.fetcher_tile_addr];
+            state.fetcher_data.used_pixels = 0;
             tryPushPixel(state, memory);
         },
         .fetch_push_bg => {
             const length_before: u8 = @intCast(state.background_fifo.readableLength());
-            state.background_fifo.writeItem(state.fetcher_bg_data) catch {};
+            state.background_fifo.writeItem(.{ // We use an ObjectFifo2bpp Type which is a super-set of BackgroundFifo2bpp.
+                .first_bitplane = state.fetcher_data.first_bitplane,
+                .second_bitplane = state.fetcher_data.second_bitplane,
+                .pallete_addr = state.fetcher_data.pallete_addr, 
+                .used_pixels = state.fetcher_data.used_pixels,
+            }) catch {};
             const length_after: u8 = @intCast(state.background_fifo.readableLength());
             state.fifo_pixel_count += (length_after - length_before) * tile_size_x; 
+            tryPushPixel(state, memory);
+        },
+        .fetch_push_obj => {
+            // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
+            state.object_fifo.writeItem(state.fetcher_data) catch {};
+            state.fifo_is_suspended = false;
             tryPushPixel(state, memory);
         },
         .fetch_tile_bg => {
             const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
-            state.fetcher_tilemap_addr = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
-            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control);
-            state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
+            const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
+            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
+            state.fetcher_data.pallete_addr = mem_map.bg_palette;
             tryPushPixel(state, memory);
+        },
+        .fetch_tile_obj => {
+            const object: ObjectLineEntry = state.oam_line_list.pop();
+            const obj_tile_base_addr: u16 = mem_map.first_tile_address;
+            // In double height mode you are allowed to use either an even tile_index or the next tile_index and draw the same object.
+            const obj_tile_index = if(lcd_control.obj_size == .double_height) object.tile_index - (object.tile_index % 2) else object.tile_index;
+            const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
+            const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
+            state.fetcher_tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
+            state.fetcher_data.pallete_addr = object.palette_addr;
+            state.fetcher_data.bg_prio = object.bg_prio;
+            state.fetcher_data.obj_prio = object.obj_prio;
+            state.fifo_is_suspended = true;
         },
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             const win_pos_x: u8 = memory[mem_map.window_x] - 7;
             const win_pos_y: u8 = memory[mem_map.window_y];
-            state.fetcher_tilemap_addr = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
-            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control);
-            state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
+            const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
+            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
+            state.fetcher_data.pallete_addr = mem_map.bg_palette;
             tryPushPixel(state, memory);
         },
-        .nop => {},
+        .nop => {
+        },
         .nop_draw => {
             tryPushPixel(state, memory);
         },
         .oam_check => {
             const object = Object.fromOAM(memory, state.oam_scan_idx);
             const object_height: u8 = if(lcd_control.obj_size == .double_height) tile_size_y * 2 else tile_size_y;
-            if(state.lcd_y + 16 >= object.y_position and state.lcd_y + 16 < object.y_position + object_height) {
+            const obj_pixel_y: i16 = @as(i16, state.lcd_y) + 16 - @as(i16, object.y_position);
+            if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
-                state.oam_line_list.append(state.oam_scan_idx) catch {};
+                state.oam_line_list.append(.{ 
+                    .screen_pos_x = @as(i9, object.x_position) - 8, 
+                    .tile_row = @intCast(obj_pixel_y),
+                    .tile_index = object.tile_index, 
+                    .palette_addr = if(object.flags.dmg_palette == .obp0) mem_map.obj_palette_0 else mem_map.obj_palette_1,
+                    .obj_prio = state.oam_scan_idx, // CGB: OAM index, DMG: Unused
+                    .bg_prio = @intFromEnum(object.flags.priority),
+                }) catch {};
             }
             state.oam_scan_idx += 1;
         },
@@ -306,11 +353,11 @@ fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pix
     return tilemap_addr;
 } 
 
-fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdControl) u16 {
+fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdControl, tilemap_addr: u16) u16 {
     const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
     const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
-    const tile_value: u16 = memory[state.fetcher_tilemap_addr];
-    const tile_addr_offset: u16 = if(signed_mode) (tile_value + 128) % 256 else tile_value;
+    const tile_index: u16 = memory[tilemap_addr];
+    const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
     const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
     const tile_addr: u16 = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
     return tile_addr;
@@ -327,7 +374,7 @@ fn getPalette(paletteByte: u8) [4]u2 {
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     // pixel mixing requires at least 8 pixels.
-    if(state.fifo_pixel_count <= 8) {
+    if(state.fifo_pixel_count <= 8 or state.fifo_is_suspended) {
         return;
     }
     

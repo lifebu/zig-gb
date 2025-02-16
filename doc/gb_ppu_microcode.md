@@ -75,6 +75,7 @@ DRAW:
             - fetch_data_low and fetch_data_high is the same. (but they need to save low and high bitplanes into different data).
             - fetch_push_obj: this always succeed. But if there is already previous non-transparent (!!!) object tile data do not override them.
                 - Basically "mix" object pixels.
+            - How to handle objects partially visible on the screen?
         - keep in mind:
             - obj-to-obj priority.
             - obj-to-bg priority.
