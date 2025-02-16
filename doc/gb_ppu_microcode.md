@@ -1,12 +1,6 @@
 # ToDo:
-- Window drawing:
-    - This can only happen when we still have 8 pixels in the fifo.
-    - This would be the point where the pixel fetcher would be able to put it's data into the buffer.
-    - We then reset the pixel fetcher and do the normal 6-dot pixel fetching for the window (pixel pushing is delayed).
-    - I think this must be the reason why you subtract 7 from WX.
-    - uOps:
-        - fetch_tile_window
-
+- Add window drawing to the ups generation.
+- Add object drawing.
 - Allow for the uOps in DRAW-mode to be composed dynamically (in preperation for the windows and objects).  
     - Solution:
         - Generate the code for the entire draw+hblank in the scanline once.
@@ -17,6 +11,7 @@
     - Because of scrolling it might override an arbitrary point in the 6-8 uOps (without penalties!) long pixel-fetcher code.
         - Everytime we add all 6-8 ups, check how far we are until we will reach 160 lcd_x.
         - If it is smaller then the next set of steps => override one step with the advance_mode? (sounds hacky!).
+- Add a ton of asserts (defensive programming!), to platform and main!
 
 # PPU Microcode:
 - Instead of a huge switch-case with sub-functions I can define a microcode for the PPU just like the CPU that does all of the ppu state management and logic implicitly.
@@ -55,18 +50,44 @@ VBLANK:
 		- ADVANCE_MODE(ppu_mode, new_mode)
 
 DRAW:
-    - Drawing Windows and Objects:
+    - UOps for Windows and Objects:
         - "The Ultimate Game Boy Talk": Using window and object comparitors.
         - Can I load the entire line of pixels as uOps assuming that we don't have any window?
         - And then overlay instructions where we are triggering the window and obj code that will reset the fetch and the fifo?
         - So we have a static part (render all backgrounds for that line) and a dynamic part of the uOps buffer that we create depending on the actual content of that line!
         - So we can define the entire line rendering when we enter draw mode!
+    - Drawing Windows:
+        - This can only happen when we still have 8 pixels in the fifo.
+        - This would be the point where the pixel fetcher would be able to put it's data into the buffer.
+        - We then reset the pixel fetcher and do the normal 6-dot pixel fetching for the window (pixel pushing is delayed).
+        - I think this must be the reason why you subtract 7 from WX.
+        - uOps:
+            - FETCH_TILE_WINDOW
     - When is WY and WX actuall checked and triggered?
         - WY is only checked once during OAM_SCAN. If the check succeeds, the window is active for this scanline.
         - WX seems to be read multiple time per scanline.
     - Drawing Objects:
         - Y Coordinate is only checked once per scanline.
         - X Coordinate is stored once per scanline in a sprite store.
+        - Suspend pixel fifo.
+        - start a 6-cycle fetch for object data and put it into object fifo.
+            - fetch_tile_obj: get the tile_addr, from spritebuffer (how to know which of the 10 objects in the oam_list to pick?).
+            - fetch_data_low and fetch_data_high is the same. (but they need to save low and high bitplanes into different data).
+            - fetch_push_obj: this always succeed. But if there is already previous non-transparent (!!!) object tile data do not override them.
+                - Basically "mix" object pixels.
+        - keep in mind:
+            - obj-to-obj priority.
+            - obj-to-bg priority.
+            - double height.
+            - transparent pixels.
+            - horizontal and vertical flip.
+            - correct palette.
+        - pixel mixing:
+            - Mix pixels between object fifo and bg and window fifo.
+        - how does the 6-11 dot penalty work?
+            - 6 dots for the actual fetch.
+            - 0-5 dots: 6 - (state.pixel_fifo_count - 8) 
+                => basically because you reset the background fifo fetch.
     - Pixel fetcher and and pixel pusher are running at the same time in draw mode. How to handle that best?
         - 1. Pixel fetcher is uOps, Pixel Pushing is tried every frame.
         - 2. Have a second machine for the pixel pusher?
@@ -84,8 +105,10 @@ DRAW:
         - CLEAR_FIFO
 		- NOP
 		- PUSH_PIXEL
-		- FETCH_TILE
-		- FETCH_DATA
+		- FETCH_TILE_BG
+        - FETCH_TILE_WINDOW
+		- FETCH_DATA_LOW
+        - FETCH_DATA_HIGH
 		- FETCH_PUSH:
 			If it fails, adds itself into queue.
 	- So Pixel fetcher is:
@@ -101,6 +124,7 @@ CLEAR_FIFO
 PUSH_PIXEL
 FETCH_TILE(tileMapPos):
     - Calculates tile address.
-FETCH_DATA
+FETCH_DATA_LOW
+FETCH_DATA_HIGH
     - Use tile address to get first/second bitplane
 FETCH_PUSH

@@ -4,6 +4,8 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
+// TODO: Think about the order of declarations I want to have in this file, what does zig standard do?
+// constants, declaration, function?
 const tile_size_x = 8;
 const tile_size_y = 8;
 const tile_size_byte = 16;
@@ -140,7 +142,9 @@ const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line })
 
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
-const draw_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
+const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
+// TODO: Be careful of the timing. The first time this runs is when we have 8 pixels left in the fifo, otherwise the 6 cycle penalty makes no sense!
+const draw_window_tile_uops = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
@@ -150,16 +154,16 @@ fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
     // TODO: I need to rethink how to generate this code better in a dynamic way.
     // draw
     for(0..2) |_| {
-        state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+        state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
     }
     for(0..19) |_| {
-        state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+        state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
         state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .fetch_push_bg }) catch unreachable;
     }
-    state.uop_fifo.write(&draw_tile_uops) catch unreachable;
+    state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
     state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg }) catch unreachable;
     // TODO: pretty hacky!
-    const initial_shift_uops = [_]MicroOp{ .fetch_push_bg } ++ draw_tile_uops ++ [_]MicroOp{ .fetch_push_bg, .fetch_push_bg };
+    const initial_shift_uops = [_]MicroOp{ .fetch_push_bg } ++ draw_bg_tile_uops ++ [_]MicroOp{ .fetch_push_bg, .fetch_push_bg };
     for(0..line_initial_shift) |i| {
         state.uop_fifo.writeItem(initial_shift_uops[i]) catch unreachable;
     }
@@ -186,7 +190,8 @@ pub const State = struct {
     fetcher_bg_data: BackgroundFifo2bpp = undefined,
     oam_scan_idx: u6 = 0,
     // TODO: What data do we store here, what is easiest for the draw function? a list of indices into OAM? A copy of the object? Pre-digested data?
-    // https://www.reddit.com/r/EmuDev/comments/1bpxuwp/gameboy_ppu_mode_2_oam_scan/ => X-Pos (8-bits), Tile-Row 0-15 (4 bits), sprite-num 0-39 (6 bits)
+    // https://www.reddit.com/r/EmuDev/comments/1bpxuwp/gameboy_ppu_mode_2_oam_scan/ => X-Pos (8-bits) (to compose uOps), Tile-Row 0-15 (which object row to draw) (4 bits), tile_index 0-255 (8 bits)
+    // I can save the tile_index!
     oam_line_list: std.BoundedArray(u6, 10) = std.BoundedArray(u6, 10).init(0) catch unreachable,
 
     color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** 40 ** 144,
@@ -254,13 +259,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
             state.fetcher_tilemap_addr = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
-
-            const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
-            const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
-            const tile_value: u16 = memory[state.fetcher_tilemap_addr];
-            const tile_addr_offset: u16 = if(signed_mode) (tile_value + 128) % 256 else tile_value;
-            const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
-            state.fetcher_tile_addr = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
+            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control);
             state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
             tryPushPixel(state, memory);
         },
@@ -269,7 +268,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const win_pos_x: u8 = memory[mem_map.window_x] - 7;
             const win_pos_y: u8 = memory[mem_map.window_y];
             state.fetcher_tilemap_addr = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
-
+            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control);
+            state.fetcher_bg_data.pallete_addr = mem_map.bg_palette;
+            tryPushPixel(state, memory);
         },
         .nop => {},
         .nop_draw => {
@@ -304,6 +305,16 @@ fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pix
     const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
     return tilemap_addr;
 } 
+
+fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdControl) u16 {
+    const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
+    const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
+    const tile_value: u16 = memory[state.fetcher_tilemap_addr];
+    const tile_addr_offset: u16 = if(signed_mode) (tile_value + 128) % 256 else tile_value;
+    const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
+    const tile_addr: u16 = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
+    return tile_addr;
+}
 
 fn getPalette(paletteByte: u8) [4]u2 {
     // https://gbdev.io/pandocs/Palettes.html
