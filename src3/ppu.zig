@@ -108,7 +108,7 @@ const Object = packed struct {
 
 const FifoData = struct {
     color_id: u2,
-    palette_index: u3,
+    palette_index: u3, // CGB: 0-7, DMG: 0-1 
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     bg_prio: ObjectPriority,
 };
@@ -433,20 +433,27 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
         return;
     }
    
-    // TODO: Implement mixing object and background fifo. Maybe if we don't have an object use an color_id with 0 as fallback (which is transparent).
-    // const object_pixel = state.object_fifo.readItem() orelse transparent_pixel;
-    const fifo_data: FifoData = state.background_fifo.readItem() orelse unreachable;
+    const bg_pixel: FifoData = state.background_fifo.readItem() orelse unreachable;
     if(state.line_initial_shift > 0) {
         state.line_initial_shift -= 1;
         return; // Discard background pixel.
     }
 
-    const palette = getPalette(memory[mem_map.bg_palette]);
-    const hw_color_id: u2 = palette[fifo_data.color_id];
-    const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
-    const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);
+    // fall back transparent object pixel that will be drawn over if we don't have pixels in the object fifo.
+    const empty_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_index = 0 };
+    const obj_pixel: FifoData = state.object_fifo.readItem() orelse empty_pixel;
+    const obj_palette_addr: u16 = mem_map.obj_palettes_dmg + obj_pixel.palette_index;
+    const obj_palette = getPalette(memory[obj_palette_addr]);
+    const obj_color_id: u2 = obj_palette[obj_pixel.color_id];
 
-    // TODO: Move the shader code to use an array of hardware colorIds and not bitplanes!
+    const bg_palette = getPalette(memory[mem_map.bg_palette]);
+    const bg_color_id: u2 = bg_palette[bg_pixel.color_id];
+
+    const color_id: u2 = mixBackgroundColorId(bg_color_id, obj_color_id, obj_pixel.bg_prio);
+    const first_hw_color_bit: u8 = @intCast(color_id & 0b01);
+    const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
+
+    // TODO: Move the shader code to use a texture of hardware colorIds and not bitplanes!
     const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
     const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
     const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
