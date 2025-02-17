@@ -21,6 +21,7 @@ const obj_per_line = 10;
 
 const cycles_per_line = 456;
 
+// TODO: Add support for all the flags in this, like the window enable, lcd enable, etc.
 const LcdControl = packed struct {
     bg_window_enable: bool = false,
     obj_enable: bool = false,
@@ -48,6 +49,7 @@ const LcdControl = packed struct {
     } 
 };
 
+// TODO: Add support for updating the LCDStats and interrupts
 pub const LcdStat = packed struct {
     mode: enum(u2) {
         h_blank,
@@ -112,6 +114,10 @@ const FifoData = struct {
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     bg_prio: ObjectPriority,
 };
+// TODO: Consider creating custom fifo that uses a ring-buffer. In testing, the readItem function costs 51% of all cycles.
+// writeItem() => write(), write() => writeSlice(), readItem() => read(), readableLength() => len(), clear() / discard() => create own function 
+// Use RingBuffer with FixedBufferAllocator.
+// Consider using "AssumeLength" where appropriate.
 const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 
@@ -126,6 +132,9 @@ const ObjectLineEntry = struct {
     bg_prio: ObjectPriority,
 };
 const ObjectLineList = std.BoundedArray(ObjectLineEntry, 10);
+pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
+    return lhs.screen_pos_x < rhs.screen_pos_x;
+}
 
 const MicroOp = enum {
     advance_mode_draw,
@@ -149,8 +158,13 @@ const MicroOp = enum {
 };
 const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
 
+// oam_scan
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
+
+// draw
+// TODO: Add support for partially visible objects.
+const draw_initial_uops = [_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop };
 const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 const draw_first_window_tile_uops = [_]MicroOp{ .clear_fifo_bg, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
@@ -158,7 +172,10 @@ const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_
 // Maybe the first 6 cycles on a line that are thrown away acording to documentation can actually be used for objects like this?
 // This might be complicated for the mixing code? This would be like an overdraw?
 const draw_object_tile_uops = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_data_low_obj, .nop, .fetch_data_high_obj, .fetch_push_obj };
+
+// hblank
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
+// vblank
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
 /// Generates all uops needed for the draw mode and hblank mode of the current line.
@@ -234,6 +251,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.lcd_x = 0;
+            std.mem.sort(ObjectLineEntry, state.oam_line_list.buffer[0..state.oam_line_list.len], {}, sort_objects);
+            state.oam_scan_idx = 0;
         },
         .advance_mode_hblank => {
             assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
