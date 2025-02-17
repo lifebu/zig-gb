@@ -114,31 +114,21 @@ const Object = packed struct {
 const FifoData = struct {
     first_bitplane: u8, 
     second_bitplane: u8, 
-    // TODO: Use an palette index u3 (0-7 for CGB, 0-1 for DMG, 0 for Background/Window).
-    // TODO: We know which kind of palette to use based on which fifo this pixel is in.
     palette_index: u3,
     used_pixels: u4,
-
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     // TODO: use the enum from the object or u1?
     bg_prio: u1,
 };
-// TODO: The documentation of the fifo's is constradictory on Pan Docs and GBEDG.
-// https://hacktix.github.io/GBEDG/ppu/#the-pixel-fifo
-// If you assume 16 pixel length, the 6 dots of window penalty make no sense if it completly clears the fifo.
-// If you assume 8 pixel length, now everything fits way better (sameboy does it like this, lel).
-    // - But how does the 12 dot penalty at the start make sense? PanDocs says the first one is just discarded and that what sameboy does (???)
-// => Use 8 pixel length and have the first 6 cycles fetch a tile that is discarded (for partially visible object).
-// TODO: I can just use one Fifo Type for both fifos.
-const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = 2 });
-const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = 2 });
+const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = 1 });
+const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = 1 });
 
 fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
     return if(current_obj_colorid == 0) new_obj_colorid else current_obj_colorid;
 }
 
-fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, obj_prio: u1) u2 {
-    if(obj_prio == 0) {
+fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, bg_prio: u1) u2 {
+    if(bg_prio == 0) {
         return if(obj_colorid == 0) bg_colorid else obj_colorid;
     } else {
         return if(bg_colorid == 0) obj_colorid else bg_colorid;
@@ -195,9 +185,11 @@ fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
     // TODO: Add support for objects and window!
     // TODO: I need to rethink how to generate this code better in a dynamic way.
     // draw
-    for(0..2) |_| {
-        state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
-    }
+    // TODO: According to pandocs the first tile we would load (draw_bg_tile_uops) will be discarded.
+    // Because I don't handle this corerectly I will just add 6 nops instead.
+    // Later I should load garbage data and discard it, so that I can support partially visible objects.
+    state.uop_fifo.write(&[_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop }) catch unreachable;
+    state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
     for(0..19) |_| {
         state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
         state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .fetch_push_bg }) catch unreachable;
@@ -256,7 +248,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.lcd_x = 0;
         },
         .advance_mode_hblank => {
-            assert(state.lcd_x == 160); // Must reach the end of the screen before entering hblank
+            assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
+            assert(state.lcd_x < 161); // we drew to many pixels before entering hblank
             lcd_stat.mode = .h_blank;
             state.lcd_y += 1;
         },
@@ -300,15 +293,15 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.used_pixels = 0;
         },
         .fetch_push_bg => {
-            const length_before: u8 = @intCast(state.background_fifo.readableLength());
-            state.background_fifo.writeItem(state.fetcher_data) catch {};
-            const length_after: u8 = @intCast(state.background_fifo.readableLength());
-            state.fifo_pixel_count += (length_after - length_before) * tile_size_x; 
+            if(state.background_fifo.readableLength() == 0) {
+                state.background_fifo.writeItem(state.fetcher_data) catch unreachable;
+                state.fifo_pixel_count += tile_size_x;
+            }
             tryPushPixel(state, memory);
         },
         .fetch_push_obj => {
             // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
-            state.object_fifo.writeItem(state.fetcher_data) catch {};
+            state.object_fifo.writeItem(state.fetcher_data) catch unreachable;
             tryPushPixel(state, memory);
         },
         .fetch_tile_bg => {
@@ -324,7 +317,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const object: ObjectLineEntry = state.oam_line_list.pop();
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
-            const obj_tile_index_offset: u8 = @intFromEnum(lcd_control.obj_size) * (object.tile_index % 2);
+            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (object.tile_index % 2);
             const obj_tile_index: u8 = object.tile_index - obj_tile_index_offset;
             const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
             const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
@@ -349,7 +342,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .oam_check => {
             const object = Object.fromOAM(memory, state.oam_scan_idx);
-            const object_height: u8 = tile_size_y * (1 + @intFromEnum(lcd_control.obj_size));
+            const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(lcd_control.obj_size)));
             const obj_pixel_y: i16 = @as(i16, state.lcd_y) + 16 - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
@@ -420,10 +413,7 @@ fn getPalette(paletteByte: u8) [4]u2 {
 }
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
-    // pixel mixing requires at least 8 pixels.
-    // TODO: We can probably remove this check and make it an assert that it is not empty.
-    // Because we statically know when the fifo has enough data.
-    if(state.fifo_pixel_count <= 8) {
+    if(state.fifo_pixel_count == 0) {
         return;
     }
    

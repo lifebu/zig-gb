@@ -29,7 +29,7 @@ pub fn build(b: *std.Build) void {
     sfml.link(exe);
 
     // sokol
-    const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .gl = true, .with_sokol_imgui = true });
+    const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .with_sokol_imgui = true });
     exe.root_module.addImport("sokol", sokol.module("sokol"));
 
     // cimgui
