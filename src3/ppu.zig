@@ -115,7 +115,7 @@ const BackgroundFifo2bpp = struct {
 // If you assume 16 pixel length, the 6 dots of window penalty make no sense if it completly clears the fifo.
 // If you assume 8 pixel length, now everything fits way better (sameboy does it like this, lel).
     // - But how does the 12 dot penalty at the start make sense? PanDocs says the first one is just discarded and that what sameboy does (???)
-// => Use 8 pixel length and have the first 6 cycles just be nops.
+// => Use 8 pixel length and have the first 6 cycles fetch a tile that is discarded (for partially visible object).
 // TODO: I can just use one Fifo Type for both fifos.
 const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 });
 
@@ -124,6 +124,7 @@ const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 })
 // shader does not need to convert. shader2BPPCompress can compress 16 pixels into one i32.
 // Potential Drawback: Color mixing might be more challenging, because transparency is colorID 0 (or both bitplanes).
     // Maybe create a testcase for how you would mix two sets of 2bpp colors and 2 sets of 8 colorID and what is better.
+    // Testresult: mixing colorIds is so much easier then bitplanes, USE COLORIDs! 
 // This can be so easily implemented with an inline for-loop and shlWithOverflow in a helper function.
 const ObjectFifo2bpp = struct {
     first_bitplane: u8, 
@@ -138,6 +139,18 @@ const ObjectFifo2bpp = struct {
     bg_prio: u1,
 };
 const ObjectFiFo = std.fifo.LinearFifo(ObjectFifo2bpp, .{ .Static = 2 });
+
+fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
+    return if(current_obj_colorid == 0) new_obj_colorid else current_obj_colorid;
+}
+
+fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, obj_prio: u1) u2 {
+    if(obj_prio == 0) {
+        return if(obj_colorid == 0) bg_colorid else obj_colorid;
+    } else {
+        return if(bg_colorid == 0) obj_colorid else bg_colorid;
+    }
+}
 
 const ObjectLineEntry = struct {
     // TODO: actuall u8, but we can have negative screen_pos for partially visible objects because they also count to the object limit!
@@ -177,6 +190,9 @@ const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1)
 const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 // TODO: I need to clear the background_fifo the first time we encounter the window (which explains the 6 cycle penalty). 
 const draw_window_tile_uops = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+// TODO: How can I draw objects at the edge of the screen that are only partially visible? 
+// Maybe the first 6 cycles on a line that are thrown away acording to documentation can actually be used for objects like this?
+// This might be complicated for the mixing code? This would be like an overdraw?
 const draw_object_tile_uops = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_data_low_obj, .nop, .fetch_data_high_obj, .fetch_push_obj };
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
@@ -417,6 +433,8 @@ fn getPalette(paletteByte: u8) [4]u2 {
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     // pixel mixing requires at least 8 pixels.
+    // TODO: We can probably remove this check and make it an assert that it is not empty.
+    // Because we statically know when the fifo has enough data.
     if(state.fifo_pixel_count <= 8) {
         return;
     }
