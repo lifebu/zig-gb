@@ -168,6 +168,7 @@ const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1)
 // Because I don't handle this corerectly I will just add 6 nops instead.
 const draw_initial_uops = [_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop };
 const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+// TODO: Delete this?
 const draw_first_window_tile_uops = [_]MicroOp{ .clear_fifo_bg, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 // TODO: How can I draw objects at the edge of the screen that are only partially visible? 
@@ -196,6 +197,7 @@ pub const State = struct {
     uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
+    draw_window: bool = false,
     line_cycles: u9 = 0,
     line_initial_shift: u3 = 0,
     fetcher_data: FetcherData = undefined,
@@ -226,6 +228,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.lcd_x = 0;
             std.mem.sort(ObjectLineEntry, state.oam_line_list.buffer[0..state.oam_line_list.len], {}, sort_objects);
             state.oam_scan_idx = 0;
+            state.draw_window = false;
         },
         .advance_mode_hblank => {
             assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
@@ -290,7 +293,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                         .obj_prio = 0 
                     }) catch unreachable;
                 }
-                state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
+                if(state.draw_window) {
+                    state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
+                } else {
+                    state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
+                }
             } else { // push failed 
                 state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
             }
@@ -431,12 +438,21 @@ fn getPalette(paletteByte: u8) [4]u2 {
     return [4]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
-fn incrementLcdX(state: *State, _: *[def.addr_space]u8) void {
-    // const win_pos_x: u8 = memory[mem_map.window_x] - 7;
+fn incrementLcdX(state: *State, memory: *[def.addr_space]u8) void {
+    // TODO: This might not trigger correctly for win_pos_x == 0.
+    // I tried to move this to the start of the cycle function, but this broke a lot more.
+    // Maybe try a negative lcd_x do nop_draw for the first 6 tiles?
+    const win_pos_x: u8 = memory[mem_map.window_x] - 7;
+    const win_pos_y: u8 = memory[mem_map.window_y];
     state.lcd_x += 1;
     if(state.lcd_x == 160) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeItem(.advance_mode_hblank) catch unreachable;
+    } else if (state.lcd_y >= win_pos_y and state.lcd_x == win_pos_x) {
+        state.uop_fifo.discard(state.uop_fifo.readableLength());
+        state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
+        state.background_fifo.discard(state.background_fifo.readableLength());
+        state.draw_window = true;
     }
 }
 
