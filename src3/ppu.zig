@@ -9,6 +9,7 @@ const mem_map = @import("mem_map.zig");
 const tile_size_x = 8;
 const tile_size_y = 8;
 const tile_size_byte = 16;
+const color_id_transparent = 0;
 
 const tile_map_size_x = 32;
 const tile_map_size_y = 32;
@@ -104,36 +105,15 @@ const Object = packed struct {
     }
 };
 
-// TODO: Once this is done, rethink If I really want to store the fifos in 2bpp, or if I convert the data once into []colorId
-// This makes tryPushPixel() so much simpler and we don't need to keep track of used pixels in a 2bpp or the total number of pixels.
-// shader does not need to convert. shader2BPPCompress can compress 16 pixels into one i32.
-// Potential Drawback: Color mixing might be more challenging, because transparency is colorID 0 (or both bitplanes).
-    // Maybe create a testcase for how you would mix two sets of 2bpp colors and 2 sets of 8 colorID and what is better.
-    // Testresult: mixing colorIds is so much easier then bitplanes, USE COLORIDs! 
-// This can be so easily implemented with an inline for-loop and shlWithOverflow in a helper function.
 const FifoData = struct {
-    first_bitplane: u8, 
-    second_bitplane: u8, 
+    color_id: u2,
     palette_index: u3,
-    used_pixels: u4,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     // TODO: use the enum from the object or u1?
     bg_prio: u1,
 };
-const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = 1 });
-const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = 1 });
-
-fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
-    return if(current_obj_colorid == 0) new_obj_colorid else current_obj_colorid;
-}
-
-fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, bg_prio: u1) u2 {
-    if(bg_prio == 0) {
-        return if(obj_colorid == 0) bg_colorid else obj_colorid;
-    } else {
-        return if(bg_colorid == 0) obj_colorid else bg_colorid;
-    }
-}
+const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
+const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 
 const ObjectLineEntry = struct {
     // TODO: actuall u8, but we can have negative screen_pos for partially visible objects because they also count to the object limit!
@@ -210,17 +190,25 @@ fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
     state.uop_fifo.writeItem(advance) catch unreachable;
 }
 
+const FetcherData = struct {
+    tile_addr: u16,
+    first_bitplane: u8, 
+    second_bitplane: u8,
+    palette_index: u3,
+    obj_prio: u6, // CGB: OAM index, DMG: Unused
+    // TODO: use the enum from the object or u1?
+    bg_prio: u1,
+};
+
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
-    fifo_pixel_count: u8 = 0,
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
     uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
     line_cycles: u9 = 0,
     line_initial_shift: u3 = 0,
-    fetcher_tile_addr: u16 = 0,
-    fetcher_data: FifoData = undefined,
+    fetcher_data: FetcherData = undefined,
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineList = ObjectLineList.init(0) catch unreachable,
 
@@ -244,7 +232,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             genMicroCodeDrawAndHBlank(state, state.line_initial_shift);
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
-            state.fifo_pixel_count = 0;
             state.lcd_x = 0;
         },
         .advance_mode_hblank => {
@@ -269,39 +256,54 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
         .fetch_data_low_bg => {
-            state.fetcher_data.first_bitplane = memory[state.fetcher_tile_addr];
-            state.fetcher_tile_addr += 1;
+            state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.tile_addr += 1;
             tryPushPixel(state, memory);
         },
         // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
         // Fall from _bg to _obj
         // https://github.com/ziglang/zig/issues/8220
         .fetch_data_low_obj => {
-            state.fetcher_data.first_bitplane = memory[state.fetcher_tile_addr];
-            state.fetcher_tile_addr += 1;
+            state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.tile_addr += 1;
         },
         .fetch_data_high_bg => {
-            state.fetcher_data.second_bitplane = memory[state.fetcher_tile_addr];
-            state.fetcher_data.used_pixels = 0;
+            state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
             tryPushPixel(state, memory);
         },
         // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
         // Fall from _bg to _obj
         // https://github.com/ziglang/zig/issues/8220
         .fetch_data_high_obj => {
-            state.fetcher_data.second_bitplane = memory[state.fetcher_tile_addr];
-            state.fetcher_data.used_pixels = 0;
+            state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
         },
-        .fetch_push_bg => {
+        .fetch_push_bg => {    
             if(state.background_fifo.readableLength() == 0) {
-                state.background_fifo.writeItem(state.fetcher_data) catch unreachable;
-                state.fifo_pixel_count += tile_size_x;
+                // TODO: Move this into a helper function that pushes fetcher_data into the fifo, (which can also include 2bpp conversion).
+                // Because the object is basically the same code.
+                const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane);
+                inline for(color_ids) |color_id| {
+                    state.background_fifo.writeItem(.{ 
+                        .color_id = color_id, 
+                        .bg_prio = 0, 
+                        .palette_index = 0, 
+                        .obj_prio = 0 
+                    }) catch unreachable;
+                }
             }
             tryPushPixel(state, memory);
         },
         .fetch_push_obj => {
             // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
-            state.object_fifo.writeItem(state.fetcher_data) catch unreachable;
+            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane);
+            inline for(color_ids) |color_id| {
+                state.object_fifo.writeItem(.{ 
+                    .color_id = color_id, 
+                    .bg_prio = state.fetcher_data.bg_prio, 
+                    .palette_index = state.fetcher_data.palette_index, 
+                    .obj_prio = state.fetcher_data.obj_prio 
+                }) catch unreachable;
+            }
             tryPushPixel(state, memory);
         },
         .fetch_tile_bg => {
@@ -309,7 +311,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
-            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
+            state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
             state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
@@ -321,7 +323,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const obj_tile_index: u8 = object.tile_index - obj_tile_index_offset;
             const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
             const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
-            state.fetcher_tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
+            state.fetcher_data.tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
             state.fetcher_data.palette_index = object.palette_index;
             state.fetcher_data.bg_prio = object.bg_prio;
             state.fetcher_data.obj_prio = object.obj_prio;
@@ -331,7 +333,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const win_pos_x: u8 = memory[mem_map.window_x] - 7;
             const win_pos_y: u8 = memory[mem_map.window_y];
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
-            state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
+            state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
             state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
@@ -369,7 +371,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
 }
 
 fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
-    const pixel_x: u16 = @as(u16, state.lcd_x) + pixel_offset_x  + state.fifo_pixel_count; 
+    const fifo_pixel_count: u16 = @intCast(state.background_fifo.readableLength());
+    const pixel_x: u16 = @as(u16, state.lcd_x) + pixel_offset_x + fifo_pixel_count; 
     const pixel_y: u16 = @as(u16, state.lcd_y) + pixel_offset_y;
 
     const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
@@ -389,13 +392,13 @@ fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdContr
     return tile_addr;
 }
 
-fn convert2bpp(first_bitplane: u8, second_bitplane: u8) [8]u2 {
+fn convert2bpp(first_bitplane: u8, second_bitplane: u8) [tile_size_x]u2 {
     // TODO: Objects need to flip horizontally. Parameter? Maybe have two versions of this function?
     // @bitReverse()
     var first_bitplane_var: u8 = first_bitplane;
     var second_bitplane_var: u8 = second_bitplane;
-    var result: [8]u2 = undefined;
-    inline for(0..8) |i| {
+    var result: [tile_size_x]u2 = undefined;
+    inline for(0..tile_size_x) |i| {
         first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
         second_bitplane_var, const second_bit: u2 = @shlWithOverflow(second_bitplane_var, 1);
         result[i] = first_bit + (second_bit << 1); // LSB first
@@ -403,6 +406,17 @@ fn convert2bpp(first_bitplane: u8, second_bitplane: u8) [8]u2 {
     return result;
 }
 
+fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
+    return if(current_obj_colorid == color_id_transparent) new_obj_colorid else current_obj_colorid;
+}
+
+fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, bg_prio: u1) u2 {
+    if(bg_prio == 0) {
+        return if(obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
+    } else {
+        return if(bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
+    }
+}
 fn getPalette(paletteByte: u8) [4]u2 {
     // https://gbdev.io/pandocs/Palettes.html
     const color_id3: u2 = @intCast((paletteByte & (0b11 << 6)) >> 6);
@@ -413,42 +427,32 @@ fn getPalette(paletteByte: u8) [4]u2 {
 }
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
-    if(state.fifo_pixel_count == 0) {
+    if(state.background_fifo.readableLength() == 0) {
         return;
     }
    
     // TODO: Implement mixing object and background fifo. Maybe if we don't have an object use an color_id with 0 as fallback (which is transparent).
     // const object_pixel = state.object_fifo.readItem() orelse transparent_pixel;
-    const pixel2bpp: *FifoData = &state.background_fifo.buf[state.background_fifo.head];
-    pixel2bpp.used_pixels += 1;
-    pixel2bpp.first_bitplane, const first_color_bit = @shlWithOverflow(pixel2bpp.first_bitplane, 1);
-    pixel2bpp.second_bitplane, const second_color_bit = @shlWithOverflow(pixel2bpp.second_bitplane, 1);
-    // TODO: Maybe we can make this behaviour clearer if we had discard pixel function that is also microcoded?
+    const fifo_data: FifoData = state.background_fifo.readItem() orelse unreachable;
     if(state.line_initial_shift > 0) {
         state.line_initial_shift -= 1;
-    } else {
-        const color_id: u2 = @as(u2, first_color_bit) + (@as(u2, second_color_bit) << 1); // LSB first
-
-        const palette = getPalette(memory[mem_map.bg_palette]);
-        const hw_color_id: u2 = palette[color_id];
-        const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
-        const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);
-
-        const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
-        const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
-        const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
-
-        const tile_pixel_x = state.lcd_x % 8;
-        const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
-        first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
-        second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
-
-        state.lcd_x += 1;
-        state.fifo_pixel_count -= 1;
+        return; // Discard background pixel.
     }
 
-    if(pixel2bpp.used_pixels > 7) {
-        // Pop it if there is now more pixel data to get!
-        _ = state.background_fifo.readItem();
-    }
+    const palette = getPalette(memory[mem_map.bg_palette]);
+    const hw_color_id: u2 = palette[fifo_data.color_id];
+    const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
+    const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);
+
+    // TODO: Move the shader code to use an array of hardware colorIds and not bitplanes!
+    const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
+    const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
+    const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
+
+    const tile_pixel_x = state.lcd_x % 8;
+    const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
+    first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
+    second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
+
+    state.lcd_x += 1;
 }
