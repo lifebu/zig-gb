@@ -71,6 +71,10 @@ pub const LcdStat = packed struct {
     } 
 };
 
+const ObjectPriority = enum(u1) {
+    obj_over_bg,
+    obj_under_bg,
+};
 const Object = packed struct {
     y_position: u8,
     x_position: u8,
@@ -84,10 +88,7 @@ const Object = packed struct {
         },
         x_flip: bool,
         y_flip: bool,
-        priority: enum(u1) {
-            obj_over_bg,
-            obj_under_bg,
-        },
+        priority: ObjectPriority,
     },
 
     pub fn fromOAM(memory: *[def.addr_space]u8, obj_idx: u6) *align(1) const Object {
@@ -109,8 +110,7 @@ const FifoData = struct {
     color_id: u2,
     palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
-    // TODO: use the enum from the object or u1?
-    bg_prio: u1,
+    bg_prio: ObjectPriority,
 };
 const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
@@ -122,8 +122,8 @@ const ObjectLineEntry = struct {
     tile_index: u8,
     palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
-    // TODO: use the enum from the object or u1?
-    bg_prio: u1,
+    obj_flip_y: bool,
+    bg_prio: ObjectPriority,
 };
 const ObjectLineList = std.BoundedArray(ObjectLineEntry, 10);
 
@@ -196,8 +196,8 @@ const FetcherData = struct {
     second_bitplane: u8,
     palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
-    // TODO: use the enum from the object or u1?
-    bg_prio: u1,
+    obj_flip_y: bool,
+    bg_prio: ObjectPriority,
 };
 
 pub const State = struct {
@@ -281,11 +281,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             if(state.background_fifo.readableLength() == 0) {
                 // TODO: Move this into a helper function that pushes fetcher_data into the fifo, (which can also include 2bpp conversion).
                 // Because the object is basically the same code.
-                const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane);
+                // I should try to write the function so that I am using std.fifo.write(), which will return an error if it fails. This requires that I generate an entire fifo_data array!
+                const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
                 inline for(color_ids) |color_id| {
                     state.background_fifo.writeItem(.{ 
                         .color_id = color_id, 
-                        .bg_prio = 0, 
+                        .bg_prio = .obj_over_bg, 
                         .palette_index = 0, 
                         .obj_prio = 0 
                     }) catch unreachable;
@@ -295,7 +296,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_push_obj => {
             // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
-            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane);
+            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_y);
             inline for(color_ids) |color_id| {
                 state.object_fifo.writeItem(.{ 
                     .color_id = color_id, 
@@ -326,6 +327,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
             state.fetcher_data.palette_index = object.palette_index;
             state.fetcher_data.bg_prio = object.bg_prio;
+            state.fetcher_data.obj_flip_y = object.obj_flip_y;
             state.fetcher_data.obj_prio = object.obj_prio;
         },
         .fetch_tile_window => {
@@ -347,15 +349,17 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(lcd_control.obj_size)));
             const obj_pixel_y: i16 = @as(i16, state.lcd_y) + 16 - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
+                const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
+                const tile_row: u4 = @intCast(object_flip % tile_size_y);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
                 state.oam_line_list.append(.{ 
                     .screen_pos_x = @as(i9, object.x_position) - 8, 
-                    // TODO: Objects need to flip vertically invert the tile_row here!
-                    .tile_row = @intCast(obj_pixel_y),
+                    .tile_row = tile_row,
                     .tile_index = object.tile_index, 
                     .palette_index =  @intFromEnum(object.flags.dmg_palette),
                     .obj_prio = state.oam_scan_idx, // CGB: OAM index, DMG: Unused
-                    .bg_prio = @intFromEnum(object.flags.priority),
+                    .obj_flip_y = object.flags.y_flip,
+                    .bg_prio = object.flags.priority,
                 }) catch {};
             }
             state.oam_scan_idx += 1;
@@ -392,11 +396,9 @@ fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdContr
     return tile_addr;
 }
 
-fn convert2bpp(first_bitplane: u8, second_bitplane: u8) [tile_size_x]u2 {
-    // TODO: Objects need to flip horizontally. Parameter? Maybe have two versions of this function?
-    // @bitReverse()
-    var first_bitplane_var: u8 = first_bitplane;
-    var second_bitplane_var: u8 = second_bitplane;
+fn convert2bpp(first_bitplane: u8, second_bitplane: u8, reverse: bool) [tile_size_x]u2 {
+    var first_bitplane_var: u8 = if(reverse) @bitReverse(first_bitplane) else first_bitplane;
+    var second_bitplane_var: u8 = if(reverse) @bitReverse(second_bitplane) else second_bitplane;
     var result: [tile_size_x]u2 = undefined;
     inline for(0..tile_size_x) |i| {
         first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
@@ -410,8 +412,8 @@ fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
     return if(current_obj_colorid == color_id_transparent) new_obj_colorid else current_obj_colorid;
 }
 
-fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, bg_prio: u1) u2 {
-    if(bg_prio == 0) {
+fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, bg_prio: ObjectPriority) u2 {
+    if(bg_prio == .obj_over_bg) {
         return if(obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
     } else {
         return if(bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
