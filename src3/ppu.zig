@@ -156,18 +156,15 @@ const MicroOp = enum {
     advance_mode_hblank,
     advance_mode_oam_scan,
     advance_mode_vblank,
-    clear_fifo,
-    // TODO: If we split fetch_data_low into fetch_data_low_bg and fetch_data_low_obj don't have to use a bool in the state to suspend the fifo while objects are fetched.
-    // We just don't include any calls to tryPushPixel() in the uOps for the object fetching.
-    // And data_low/data_high don't do much code anyway.
-    fetch_data_low,
-    fetch_data_high,
+    fetch_data_low_bg,
+    fetch_data_low_obj,
+    fetch_data_high_bg,
+    fetch_data_high_obj,
     fetch_push_bg,
     fetch_push_obj,
     fetch_tile_bg,
     fetch_tile_obj,
     fetch_tile_window,
-    inc_lcd_y,
     nop,
     nop_draw,
     oam_check,
@@ -177,9 +174,10 @@ const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line })
 
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
-const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
-// TODO: Be careful of the timing. The first time this runs is when we have 8 pixels left in the fifo, otherwise the 6 cycle penalty makes no sense!
-const draw_window_tile_uops = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_data_low, .nop_draw, .fetch_data_high, .fetch_push_bg, };
+const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+// TODO: I need to clear the background_fifo the first time we encounter the window (which explains the 6 cycle penalty). 
+const draw_window_tile_uops = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+const draw_object_tile_uops = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_data_low_obj, .nop, .fetch_data_high_obj, .fetch_push_obj };
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
@@ -214,7 +212,6 @@ fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     fifo_pixel_count: u8 = 0,
-    fifo_is_suspended: bool = false,
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
     uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
     lcd_x: u8 = 0, 
@@ -269,15 +266,29 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const advance: MicroOp = if(state.lcd_y == 0) .advance_mode_oam_scan else .advance_mode_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
-        .fetch_data_low => {
+        .fetch_data_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_tile_addr];
             state.fetcher_tile_addr += 1;
             tryPushPixel(state, memory);
         },
-        .fetch_data_high => {
+        // TODO: zig 0.14.0 has labeled switches that i can use for fallthrough.
+        // Fall from _bg to _obj
+        // https://github.com/ziglang/zig/issues/8220
+        .fetch_data_low_obj => {
+            state.fetcher_data.first_bitplane = memory[state.fetcher_tile_addr];
+            state.fetcher_tile_addr += 1;
+        },
+        .fetch_data_high_bg => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_tile_addr];
             state.fetcher_data.used_pixels = 0;
             tryPushPixel(state, memory);
+        },
+        // TODO: zig 0.14.0 has labeled switches that i can use for fallthrough.
+        // Fall from _bg to _obj
+        // https://github.com/ziglang/zig/issues/8220
+        .fetch_data_high_obj => {
+            state.fetcher_data.second_bitplane = memory[state.fetcher_tile_addr];
+            state.fetcher_data.used_pixels = 0;
         },
         .fetch_push_bg => {
             const length_before: u8 = @intCast(state.background_fifo.readableLength());
@@ -295,7 +306,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             _ = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane);
             // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
             state.object_fifo.writeItem(state.fetcher_data) catch {};
-            state.fifo_is_suspended = false;
             tryPushPixel(state, memory);
         },
         .fetch_tile_bg => {
@@ -318,7 +328,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.pallete_addr = object.palette_addr;
             state.fetcher_data.bg_prio = object.bg_prio;
             state.fetcher_data.obj_prio = object.obj_prio;
-            state.fifo_is_suspended = true;
         },
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -388,13 +397,13 @@ fn convert2bpp(first_bitplane: u8, second_bitplane: u8) [8]u2 {
     // @bitReverse()
     var first_bitplane_var: u8 = first_bitplane;
     var second_bitplane_var: u8 = second_bitplane;
-    var return_val: [8]u2 = undefined;
+    var result: [8]u2 = undefined;
     inline for(0..8) |i| {
         first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
         second_bitplane_var, const second_bit: u2 = @shlWithOverflow(second_bitplane_var, 1);
-        return_val[i] = first_bit + (second_bit << 1); // LSB first
+        result[i] = first_bit + (second_bit << 1); // LSB first
     }
-    return return_val;
+    return result;
 }
 
 fn getPalette(paletteByte: u8) [4]u2 {
@@ -408,7 +417,7 @@ fn getPalette(paletteByte: u8) [4]u2 {
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     // pixel mixing requires at least 8 pixels.
-    if(state.fifo_pixel_count <= 8 or state.fifo_is_suspended) {
+    if(state.fifo_pixel_count <= 8) {
         return;
     }
    
