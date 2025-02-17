@@ -132,6 +132,7 @@ const MicroOp = enum {
     advance_mode_hblank,
     advance_mode_oam_scan,
     advance_mode_vblank,
+    clear_fifo_bg,
     fetch_data_low_bg,
     fetch_data_low_obj,
     fetch_data_high_bg,
@@ -151,8 +152,8 @@ const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line })
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
 const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
-// TODO: I need to clear the background_fifo the first time we encounter the window (which explains the 6 cycle penalty). 
-const draw_window_tile_uops = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+const draw_first_window_tile_uops = [_]MicroOp{ .clear_fifo_bg, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 // TODO: How can I draw objects at the edge of the screen that are only partially visible? 
 // Maybe the first 6 cycles on a line that are thrown away acording to documentation can actually be used for objects like this?
 // This might be complicated for the mixing code? This would be like an overdraw?
@@ -255,6 +256,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const advance: MicroOp = if(state.lcd_y == 0) .advance_mode_oam_scan else .advance_mode_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
+        .clear_fifo_bg => {
+            state.background_fifo.discard(state.background_fifo.readableLength());
+        },
         .fetch_data_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
@@ -279,9 +283,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_push_bg => {    
             if(state.background_fifo.readableLength() == 0) {
-                // TODO: Move this into a helper function that pushes fetcher_data into the fifo, (which can also include 2bpp conversion).
-                // Because the object is basically the same code.
-                // I should try to write the function so that I am using std.fifo.write(), which will return an error if it fails. This requires that I generate an entire fifo_data array!
                 const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
                 inline for(color_ids) |color_id| {
                     state.background_fifo.writeItem(.{ 
@@ -295,11 +296,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_push_obj => {
-            // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
             const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_y);
-            inline for(color_ids) |color_id| {
+            inline for(0..color_ids.len) |i| {
+                const current_color: u2 = if(state.object_fifo.readableLength() > i) state.object_fifo.peekItem(i).color_id else color_id_transparent;
+                const mixed_color: u2 = mixObjectColorId(current_color, color_ids[i]);
                 state.object_fifo.writeItem(.{ 
-                    .color_id = color_id, 
+                    .color_id = mixed_color, 
                     .bg_prio = state.fetcher_data.bg_prio, 
                     .palette_index = state.fetcher_data.palette_index, 
                     .obj_prio = state.fetcher_data.obj_prio 
