@@ -104,11 +104,24 @@ const Object = packed struct {
     }
 };
 
-const BackgroundFifo2bpp = struct {
-    first_bitplane: u8,
-    second_bitplane: u8,
-    pallete_addr: u16,
+// TODO: Once this is done, rethink If I really want to store the fifos in 2bpp, or if I convert the data once into []colorId
+// This makes tryPushPixel() so much simpler and we don't need to keep track of used pixels in a 2bpp or the total number of pixels.
+// shader does not need to convert. shader2BPPCompress can compress 16 pixels into one i32.
+// Potential Drawback: Color mixing might be more challenging, because transparency is colorID 0 (or both bitplanes).
+    // Maybe create a testcase for how you would mix two sets of 2bpp colors and 2 sets of 8 colorID and what is better.
+    // Testresult: mixing colorIds is so much easier then bitplanes, USE COLORIDs! 
+// This can be so easily implemented with an inline for-loop and shlWithOverflow in a helper function.
+const FifoData = struct {
+    first_bitplane: u8, 
+    second_bitplane: u8, 
+    // TODO: Use an palette index u3 (0-7 for CGB, 0-1 for DMG, 0 for Background/Window).
+    // TODO: We know which kind of palette to use based on which fifo this pixel is in.
+    palette_index: u3,
     used_pixels: u4,
+
+    obj_prio: u6, // CGB: OAM index, DMG: Unused
+    // TODO: use the enum from the object or u1?
+    bg_prio: u1,
 };
 // TODO: The documentation of the fifo's is constradictory on Pan Docs and GBEDG.
 // https://hacktix.github.io/GBEDG/ppu/#the-pixel-fifo
@@ -117,28 +130,8 @@ const BackgroundFifo2bpp = struct {
     // - But how does the 12 dot penalty at the start make sense? PanDocs says the first one is just discarded and that what sameboy does (???)
 // => Use 8 pixel length and have the first 6 cycles fetch a tile that is discarded (for partially visible object).
 // TODO: I can just use one Fifo Type for both fifos.
-const BackgroundFifo = std.fifo.LinearFifo(BackgroundFifo2bpp, .{ .Static = 2 });
-
-// TODO: Once this is done, rethink If I really want to store the fifos in 2bpp, or if I convert the data once into []colorId
-// This makes tryPushPixel() so much simpler and we don't need to keep track of used pixels in a 2bpp or the total number of pixels.
-// shader does not need to convert. shader2BPPCompress can compress 16 pixels into one i32.
-// Potential Drawback: Color mixing might be more challenging, because transparency is colorID 0 (or both bitplanes).
-    // Maybe create a testcase for how you would mix two sets of 2bpp colors and 2 sets of 8 colorID and what is better.
-    // Testresult: mixing colorIds is so much easier then bitplanes, USE COLORIDs! 
-// This can be so easily implemented with an inline for-loop and shlWithOverflow in a helper function.
-const ObjectFifo2bpp = struct {
-    first_bitplane: u8, 
-    second_bitplane: u8, 
-    // TODO: Use an palette index u3 (0-7 for CGB, 0-1 for DMG, 0 for Background/Window).
-    // TODO: We know which kind of palette to use based on which fifo this pixel is in.
-    pallete_addr: u16,
-    used_pixels: u4,
-
-    obj_prio: u6, // CGB: OAM index, DMG: Unused
-    // TODO: use the enum from the object or u1?
-    bg_prio: u1,
-};
-const ObjectFiFo = std.fifo.LinearFifo(ObjectFifo2bpp, .{ .Static = 2 });
+const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = 2 });
+const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = 2 });
 
 fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
     return if(current_obj_colorid == 0) new_obj_colorid else current_obj_colorid;
@@ -157,7 +150,7 @@ const ObjectLineEntry = struct {
     screen_pos_x: i9, // to compose uOps.
     tile_row: u4, // single_height: [0, 7], double_height: [0, 15]
     tile_index: u8,
-    palette_addr: u16,
+    palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     // TODO: use the enum from the object or u1?
     bg_prio: u1,
@@ -235,7 +228,7 @@ pub const State = struct {
     line_cycles: u9 = 0,
     line_initial_shift: u3 = 0,
     fetcher_tile_addr: u16 = 0,
-    fetcher_data: ObjectFifo2bpp = undefined,
+    fetcher_data: FifoData = undefined,
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineList = ObjectLineList.init(0) catch unreachable,
 
@@ -287,7 +280,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_tile_addr += 1;
             tryPushPixel(state, memory);
         },
-        // TODO: zig 0.14.0 has labeled switches that i can use for fallthrough.
+        // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
         // Fall from _bg to _obj
         // https://github.com/ziglang/zig/issues/8220
         .fetch_data_low_obj => {
@@ -299,7 +292,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.used_pixels = 0;
             tryPushPixel(state, memory);
         },
-        // TODO: zig 0.14.0 has labeled switches that i can use for fallthrough.
+        // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
         // Fall from _bg to _obj
         // https://github.com/ziglang/zig/issues/8220
         .fetch_data_high_obj => {
@@ -308,18 +301,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_push_bg => {
             const length_before: u8 = @intCast(state.background_fifo.readableLength());
-            state.background_fifo.writeItem(.{ // We use an ObjectFifo2bpp Type which is a super-set of BackgroundFifo2bpp.
-                .first_bitplane = state.fetcher_data.first_bitplane,
-                .second_bitplane = state.fetcher_data.second_bitplane,
-                .pallete_addr = state.fetcher_data.pallete_addr, 
-                .used_pixels = state.fetcher_data.used_pixels,
-            }) catch {};
+            state.background_fifo.writeItem(state.fetcher_data) catch {};
             const length_after: u8 = @intCast(state.background_fifo.readableLength());
             state.fifo_pixel_count += (length_after - length_before) * tile_size_x; 
             tryPushPixel(state, memory);
         },
         .fetch_push_obj => {
-            _ = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane);
             // TODO: Mix with existing object data if we have one. This will crash if we already have 2 object data.
             state.object_fifo.writeItem(state.fetcher_data) catch {};
             tryPushPixel(state, memory);
@@ -330,18 +317,19 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
             state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
-            state.fetcher_data.pallete_addr = mem_map.bg_palette;
+            state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
             const object: ObjectLineEntry = state.oam_line_list.pop();
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
-            // In double height mode you are allowed to use either an even tile_index or the next tile_index and draw the same object.
-            const obj_tile_index = if(lcd_control.obj_size == .double_height) object.tile_index - (object.tile_index % 2) else object.tile_index;
+            // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
+            const obj_tile_index_offset: u8 = @intFromEnum(lcd_control.obj_size) * (object.tile_index % 2);
+            const obj_tile_index: u8 = object.tile_index - obj_tile_index_offset;
             const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
             const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
             state.fetcher_tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
-            state.fetcher_data.pallete_addr = object.palette_addr;
+            state.fetcher_data.palette_index = object.palette_index;
             state.fetcher_data.bg_prio = object.bg_prio;
             state.fetcher_data.obj_prio = object.obj_prio;
         },
@@ -351,7 +339,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const win_pos_y: u8 = memory[mem_map.window_y];
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
             state.fetcher_tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
-            state.fetcher_data.pallete_addr = mem_map.bg_palette;
+            state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
         .nop => {
@@ -361,7 +349,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .oam_check => {
             const object = Object.fromOAM(memory, state.oam_scan_idx);
-            const object_height: u8 = if(lcd_control.obj_size == .double_height) tile_size_y * 2 else tile_size_y;
+            const object_height: u8 = tile_size_y * (1 + @intFromEnum(lcd_control.obj_size));
             const obj_pixel_y: i16 = @as(i16, state.lcd_y) + 16 - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
@@ -370,7 +358,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                     // TODO: Objects need to flip vertically invert the tile_row here!
                     .tile_row = @intCast(obj_pixel_y),
                     .tile_index = object.tile_index, 
-                    .palette_addr = if(object.flags.dmg_palette == .obp0) mem_map.obj_palette_0 else mem_map.obj_palette_1,
+                    .palette_index =  @intFromEnum(object.flags.dmg_palette),
                     .obj_prio = state.oam_scan_idx, // CGB: OAM index, DMG: Unused
                     .bg_prio = @intFromEnum(object.flags.priority),
                 }) catch {};
@@ -441,7 +429,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
    
     // TODO: Implement mixing object and background fifo. Maybe if we don't have an object use an color_id with 0 as fallback (which is transparent).
     // const object_pixel = state.object_fifo.readItem() orelse transparent_pixel;
-    const pixel2bpp: *BackgroundFifo2bpp = &state.background_fifo.buf[state.background_fifo.head];
+    const pixel2bpp: *FifoData = &state.background_fifo.buf[state.background_fifo.head];
     pixel2bpp.used_pixels += 1;
     pixel2bpp.first_bitplane, const first_color_bit = @shlWithOverflow(pixel2bpp.first_bitplane, 1);
     pixel2bpp.second_bitplane, const second_color_bit = @shlWithOverflow(pixel2bpp.second_bitplane, 1);
@@ -451,7 +439,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     } else {
         const color_id: u2 = @as(u2, first_color_bit) + (@as(u2, second_color_bit) << 1); // LSB first
 
-        const palette = getPalette(memory[pixel2bpp.pallete_addr]);
+        const palette = getPalette(memory[mem_map.bg_palette]);
         const hw_color_id: u2 = palette[color_id];
         const first_hw_color_bit: u8 = @intCast(hw_color_id & 0b01);
         const second_hw_color_bit: u8 = @intCast((hw_color_id & 0b10) >> 1);

@@ -70,6 +70,7 @@ pub const lcd_y: u16            = 0xFF44;
 pub const lcd_y_compare: u16    = 0xFF45;
 pub const dma: u16              = 0xFF46;
 pub const bg_palette: u16       = 0xFF47;
+pub const obj_palettes_dmg: u16 = 0xFF48;
 pub const obj_palette_0: u16    = 0xFF48;
 pub const obj_palette_1: u16    = 0xFF49;
 pub const window_y: u16         = 0xFF4A;
