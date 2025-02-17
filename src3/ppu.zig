@@ -163,7 +163,9 @@ const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1)
                    ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
 
 // draw
-// TODO: Add support for partially visible objects.
+// TODO: Add support for partially visible objects. 
+// TODO: According to pandocs the first tile we would load (draw_bg_tile_uops) will be discarded.
+// Because I don't handle this corerectly I will just add 6 nops instead.
 const draw_initial_uops = [_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop };
 const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 const draw_first_window_tile_uops = [_]MicroOp{ .clear_fifo_bg, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
@@ -178,36 +180,6 @@ const hblank_uops = [_]MicroOp{ .nop } ** 203;
 // vblank
 const vblank_uops = [_]MicroOp{ .nop } ** 455;
 
-/// Generates all uops needed for the draw mode and hblank mode of the current line.
-fn genMicroCodeDrawAndHBlank(state: *State, line_initial_shift: u3) void {
-    // TODO: Add support for objects and window!
-    // TODO: I need to rethink how to generate this code better in a dynamic way.
-    // draw
-    // TODO: According to pandocs the first tile we would load (draw_bg_tile_uops) will be discarded.
-    // Because I don't handle this corerectly I will just add 6 nops instead.
-    // Later I should load garbage data and discard it, so that I can support partially visible objects.
-    state.uop_fifo.write(&[_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop }) catch unreachable;
-    state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
-    for(0..19) |_| {
-        state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
-        state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg, .fetch_push_bg }) catch unreachable;
-    }
-    state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
-    state.uop_fifo.write(&[_]MicroOp{ .fetch_push_bg }) catch unreachable;
-    // TODO: pretty hacky!
-    const initial_shift_uops = [_]MicroOp{ .fetch_push_bg } ++ draw_bg_tile_uops ++ [_]MicroOp{ .fetch_push_bg, .fetch_push_bg };
-    for(0..line_initial_shift) |i| {
-        state.uop_fifo.writeItem(initial_shift_uops[i]) catch unreachable;
-    }
-    state.uop_fifo.write(&[_]MicroOp{ .advance_mode_hblank }) catch unreachable;
-
-    // hblank
-    const hblank_len = 455 - 80 - state.uop_fifo.readableLength();
-    state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
-    const advance: MicroOp = if(state.lcd_y >= 143) .advance_mode_vblank else .advance_mode_oam_scan;
-    state.uop_fifo.writeItem(advance) catch unreachable;
-}
-
 const FetcherData = struct {
     tile_addr: u16,
     first_bitplane: u8, 
@@ -221,7 +193,7 @@ const FetcherData = struct {
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
-    uop_fifo: MicroOpFifo = MicroOpFifo.init(),     
+    uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
     lcd_x: u8 = 0, 
     lcd_y: u8 = 0, 
     line_cycles: u9 = 0,
@@ -247,7 +219,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             lcd_stat.mode = .draw;
             const scroll_x: u8 = memory[mem_map.scroll_x];
             state.line_initial_shift = @intCast(scroll_x % 8);
-            genMicroCodeDrawAndHBlank(state, state.line_initial_shift);
+            state.uop_fifo.writeAssumeCapacity(&draw_initial_uops); 
+            state.uop_fifo.writeAssumeCapacity(&draw_bg_tile_uops); 
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.lcd_x = 0;
@@ -257,6 +230,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .advance_mode_hblank => {
             assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
             assert(state.lcd_x < 161); // we drew to many pixels before entering hblank
+
+            const hblank_len = 455 - 80 - state.line_cycles;
+            state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
+            const advance: MicroOp = if(state.lcd_y >= 143) .advance_mode_vblank else .advance_mode_oam_scan;
+            state.uop_fifo.writeItem(advance) catch unreachable;
             lcd_stat.mode = .h_blank;
             state.lcd_y += 1;
         },
@@ -301,7 +279,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
         },
         .fetch_push_bg => {    
-            if(state.background_fifo.readableLength() == 0) {
+            assert(state.uop_fifo.readableLength() == 0); // fetch_push_bg should be the last operation. 
+            if(state.background_fifo.readableLength() == 0) { // push succeeded
                 const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
                 inline for(color_ids) |color_id| {
                     state.background_fifo.writeItem(.{ 
@@ -311,6 +290,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                         .obj_prio = 0 
                     }) catch unreachable;
                 }
+                state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
+            } else { // push failed 
+                state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
             }
             tryPushPixel(state, memory);
         },
@@ -449,6 +431,15 @@ fn getPalette(paletteByte: u8) [4]u2 {
     return [4]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
+fn incrementLcdX(state: *State, _: *[def.addr_space]u8) void {
+    // const win_pos_x: u8 = memory[mem_map.window_x] - 7;
+    state.lcd_x += 1;
+    if(state.lcd_x == 160) {
+        state.uop_fifo.discard(state.uop_fifo.readableLength());
+        state.uop_fifo.writeItem(.advance_mode_hblank) catch unreachable;
+    }
+}
+
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) {
         return;
@@ -484,5 +475,5 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
     second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
 
-    state.lcd_x += 1;
+    incrementLcdX(state, memory);
 }
