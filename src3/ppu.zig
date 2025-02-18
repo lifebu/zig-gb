@@ -128,7 +128,7 @@ const ObjectLineEntry = struct {
     tile_index: u8,
     palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
-    obj_flip_y: bool,
+    obj_flip_x: bool,
     bg_prio: ObjectPriority,
 };
 const ObjectLineList = std.BoundedArray(ObjectLineEntry, 10);
@@ -187,7 +187,7 @@ const FetcherData = struct {
     second_bitplane: u8,
     palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
-    obj_flip_y: bool,
+    obj_flip_x: bool,
     bg_prio: ObjectPriority,
 };
 
@@ -202,6 +202,8 @@ pub const State = struct {
     line_initial_shift: u3 = 0,
     fetcher_data: FetcherData = undefined,
     oam_scan_idx: u6 = 0,
+    // TODO: Rethink what data structure is best for this.
+    // I would like a sorted list (screen_pos_x ascending) and also an easy way to get the first element of the list.
     oam_line_list: ObjectLineList = ObjectLineList.init(0) catch unreachable,
 
     color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** 40 ** 144,
@@ -212,6 +214,8 @@ pub fn init(state: *State) void {
 }
 
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
+    // TODO: Workaround!
+    memory[mem_map.window_x] = 8;
     var lcd_stat = LcdStat.fromMem(memory);
     const lcd_control = LcdControl.fromMem(memory);
 
@@ -231,6 +235,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.draw_window = false;
         },
         .advance_mode_hblank => {
+            // TODO: Add more asserts everywhere to make sure this works correctly!
             assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
             assert(state.lcd_x < 161); // we drew to many pixels before entering hblank
 
@@ -304,16 +309,22 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_push_obj => {
-            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_y);
+            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
             inline for(0..color_ids.len) |i| {
                 const current_color: u2 = if(state.object_fifo.readableLength() > i) state.object_fifo.peekItem(i).color_id else color_id_transparent;
                 const mixed_color: u2 = mixObjectColorId(current_color, color_ids[i]);
+                // TODO: When the objects overlap we should not call writeItem (this appends a pixel!)
                 state.object_fifo.writeItem(.{ 
                     .color_id = mixed_color, 
                     .bg_prio = state.fetcher_data.bg_prio, 
                     .palette_index = state.fetcher_data.palette_index, 
                     .obj_prio = state.fetcher_data.obj_prio 
                 }) catch unreachable;
+            }
+            if(state.draw_window) {
+                state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
+            } else {
+                state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
             }
             tryPushPixel(state, memory);
         },
@@ -327,7 +338,17 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
-            const object: ObjectLineEntry = state.oam_line_list.pop();
+            // TODO: I would like to use a simpler pop-style, but the objects a sorted by x_position ascending.
+            // This is very over the top!
+            var found: bool = false;
+            var object: ObjectLineEntry = undefined;
+            for(state.oam_line_list.slice()) |i_object| {
+                if(i_object.screen_pos_x == state.lcd_x) {
+                    object = i_object;
+                    found = true;
+                }
+            }
+            assert(found); // We must find the correct object when we trigger a tile fetch.
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
             const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (object.tile_index % 2);
@@ -337,7 +358,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
             state.fetcher_data.palette_index = object.palette_index;
             state.fetcher_data.bg_prio = object.bg_prio;
-            state.fetcher_data.obj_flip_y = object.obj_flip_y;
+            state.fetcher_data.obj_flip_x = object.obj_flip_x;
             state.fetcher_data.obj_prio = object.obj_prio;
         },
         .fetch_tile_window => {
@@ -360,7 +381,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const obj_pixel_y: i16 = @as(i16, state.lcd_y) + 16 - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
-                const tile_row: u4 = @intCast(object_flip % tile_size_y);
+                const tile_row: u4 = @intCast(object_flip % object_height);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
                 state.oam_line_list.append(.{ 
                     .screen_pos_x = @as(i9, object.x_position) - 8, 
@@ -368,7 +389,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                     .tile_index = object.tile_index, 
                     .palette_index =  @intFromEnum(object.flags.dmg_palette),
                     .obj_prio = state.oam_scan_idx, // CGB: OAM index, DMG: Unused
-                    .obj_flip_y = object.flags.y_flip,
+                    .obj_flip_x = object.flags.x_flip,
                     .bg_prio = object.flags.priority,
                 }) catch {};
             }
@@ -422,9 +443,9 @@ fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
     return if(current_obj_colorid == color_id_transparent) new_obj_colorid else current_obj_colorid;
 }
 
-fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, bg_prio: ObjectPriority) u2 {
+fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, original_obj_colorid: u2, bg_prio: ObjectPriority) u2 {
     if(bg_prio == .obj_over_bg) {
-        return if(obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
+        return if(original_obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
     } else {
         return if(bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
     }
@@ -439,12 +460,13 @@ fn getPalette(paletteByte: u8) [4]u2 {
 }
 
 fn incrementLcdX(state: *State, memory: *[def.addr_space]u8) void {
+    state.lcd_x += 1;
     // TODO: This might not trigger correctly for win_pos_x == 0.
     // I tried to move this to the start of the cycle function, but this broke a lot more.
     // Maybe try a negative lcd_x do nop_draw for the first 6 tiles?
     const win_pos_x: u8 = memory[mem_map.window_x] - 7;
     const win_pos_y: u8 = memory[mem_map.window_y];
-    state.lcd_x += 1;
+
     if(state.lcd_x == 160) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeItem(.advance_mode_hblank) catch unreachable;
@@ -453,6 +475,15 @@ fn incrementLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
         state.background_fifo.discard(state.background_fifo.readableLength());
         state.draw_window = true;
+    } else {
+        // TODO: Use the state.oam_scan_idx to speed this up, because the list is sorted.
+        for(state.oam_line_list.slice()) |object| {
+            if(object.screen_pos_x == state.lcd_x) {
+                state.uop_fifo.discard(state.uop_fifo.readableLength());
+                state.uop_fifo.write(&draw_object_tile_uops) catch unreachable;
+                break;
+            }
+        }
     }
 }
 
@@ -477,7 +508,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     const bg_palette = getPalette(memory[mem_map.bg_palette]);
     const bg_color_id: u2 = bg_palette[bg_pixel.color_id];
 
-    const color_id: u2 = mixBackgroundColorId(bg_color_id, obj_color_id, obj_pixel.bg_prio);
+    const color_id: u2 = mixBackgroundColorId(bg_color_id, obj_color_id, obj_pixel.color_id, obj_pixel.bg_prio);
     const first_hw_color_bit: u8 = @intCast(color_id & 0b01);
     const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
 
