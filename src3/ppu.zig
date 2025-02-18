@@ -168,8 +168,6 @@ const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1)
 // Because I don't handle this corerectly I will just add 6 nops instead.
 const draw_initial_uops = [_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop };
 const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
-// TODO: Delete this?
-const draw_first_window_tile_uops = [_]MicroOp{ .clear_fifo_bg, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
 // TODO: How can I draw objects at the edge of the screen that are only partially visible? 
 // Maybe the first 6 cycles on a line that are thrown away acording to documentation can actually be used for objects like this?
@@ -230,6 +228,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.lcd_x = 0;
+            // TODO: This sorting breaks the drawing priority. If the objects have the same x-coordinate the one that comes first in the OAM wins.
+            // Example: Title screen from pokemon blu
             std.mem.sort(ObjectLineEntry, state.oam_line_list.buffer[0..state.oam_line_list.len], {}, sort_objects);
             state.oam_scan_idx = 0;
             state.draw_window = false;
@@ -309,17 +309,29 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_push_obj => {
+            // TODO: Not a big fan of all those conditions, maybe we can write it better by using transparent data?
             const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
             inline for(0..color_ids.len) |i| {
-                const current_color: u2 = if(state.object_fifo.readableLength() > i) state.object_fifo.peekItem(i).color_id else color_id_transparent;
-                const mixed_color: u2 = mixObjectColorId(current_color, color_ids[i]);
-                // TODO: When the objects overlap we should not call writeItem (this appends a pixel!)
-                state.object_fifo.writeItem(.{ 
-                    .color_id = mixed_color, 
+                const newData = FifoData{
+                    .color_id = color_ids[i], 
                     .bg_prio = state.fetcher_data.bg_prio, 
                     .palette_index = state.fetcher_data.palette_index, 
                     .obj_prio = state.fetcher_data.obj_prio 
-                }) catch unreachable;
+                };
+
+                if(state.object_fifo.readableLength() > i) { // Mix existing pixel.
+                    // TODO: Not that nice to just raw access the fifo!
+                    var fifo_index = state.object_fifo.head + i;
+                    fifo_index %= state.object_fifo.buf.len;
+                    const current_pixel: *FifoData = &state.object_fifo.buf[fifo_index];
+                    const use_new: bool = current_pixel.color_id == color_id_transparent;
+                    if(use_new) {
+                        current_pixel.* = newData;
+                    }
+                    
+                } else { // Add new pixel
+                    state.object_fifo.writeItem(newData) catch unreachable;
+                }
             }
             if(state.draw_window) {
                 state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
@@ -443,11 +455,11 @@ fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
     return if(current_obj_colorid == color_id_transparent) new_obj_colorid else current_obj_colorid;
 }
 
-fn mixBackgroundColorId(bg_colorid: u2, obj_colorid: u2, original_obj_colorid: u2, bg_prio: ObjectPriority) u2 {
+fn mixBackgroundColorId(bg_colorid: u2, original_bg_colorid: u2, obj_colorid: u2, original_obj_colorid: u2, bg_prio: ObjectPriority) u2 {
     if(bg_prio == .obj_over_bg) {
         return if(original_obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
     } else {
-        return if(bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
+        return if(original_bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
     }
 }
 fn getPalette(paletteByte: u8) [4]u2 {
@@ -508,7 +520,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     const bg_palette = getPalette(memory[mem_map.bg_palette]);
     const bg_color_id: u2 = bg_palette[bg_pixel.color_id];
 
-    const color_id: u2 = mixBackgroundColorId(bg_color_id, obj_color_id, obj_pixel.color_id, obj_pixel.bg_prio);
+    const color_id: u2 = mixBackgroundColorId(bg_color_id, bg_pixel.color_id, obj_color_id, obj_pixel.color_id, obj_pixel.bg_prio);
     const first_hw_color_bit: u8 = @intCast(color_id & 0b01);
     const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
 
