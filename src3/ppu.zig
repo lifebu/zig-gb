@@ -137,11 +137,13 @@ pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
 }
 
 const MicroOp = enum {
+    // TODO: remove mode from the name-
     advance_mode_draw,
     advance_mode_hblank,
     advance_mode_oam_scan,
     advance_mode_vblank,
     clear_fifo_bg,
+    // TODO: remove data from the name. 
     fetch_data_low_bg,
     fetch_data_low_obj,
     fetch_data_high_bg,
@@ -212,8 +214,6 @@ pub fn init(state: *State) void {
 }
 
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
-    // TODO: Workaround!
-    memory[mem_map.window_x] = 8;
     var lcd_stat = LcdStat.fromMem(memory);
     const lcd_control = LcdControl.fromMem(memory);
 
@@ -227,12 +227,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_fifo.writeAssumeCapacity(&draw_bg_tile_uops); 
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
-            state.lcd_x = 0;
+            state.draw_window = false;
             // TODO: This sorting breaks the drawing priority. If the objects have the same x-coordinate the one that comes first in the OAM wins.
             // Example: Title screen from pokemon blu
             std.mem.sort(ObjectLineEntry, state.oam_line_list.buffer[0..state.oam_line_list.len], {}, sort_objects);
             state.oam_scan_idx = 0;
-            state.draw_window = false;
+            state.lcd_x = 0;
+            checkLcdX(state, memory);
         },
         .advance_mode_hblank => {
             // TODO: Add more asserts everywhere to make sure this works correctly!
@@ -375,7 +376,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
-            const win_pos_x: u8 = memory[mem_map.window_x] - 7;
+            const win_x: u8 = memory[mem_map.window_x];
+            const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
             const win_pos_y: u8 = memory[mem_map.window_y];
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
             state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
@@ -471,12 +473,12 @@ fn getPalette(paletteByte: u8) [4]u2 {
     return [4]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
-fn incrementLcdX(state: *State, memory: *[def.addr_space]u8) void {
-    state.lcd_x += 1;
+fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     // TODO: This might not trigger correctly for win_pos_x == 0.
     // I tried to move this to the start of the cycle function, but this broke a lot more.
     // Maybe try a negative lcd_x do nop_draw for the first 6 tiles?
-    const win_pos_x: u8 = memory[mem_map.window_x] - 7;
+    const win_x: u8 = memory[mem_map.window_x];
+    const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
     const win_pos_y: u8 = memory[mem_map.window_y];
 
     if(state.lcd_x == 160) {
@@ -526,6 +528,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
 
     // TODO: Move the shader code to use a texture of hardware colorIds and not bitplanes!
     const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
+    // TODO: This breaks after the first frame, because we are "adding" color ids to it, the last frame will be "smeared" on top of this frame.
     const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
     const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
 
@@ -534,5 +537,6 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
     second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
 
-    incrementLcdX(state, memory);
+    state.lcd_x += 1;
+    checkLcdX(state, memory);
 }

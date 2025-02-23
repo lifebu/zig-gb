@@ -6,10 +6,13 @@ pub const State = struct {
     memory: [def.addr_space]u8 = [1]u8{0} ** def.addr_space,
 };
 
-pub fn init(state: *State) void {
-    // Some test memory dump.
-    const result = std.fs.cwd().readFile("playground/castlevania.dump", &state.memory) catch unreachable;
-    std.debug.assert(result.len == state.memory.len);
+pub fn init(_: *State) void {
+}
+
+pub fn loadDump(state: *State, path: []u8) void {
+    const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
+    const len = file.readAll(&state.memory) catch unreachable;
+    std.debug.assert(len == state.memory.len);
 }
 
 pub fn cycle(_: *State) void {

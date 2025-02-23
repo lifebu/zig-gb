@@ -1,8 +1,9 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const sokol = @import("sokol");
-const imgui = @import("cimgui");
 
 const def = @import("defines.zig");
+const Imgui = @import("imgui.zig");
 const shader = @import("shaders/gb.glsl.zig");
 const shaderTypes = @import("shaders/shader_types.zig");
 
@@ -11,9 +12,12 @@ pub const State = struct {
     pip: sokol.gfx.Pipeline = .{},
     pass_action: sokol.gfx.PassAction = .{},
     ub_shader_init: shader.Init = undefined,
+    imgui_state: Imgui.State = .{},
 };
 
-pub fn init(state: *State) void {
+pub fn init(state: *State, alloc: std.mem.Allocator, imgui_cb: *const fn ([]u8) void) void {
+    Imgui.init(&state.imgui_state, alloc, imgui_cb);
+
     // gfx
     sokol.gfx.setup(.{
         .environment = sokol.glue.environment(),
@@ -92,14 +96,7 @@ pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]
         .delta_time = sokol.app.frameDuration(),
         .dpi_scale = sokol.app.dpiScale(),
     });
-
-    // Imgui
-    // imgui.igSetNextWindowPos(.{ .x = 10, .y = 10 }, imgui.ImGuiCond_Once);pla
-    // imgui.igSetNextWindowSize(.{ .x = 400, .y = 100 }, imgui.ImGuiCond_Once);
-    // _ = imgui.igBegin("Hello Dear ImGui!", 0, imgui.ImGuiWindowFlags_None);
-    // _ = imgui.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, imgui.ImGuiColorEditFlags_None);
-    // imgui.igEnd();
-    // Imgui
+    Imgui.render(&state.imgui_state);
 
     // graphics
     var window_title: [64]u8 = undefined;
@@ -107,7 +104,7 @@ pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]
     const new_title = std.fmt.bufPrintZ(&window_title, "Zig GB Emulator. FPS: {d:.2}", .{1.0 / delta_ms}) catch unreachable;
     sokol.app.setWindowTitle(new_title);
 
-    sokol.gfx.beginPass(.{ .swapchain = sokol.glue.swapchain() });
+    sokol.gfx.beginPass(.{ .action = state.pass_action, .swapchain = sokol.glue.swapchain() });
     sokol.gfx.applyPipeline(state.pip);
     sokol.gfx.applyBindings(state.bind);
     sokol.gfx.applyUniforms(shader.UB_init, sokol.gfx.asRange(&state.ub_shader_init));
@@ -121,12 +118,16 @@ pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]
     sokol.gfx.commit();
 }
 
-pub export fn event(ev: ?*const sokol.app.Event) void {
+pub export fn event(ev: ?*const sokol.app.Event, state_opaque: ?*anyopaque) void {
+    const state: ?*State = @alignCast(@ptrCast(state_opaque));
     if(ev) |e| {
         _ = sokol.imgui.handleEvent(e.*);
         if(e.type == .KEY_DOWN) {
-            if(e.key_code == .ESCAPE) {
+            if(e.key_code == .Q and (e.modifiers & sokol.app.modifier_ctrl != 0)) {
                 sokol.app.requestQuit();
+            } else if (e.key_code == .GRAVE_ACCENT) {
+                assert(state != null);
+                state.?.imgui_state.imgui_visible = !state.?.imgui_state.imgui_visible;
             }
         }
     }
@@ -135,12 +136,15 @@ pub export fn event(ev: ?*const sokol.app.Event) void {
 pub fn run(
     init_cb: ?*const fn () callconv(.C) void, 
     frame_cb: ?*const fn () callconv(.C) void,
-    deinit_cb: ?*const fn () callconv(.C) void) void {
+    deinit_cb: ?*const fn () callconv(.C) void,
+    state: *State) void {
+
     sokol.app.run(.{
         .init_cb = init_cb,
         .frame_cb = frame_cb,
         .cleanup_cb = deinit_cb,
-        .event_cb = event,
+        .event_userdata_cb = event,
+        .user_data = state, 
         .width = def.window_width,
         .height = def.window_height,
         .icon = .{ .sokol_default = true },

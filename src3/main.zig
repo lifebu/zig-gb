@@ -7,6 +7,7 @@ const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
 
 const state = struct {
+    var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var platform: Platform.State = .{};
     var apu: APU.State = .{};
     var mmu: MMU.State = .{};
@@ -14,10 +15,14 @@ const state = struct {
 };
 
 export fn init() void {
-    Platform.init(&state.platform);
+    Platform.init(&state.platform, state.allocator.allocator(), imgui_cb);
     APU.init(&state.apu);
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
+}
+
+fn imgui_cb(dump_path: []u8) void {
+    MMU.loadDump(&state.mmu, dump_path);
 }
 
 export fn frame() void {
@@ -30,6 +35,9 @@ export fn frame() void {
     }
 
     Platform.frame(&state.platform, state.ppu.color2bpp, state.apu.gb_sample_buffer);
+    // TODO: The ppu currently mixes pixels which will lead to previous frames changing the current frame.
+    // This leads to smearing. As a workaround, clear the color buffer each frame!
+    state.ppu.color2bpp = [_]u8{ 0 } ** 40 ** 144;
 }
 
 export fn deinit() void {
@@ -37,5 +45,8 @@ export fn deinit() void {
 }
 
 pub fn main() void {
-    Platform.run(init, frame, deinit);
+    state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = state.allocator.deinit();
+
+    Platform.run(init, frame, deinit, &state.platform);
 }
