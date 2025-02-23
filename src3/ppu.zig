@@ -386,7 +386,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .halt => {
-            state.uop_fifo.writeItem(.halt);
+            state.uop_fifo.writeItem(.halt) catch unreachable;
         },
         .nop => {
         },
