@@ -15,8 +15,8 @@ pub const State = struct {
     imgui_state: Imgui.State = .{},
 };
 
-pub fn init(state: *State, alloc: std.mem.Allocator, imgui_cb: *const fn ([]u8) void) void {
-    Imgui.init(&state.imgui_state, alloc, imgui_cb);
+pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
+    Imgui.init(&state.imgui_state, imgui_cb);
 
     // gfx
     sokol.gfx.setup(.{

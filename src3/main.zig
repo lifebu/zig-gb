@@ -7,7 +7,6 @@ const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
 
 const state = struct {
-    var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var platform: Platform.State = .{};
     var apu: APU.State = .{};
     var mmu: MMU.State = .{};
@@ -15,7 +14,7 @@ const state = struct {
 };
 
 export fn init() void {
-    Platform.init(&state.platform, state.allocator.allocator(), imgui_cb);
+    Platform.init(&state.platform, imgui_cb);
     APU.init(&state.apu);
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
@@ -45,8 +44,5 @@ export fn deinit() void {
 }
 
 pub fn main() void {
-    state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = state.allocator.deinit();
-
     Platform.run(init, frame, deinit, &state.platform);
 }
