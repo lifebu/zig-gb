@@ -21,8 +21,8 @@ const obj_per_line = 10;
 
 const cycles_per_line = 456;
 
-// TODO: Add support for all the flags in this, like the window enable, lcd enable, etc.
 const LcdControl = packed struct {
+    // TODO: Add support to disable background with this.
     bg_window_enable: bool = false,
     obj_enable: bool = false,
     obj_size: enum(u1) {
@@ -42,6 +42,9 @@ const LcdControl = packed struct {
         first_map,
         second_map,
     } = .first_map,
+    // TODO: Add support for lcd_enable. 
+    // When set to true, add .halt uop to uop_fifo. 
+    // When set to false, start add initialize ppu (like on start). 
     lcd_enable: bool = false,
 
     pub fn fromMem(memory: *[def.addr_space]u8) LcdControl {
@@ -49,7 +52,6 @@ const LcdControl = packed struct {
     } 
 };
 
-// TODO: Add support for updating the LCDStats and interrupts
 pub const LcdStat = packed struct {
     mode: enum(u2) {
         h_blank,
@@ -137,22 +139,21 @@ pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
 }
 
 const MicroOp = enum {
-    // TODO: remove mode from the name-
-    advance_mode_draw,
-    advance_mode_hblank,
-    advance_mode_oam_scan,
-    advance_mode_vblank,
+    advance_draw,
+    advance_hblank,
+    advance_oam_scan,
+    advance_vblank,
     clear_fifo_bg,
-    // TODO: remove data from the name. 
-    fetch_data_low_bg,
-    fetch_data_low_obj,
-    fetch_data_high_bg,
-    fetch_data_high_obj,
+    fetch_low_bg,
+    fetch_low_obj,
+    fetch_high_bg,
+    fetch_high_obj,
     fetch_push_bg,
     fetch_push_obj,
     fetch_tile_bg,
     fetch_tile_obj,
     fetch_tile_window,
+    halt,
     nop,
     nop_draw,
     oam_check,
@@ -162,19 +163,19 @@ const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line })
 
 // oam_scan
 const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
-                   ++ [_]MicroOp{ .oam_check, .advance_mode_draw };
+                   ++ [_]MicroOp{ .oam_check, .advance_draw };
 
 // draw
 // TODO: Add support for partially visible objects. 
 // TODO: According to pandocs the first tile we would load (draw_bg_tile_uops) will be discarded.
 // Because I don't handle this corerectly I will just add 6 nops instead.
 const draw_initial_uops = [_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop };
-const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
-const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_data_low_bg, .nop_draw, .fetch_data_high_bg, .fetch_push_bg, };
+const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, .fetch_push_bg, };
+const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_low_bg, .nop_draw, .fetch_high_bg, .fetch_push_bg, };
 // TODO: How can I draw objects at the edge of the screen that are only partially visible? 
 // Maybe the first 6 cycles on a line that are thrown away acording to documentation can actually be used for objects like this?
 // This might be complicated for the mixing code? This would be like an overdraw?
-const draw_object_tile_uops = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_data_low_obj, .nop, .fetch_data_high_obj, .fetch_push_obj };
+const draw_object_tile_uops = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, .fetch_push_obj };
 
 // hblank
 const hblank_uops = [_]MicroOp{ .nop } ** 203;
@@ -219,7 +220,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
 
     const uop: MicroOp = state.uop_fifo.readItem().?;
     switch(uop) {
-        .advance_mode_draw => {
+        .advance_draw => {
             lcd_stat.mode = .draw;
             const scroll_x: u8 = memory[mem_map.scroll_x];
             state.line_initial_shift = @intCast(scroll_x % 8);
@@ -235,37 +236,37 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.lcd_x = 0;
             checkLcdX(state, memory);
         },
-        .advance_mode_hblank => {
+        .advance_hblank => {
             // TODO: Add more asserts everywhere to make sure this works correctly!
             assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
             assert(state.lcd_x < 161); // we drew to many pixels before entering hblank
 
             const hblank_len = 455 - 80 - state.line_cycles;
             state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
-            const advance: MicroOp = if(state.lcd_y >= 143) .advance_mode_vblank else .advance_mode_oam_scan;
+            const advance: MicroOp = if(state.lcd_y >= 143) .advance_vblank else .advance_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
             lcd_stat.mode = .h_blank;
             state.lcd_y += 1;
         },
-        .advance_mode_oam_scan => {
+        .advance_oam_scan => {
             lcd_stat.mode = .oam_scan;
             state.uop_fifo.write(&oam_scan_uops) catch unreachable;
             state.oam_line_list.resize(0) catch unreachable;
             state.oam_scan_idx = 0;
             state.line_cycles = 0;
         },
-        .advance_mode_vblank => {
+        .advance_vblank => {
             lcd_stat.mode = .v_blank;
             state.line_cycles = 0;
             state.uop_fifo.write(&vblank_uops) catch unreachable;
             state.lcd_y = (state.lcd_y + 1) % 154;
-            const advance: MicroOp = if(state.lcd_y == 0) .advance_mode_oam_scan else .advance_mode_vblank;
+            const advance: MicroOp = if(state.lcd_y == 0) .advance_oam_scan else .advance_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
         .clear_fifo_bg => {
             state.background_fifo.discard(state.background_fifo.readableLength());
         },
-        .fetch_data_low_bg => {
+        .fetch_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
             tryPushPixel(state, memory);
@@ -273,18 +274,18 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
         // Fall from _bg to _obj
         // https://github.com/ziglang/zig/issues/8220
-        .fetch_data_low_obj => {
+        .fetch_low_obj => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
         },
-        .fetch_data_high_bg => {
+        .fetch_high_bg => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
             tryPushPixel(state, memory);
         },
         // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
         // Fall from _bg to _obj
         // https://github.com/ziglang/zig/issues/8220
-        .fetch_data_high_obj => {
+        .fetch_high_obj => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
         },
         .fetch_push_bg => {    
@@ -384,6 +385,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
+        .halt => {
+            state.uop_fifo.writeItem(.halt);
+        },
         .nop => {
         },
         .nop_draw => {
@@ -414,8 +418,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             unreachable;
         },
     }
-
     state.line_cycles += 1;
+
+    memory[mem_map.lcd_y] = state.lcd_y;
+    lcd_stat.ly_is_lyc = state.lcd_y == memory[mem_map.lcd_y_compare];
+    // TODO: Add support for stat interrupt.
     lcd_stat.toMem(memory);
 }
 
@@ -474,6 +481,7 @@ fn getPalette(paletteByte: u8) [4]u2 {
 }
 
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
+    const lcd_control = LcdControl.fromMem(memory);
     // TODO: This might not trigger correctly for win_pos_x == 0.
     // I tried to move this to the start of the cycle function, but this broke a lot more.
     // Maybe try a negative lcd_x do nop_draw for the first 6 tiles?
@@ -483,13 +491,13 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
 
     if(state.lcd_x == 160) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeItem(.advance_mode_hblank) catch unreachable;
-    } else if (state.lcd_y >= win_pos_y and state.lcd_x == win_pos_x) {
+        state.uop_fifo.writeItem(.advance_hblank) catch unreachable;
+    } else if (state.lcd_y >= win_pos_y and state.lcd_x == win_pos_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
         state.background_fifo.discard(state.background_fifo.readableLength());
         state.draw_window = true;
-    } else {
+    } else if(lcd_control.obj_enable) {
         // TODO: Use the state.oam_scan_idx to speed this up, because the list is sorted.
         for(state.oam_line_list.slice()) |object| {
             if(object.screen_pos_x == state.lcd_x) {
