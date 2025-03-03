@@ -9,7 +9,7 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn loadDump(state: *State, path: []u8) void {
+pub fn loadDump(state: *State, path: []const u8) void {
     const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
     const len = file.readAll(&state.memory) catch unreachable;
     std.debug.assert(len == state.memory.len);

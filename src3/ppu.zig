@@ -482,9 +482,6 @@ fn getPalette(paletteByte: u8) [4]u2 {
 
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     const lcd_control = LcdControl.fromMem(memory);
-    // TODO: This might not trigger correctly for win_pos_x == 0.
-    // I tried to move this to the start of the cycle function, but this broke a lot more.
-    // Maybe try a negative lcd_x do nop_draw for the first 6 tiles?
     const win_x: u8 = memory[mem_map.window_x];
     const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
     const win_pos_y: u8 = memory[mem_map.window_y];

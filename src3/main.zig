@@ -1,12 +1,15 @@
 const std = @import("std");
 
 const def = @import("defines.zig");
+const CLI = @import("cli.zig");
 const Platform = @import("platform.zig");
 const APU = @import("apu.zig");
 const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
 
 const state = struct {
+    var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
+    var cli: CLI.State = .{};
     var platform: Platform.State = .{};
     var apu: APU.State = .{};
     var mmu: MMU.State = .{};
@@ -14,10 +17,17 @@ const state = struct {
 };
 
 export fn init() void {
+    state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
+    CLI.init(&state.cli, state.allocator.allocator());
     Platform.init(&state.platform, imgui_cb);
     APU.init(&state.apu);
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
+
+    // TODO: Better way to do this? Not in main function!
+    if(state.cli.dumpFile) |dumpFile| {
+        MMU.loadDump(&state.mmu, dumpFile);
+    }
 }
 
 fn imgui_cb(dump_path: []u8) void {
@@ -40,7 +50,9 @@ export fn frame() void {
 }
 
 export fn deinit() void {
+    CLI.deinit(&state.cli, state.allocator.allocator());
     Platform.deinit();
+    _ = state.allocator.deinit();
 }
 
 pub fn main() void {
