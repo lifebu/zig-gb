@@ -305,7 +305,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(found); // We must find the correct object when we trigger a tile fetch.
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
-            // TODO: With overscan space objects are 1 pixels of in the x-Axis.
             const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (object.tile_index % 2);
             const obj_tile_index: u8 = object.tile_index - obj_tile_index_offset;
             const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
@@ -343,7 +342,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const tile_row: u4 = @intCast(object_flip % object_height);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
                 state.oam_line_list.append(.{ 
-                    .obj_pos_x = object.x_position, 
+                    .obj_pos_x = object.x_position + 1, 
                     .tile_row = tile_row,
                     .tile_index = object.tile_index, 
                     .palette_index =  @intFromEnum(object.flags.dmg_palette),
@@ -532,6 +531,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
 
     // TODO: Move the shader code to use a texture of hardware colorIds and not bitplanes!
+    // Like the example from sokol chipz
     const bitplane_idx: u13 = (@as(u13, state.lcd_overscan_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
     // TODO: This breaks after the first frame, because we are "adding" color ids to it, the last frame will be "smeared" on top of this frame.
     const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
