@@ -124,8 +124,7 @@ const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x })
 const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 
 const ObjectLineEntry = struct {
-    // TODO: actuall u8, but we can have negative screen_pos for partially visible objects because they also count to the object limit!
-    screen_pos_x: i9, // to compose uOps.
+    obj_pos_x: u8,
     tile_row: u4, // single_height: [0, 7], double_height: [0, 15]
     tile_index: u8,
     palette_index: u3,
@@ -135,7 +134,7 @@ const ObjectLineEntry = struct {
 };
 const ObjectLineList = std.BoundedArray(ObjectLineEntry, 10);
 pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
-    return lhs.screen_pos_x < rhs.screen_pos_x;
+    return lhs.obj_pos_x < rhs.obj_pos_x;
 }
 
 const MicroOp = enum {
@@ -162,25 +161,18 @@ const MicroOp = enum {
 const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
 
 // oam_scan
-const oam_scan_uops = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
+const oam_scan = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
                    ++ [_]MicroOp{ .oam_check, .advance_draw };
 
 // draw
-// TODO: Add support for partially visible objects. 
-// TODO: According to pandocs the first tile we would load (draw_bg_tile_uops) will be discarded.
-// Because I don't handle this corerectly I will just add 6 nops instead.
-const draw_initial_uops = [_]MicroOp{ .nop, .nop, .nop, .nop, .nop, .nop };
-const draw_bg_tile_uops = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, .fetch_push_bg, };
-const draw_window_tile_uops = [_]MicroOp{ .nop_draw, .fetch_tile_window, .fetch_low_bg, .nop_draw, .fetch_high_bg, .fetch_push_bg, };
-// TODO: How can I draw objects at the edge of the screen that are only partially visible? 
-// Maybe the first 6 cycles on a line that are thrown away acording to documentation can actually be used for objects like this?
-// This might be complicated for the mixing code? This would be like an overdraw?
-const draw_object_tile_uops = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, .fetch_push_obj };
+const draw_bg_tile = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, };
+const draw_window_tile = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg };
+const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, };
 
 // hblank
-const hblank_uops = [_]MicroOp{ .nop } ** 203;
+const hblank = [_]MicroOp{ .nop } ** 203;
 // vblank
-const vblank_uops = [_]MicroOp{ .nop } ** 455;
+const vblank = [_]MicroOp{ .nop } ** 455;
 
 const FetcherData = struct {
     tile_addr: u16,
@@ -196,7 +188,8 @@ pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
     uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
-    lcd_x: u8 = 0, 
+    // In overscan space: [0, 167]
+    lcd_overscan_x: u8 = 0, 
     lcd_y: u8 = 0, 
     draw_window: bool = false,
     line_cycles: u9 = 0,
@@ -204,14 +197,14 @@ pub const State = struct {
     fetcher_data: FetcherData = undefined,
     oam_scan_idx: u6 = 0,
     // TODO: Rethink what data structure is best for this.
-    // I would like a sorted list (screen_pos_x ascending) and also an easy way to get the first element of the list.
+    // I would like a sorted list (obj_pos_x ascending) and also an easy way to get the first element of the list.
     oam_line_list: ObjectLineList = ObjectLineList.init(0) catch unreachable,
 
-    color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** 40 ** 144,
+    color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** def.num_2bpp,
 };
 
 pub fn init(state: *State) void {
-    state.uop_fifo.write(&oam_scan_uops) catch unreachable;
+    state.uop_fifo.write(&oam_scan) catch unreachable;
 }
 
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
@@ -224,8 +217,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             lcd_stat.mode = .draw;
             const scroll_x: u8 = memory[mem_map.scroll_x];
             state.line_initial_shift = @intCast(scroll_x % 8);
-            state.uop_fifo.writeAssumeCapacity(&draw_initial_uops); 
-            state.uop_fifo.writeAssumeCapacity(&draw_bg_tile_uops); 
+            state.uop_fifo.writeAssumeCapacity(&draw_bg_tile); 
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.draw_window = false;
@@ -233,16 +225,16 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             // Example: Title screen from pokemon blu
             std.mem.sort(ObjectLineEntry, state.oam_line_list.buffer[0..state.oam_line_list.len], {}, sort_objects);
             state.oam_scan_idx = 0;
-            state.lcd_x = 0;
+            state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
         },
         .advance_hblank => {
             // TODO: Add more asserts everywhere to make sure this works correctly!
-            assert(state.lcd_x > 159); // we drew to few pixels before entering hblank
-            assert(state.lcd_x < 161); // we drew to many pixels before entering hblank
+            assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
+            assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
             const hblank_len = 455 - 80 - state.line_cycles;
-            state.uop_fifo.write(hblank_uops[0..hblank_len]) catch unreachable;
+            state.uop_fifo.write(hblank[0..hblank_len]) catch unreachable;
             const advance: MicroOp = if(state.lcd_y >= 143) .advance_vblank else .advance_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
             lcd_stat.mode = .h_blank;
@@ -250,7 +242,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_oam_scan => {
             lcd_stat.mode = .oam_scan;
-            state.uop_fifo.write(&oam_scan_uops) catch unreachable;
+            state.uop_fifo.write(&oam_scan) catch unreachable;
             state.oam_line_list.resize(0) catch unreachable;
             state.oam_scan_idx = 0;
             state.line_cycles = 0;
@@ -258,7 +250,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .advance_vblank => {
             lcd_stat.mode = .v_blank;
             state.line_cycles = 0;
-            state.uop_fifo.write(&vblank_uops) catch unreachable;
+            state.uop_fifo.write(&vblank) catch unreachable;
             state.lcd_y = (state.lcd_y + 1) % 154;
             const advance: MicroOp = if(state.lcd_y == 0) .advance_oam_scan else .advance_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
@@ -271,79 +263,27 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.tile_addr += 1;
             tryPushPixel(state, memory);
         },
-        // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
-        // Fall from _bg to _obj
-        // https://github.com/ziglang/zig/issues/8220
         .fetch_low_obj => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
         },
         .fetch_high_bg => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
-            tryPushPixel(state, memory);
+            fetchPushBg(state, memory);
         },
-        // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
-        // Fall from _bg to _obj
-        // https://github.com/ziglang/zig/issues/8220
         .fetch_high_obj => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
+            fetchPushObj(state, memory);
         },
-        .fetch_push_bg => {    
-            assert(state.uop_fifo.readableLength() == 0); // fetch_push_bg should be the last operation. 
-            if(state.background_fifo.readableLength() == 0) { // push succeeded
-                const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
-                inline for(color_ids) |color_id| {
-                    state.background_fifo.writeItem(.{ 
-                        .color_id = color_id, 
-                        .bg_prio = .obj_over_bg, 
-                        .palette_index = 0, 
-                        .obj_prio = 0 
-                    }) catch unreachable;
-                }
-                if(state.draw_window) {
-                    state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
-                } else {
-                    state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
-                }
-            } else { // push failed 
-                state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
-            }
-            tryPushPixel(state, memory);
+        .fetch_push_bg => {
+            fetchPushBg(state, memory);
         },
         .fetch_push_obj => {
-            // TODO: Not a big fan of all those conditions, maybe we can write it better by using transparent data?
-            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
-            inline for(0..color_ids.len) |i| {
-                const newData = FifoData{
-                    .color_id = color_ids[i], 
-                    .bg_prio = state.fetcher_data.bg_prio, 
-                    .palette_index = state.fetcher_data.palette_index, 
-                    .obj_prio = state.fetcher_data.obj_prio 
-                };
-
-                if(state.object_fifo.readableLength() > i) { // Mix existing pixel.
-                    // TODO: Not that nice to just raw access the fifo!
-                    var fifo_index = state.object_fifo.head + i;
-                    fifo_index %= state.object_fifo.buf.len;
-                    const current_pixel: *FifoData = &state.object_fifo.buf[fifo_index];
-                    const use_new: bool = current_pixel.color_id == color_id_transparent;
-                    if(use_new) {
-                        current_pixel.* = newData;
-                    }
-                    
-                } else { // Add new pixel
-                    state.object_fifo.writeItem(newData) catch unreachable;
-                }
-            }
-            if(state.draw_window) {
-                state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
-            } else {
-                state.uop_fifo.write(&draw_bg_tile_uops) catch unreachable;
-            }
-            tryPushPixel(state, memory);
+            fetchPushObj(state, memory);
         },
         .fetch_tile_bg => {
             const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
+            // TODO: Subtile scrolling does not work correctly anymore!
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
@@ -357,7 +297,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             var found: bool = false;
             var object: ObjectLineEntry = undefined;
             for(state.oam_line_list.slice()) |i_object| {
-                if(i_object.screen_pos_x == state.lcd_x) {
+                if(i_object.obj_pos_x == state.lcd_overscan_x) {
                     object = i_object;
                     found = true;
                 }
@@ -365,6 +305,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(found); // We must find the correct object when we trigger a tile fetch.
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
+            // TODO: With overscan space objects are 1 pixels of in the x-Axis.
             const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (object.tile_index % 2);
             const obj_tile_index: u8 = object.tile_index - obj_tile_index_offset;
             const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
@@ -402,7 +343,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const tile_row: u4 = @intCast(object_flip % object_height);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
                 state.oam_line_list.append(.{ 
-                    .screen_pos_x = @as(i9, object.x_position) - 8, 
+                    .obj_pos_x = object.x_position, 
                     .tile_row = tile_row,
                     .tile_index = object.tile_index, 
                     .palette_index =  @intFromEnum(object.flags.dmg_palette),
@@ -426,9 +367,70 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     lcd_stat.toMem(memory);
 }
 
+// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
+// https://github.com/ziglang/zig/issues/8220
+fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
+    if(state.background_fifo.readableLength() == 0) { // push succeeded
+        const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
+        inline for(color_ids) |color_id| {
+            state.background_fifo.writeItem(.{ 
+                .color_id = color_id, 
+                .bg_prio = .obj_over_bg, 
+                .palette_index = 0, 
+                .obj_prio = 0 
+            }) catch unreachable;
+        }
+        if(state.draw_window) {
+            state.uop_fifo.write(&draw_window_tile) catch unreachable;
+        } else {
+            state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+        }
+    } else { // push failed 
+        state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
+    }
+    tryPushPixel(state, memory);
+
+}
+
+// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
+// https://github.com/ziglang/zig/issues/8220
+fn fetchPushObj(state: *State, memory: *[def.addr_space]u8) void {
+    // TODO: Not a big fan of all those conditions, maybe we can write it better by using transparent data?
+    const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
+    inline for(0..color_ids.len) |i| {
+        const newData = FifoData{
+            .color_id = color_ids[i], 
+            .bg_prio = state.fetcher_data.bg_prio, 
+            .palette_index = state.fetcher_data.palette_index, 
+            .obj_prio = state.fetcher_data.obj_prio 
+        };
+
+        if(state.object_fifo.readableLength() > i) { // Mix existing pixel.
+            // TODO: Not that nice to just raw access the fifo!
+            var fifo_index = state.object_fifo.head + i;
+            fifo_index %= state.object_fifo.buf.len;
+            const current_pixel: *FifoData = &state.object_fifo.buf[fifo_index];
+            const use_new: bool = current_pixel.color_id == color_id_transparent;
+            if(use_new) {
+                current_pixel.* = newData;
+            }
+
+        } else { // Add new pixel
+            state.object_fifo.writeItem(newData) catch unreachable;
+        }
+    }
+    if(state.draw_window) {
+        state.uop_fifo.write(&draw_window_tile) catch unreachable;
+    } else {
+        state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+    }
+    tryPushPixel(state, memory);
+}
+
 fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
-    const fifo_pixel_count: u16 = @intCast(state.background_fifo.readableLength());
-    const pixel_x: u16 = @as(u16, state.lcd_x) + pixel_offset_x + fifo_pixel_count; 
+    const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
+    const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - 8 + fifo_pixel_count;
+    const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))) + pixel_offset_x; 
     const pixel_y: u16 = @as(u16, state.lcd_y) + pixel_offset_y;
 
     const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
@@ -483,23 +485,23 @@ fn getPalette(paletteByte: u8) [4]u2 {
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     const lcd_control = LcdControl.fromMem(memory);
     const win_x: u8 = memory[mem_map.window_x];
-    const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
+    const win_overscan_x: u8 = win_x + 1;
     const win_pos_y: u8 = memory[mem_map.window_y];
 
-    if(state.lcd_x == 160) {
+    if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeItem(.advance_hblank) catch unreachable;
-    } else if (state.lcd_y >= win_pos_y and state.lcd_x == win_pos_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
+    } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.write(&draw_window_tile_uops) catch unreachable;
+        state.uop_fifo.write(&draw_window_tile) catch unreachable;
         state.background_fifo.discard(state.background_fifo.readableLength());
         state.draw_window = true;
-    } else if(lcd_control.obj_enable) {
+    } else if(lcd_control.obj_enable or true) {
         // TODO: Use the state.oam_scan_idx to speed this up, because the list is sorted.
         for(state.oam_line_list.slice()) |object| {
-            if(object.screen_pos_x == state.lcd_x) {
+            if(object.obj_pos_x == state.lcd_overscan_x) {
                 state.uop_fifo.discard(state.uop_fifo.readableLength());
-                state.uop_fifo.write(&draw_object_tile_uops) catch unreachable;
+                state.uop_fifo.write(&draw_object_tile) catch unreachable;
                 break;
             }
         }
@@ -510,12 +512,10 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) {
         return;
     }
+    assert(state.lcd_overscan_x < def.overscan_width); // we tried to put a pixel outside of the screen.
+    assert(state.lcd_y < def.resolution_height); // we tried to put a pixel outside of the screen.
    
     const bg_pixel: FifoData = state.background_fifo.readItem() orelse unreachable;
-    if(state.line_initial_shift > 0) {
-        state.line_initial_shift -= 1;
-        return; // Discard background pixel.
-    }
 
     // fall back transparent object pixel that will be drawn over if we don't have pixels in the object fifo.
     const empty_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_index = 0 };
@@ -532,16 +532,16 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
 
     // TODO: Move the shader code to use a texture of hardware colorIds and not bitplanes!
-    const bitplane_idx: u13 = (@as(u13, state.lcd_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
+    const bitplane_idx: u13 = (@as(u13, state.lcd_overscan_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
     // TODO: This breaks after the first frame, because we are "adding" color ids to it, the last frame will be "smeared" on top of this frame.
     const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
     const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
 
-    const tile_pixel_x = state.lcd_x % 8;
+    const tile_pixel_x = state.lcd_overscan_x % 8;
     const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
     first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
     second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
 
-    state.lcd_x += 1;
+    state.lcd_overscan_x += 1;
     checkLcdX(state, memory);
 }

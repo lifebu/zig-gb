@@ -46,7 +46,7 @@ export fn frame() void {
     Platform.frame(&state.platform, state.ppu.color2bpp, state.apu.gb_sample_buffer);
     // TODO: The ppu currently mixes pixels which will lead to previous frames changing the current frame.
     // This leads to smearing. As a workaround, clear the color buffer each frame!
-    state.ppu.color2bpp = [_]u8{ 0 } ** 40 ** 144;
+    state.ppu.color2bpp = [_]u8{ 0 } ** def.num_2bpp;
 }
 
 export fn deinit() void {

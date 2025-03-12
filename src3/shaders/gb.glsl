@@ -18,11 +18,12 @@ const int RESOLUTION_WIDTH = 160;
 const int RESOLUTION_HEIGHT = 144;
 
 const int TILE_WIDTH = 8;
-const int RESOLUTION_TILE_WIDTH = RESOLUTION_WIDTH / TILE_WIDTH;
+const int OVERSCAN_WIDTH = RESOLUTION_WIDTH + TILE_WIDTH; 
+const int RESOLUTION_TILE_WIDTH = OVERSCAN_WIDTH / TILE_WIDTH;
 
 const int BYTE_PER_LINE = 2;
-const int NUM_BYTES = RESOLUTION_TILE_WIDTH * BYTE_PER_LINE * RESOLUTION_HEIGHT;
-const int NUM_IVEC4 = NUM_BYTES / 4;
+const int NUM_2BPP = (RESOLUTION_TILE_WIDTH) * BYTE_PER_LINE * RESOLUTION_HEIGHT;
+const int NUM_IVEC4 = NUM_2BPP / 4;
 
 layout(binding = 0) uniform init {
     vec4 hw_colors[4];
@@ -57,12 +58,13 @@ void main()
     screen_pos.y = 1.0 - screen_pos.y;
     
     ivec2 pixel_pos = ivec2( floor(screen_pos.x * RESOLUTION_WIDTH), floor(screen_pos.y * RESOLUTION_HEIGHT)); 
+    pixel_pos.x += TILE_WIDTH; // cut of the first tile (Overscan).
     ivec2 tile_row_pos = ivec2( pixel_pos.x / TILE_WIDTH,  pixel_pos.y); 
-    int tile_row_idx = tile_row_pos.x + RESOLUTION_TILE_WIDTH * tile_row_pos.y;
+    int tile_row_idx = tile_row_pos.x + (RESOLUTION_TILE_WIDTH) * tile_row_pos.y;
 
     int packed_idx = tile_row_idx / 2;
     ivec4 color_packed = color_2bpp[packed_idx];
-    
+
     int first_plane_idx = (tile_row_idx % 2) * 2;
     int first_bitplane = color_packed[first_plane_idx]; 
     int second_bitplane = color_packed[first_plane_idx + 1]; 

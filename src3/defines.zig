@@ -7,12 +7,14 @@ pub const window_width = resolution_width * scaling;
 pub const window_height = resolution_height * scaling;
 
 pub const tile_width = 8;
-pub const resolution_tile_width = resolution_width / tile_width;
+pub const overscan_width = resolution_width + tile_width;
+pub const resolution_tile_width = overscan_width / tile_width;
 
 pub const byte_per_line = 2;
-pub const resolution_2bpp_width = resolution_tile_width * byte_per_line;
+pub const resolution_2bpp_width = (resolution_tile_width ) * byte_per_line;
 
-pub const num_2bpp = resolution_tile_width * byte_per_line * resolution_height;
+pub const num_2bpp = (resolution_tile_width) * byte_per_line * resolution_height;
+pub const num_ivec4 = num_2bpp / 4;
 
 // system
 pub const system_freq = 4 * 1_024 * 1_024;
