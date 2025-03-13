@@ -117,6 +117,7 @@ const FifoData = struct {
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     bg_prio: ObjectPriority,
 };
+const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_index = 0 };
 // TODO: Consider creating custom fifo that uses a ring-buffer. In testing, the readItem function costs 51% of all cycles.
 // writeItem() => write(), write() => writeSlice(), readItem() => read(), readableLength() => len(), clear() / discard() => create own function 
 // Use RingBuffer with FixedBufferAllocator.
@@ -391,30 +392,22 @@ fn nextObjectIsAtLcdX(state: *State) bool {
 // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
 // https://github.com/ziglang/zig/issues/8220
 fn fetchPushObj(state: *State, memory: *[def.addr_space]u8) void {
-    // TODO: Not a big fan of all those conditions, maybe we can write it better by using transparent data?
+    // mix with existing pixels.
     const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
+    var object_pixels: [color_ids.len]FifoData = undefined;
     inline for(0..color_ids.len) |i| {
-        const newData = FifoData{
+        const new_pixel = FifoData{
             .color_id = color_ids[i], 
             .bg_prio = state.fetcher_data.bg_prio, 
             .palette_index = state.fetcher_data.palette_index, 
             .obj_prio = state.fetcher_data.obj_prio 
         };
-
-        if(state.object_fifo.readableLength() > i) { // Mix existing pixel.
-            // TODO: Not that nice to just raw access the fifo!
-            var fifo_index = state.object_fifo.head + i;
-            fifo_index %= state.object_fifo.buf.len;
-            const current_pixel: *FifoData = &state.object_fifo.buf[fifo_index];
-            const use_new: bool = current_pixel.color_id == color_id_transparent;
-            if(use_new) {
-                current_pixel.* = newData;
-            }
-
-        } else { // Add new pixel
-            state.object_fifo.writeItem(newData) catch unreachable;
-        }
+        const current_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
+        const pixel_to_use: FifoData = if(current_pixel.color_id == color_id_transparent) new_pixel else current_pixel;
+        object_pixels[i] = pixel_to_use;
     }
+    assert(state.object_fifo.readableLength() == 0);
+    state.object_fifo.write(&object_pixels) catch unreachable;
 
     // next object at the same position as last one.
     if(nextObjectIsAtLcdX(state)) {
@@ -524,9 +517,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     assert(state.lcd_overscan_x < def.overscan_width); // we tried to put a pixel outside of the screen.
     assert(state.lcd_y < def.resolution_height); // we tried to put a pixel outside of the screen.
 
-    // fall back transparent object pixel that will be drawn over if we don't have pixels in the object fifo.
-    const empty_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_index = 0 };
-    const obj_pixel: FifoData = state.object_fifo.readItem() orelse empty_pixel;
+    const obj_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
     const obj_palette_addr: u16 = mem_map.obj_palettes_dmg + obj_pixel.palette_index;
     const obj_palette = getPalette(memory[obj_palette_addr]);
     const obj_color_id: u2 = obj_palette[obj_pixel.color_id];
