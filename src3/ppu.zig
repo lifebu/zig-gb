@@ -20,6 +20,7 @@ const obj_size_byte = 4;
 const obj_per_line = 10;
 
 const cycles_per_line = 456;
+const cycles_oam_scan = 80;
 
 const LcdControl = packed struct {
     // TODO: Add support to disable background with this.
@@ -132,7 +133,8 @@ const ObjectLineEntry = struct {
     obj_flip_x: bool,
     bg_prio: ObjectPriority,
 };
-const ObjectLineList = std.BoundedArray(ObjectLineEntry, 10);
+const ObjectLineFifo = std.fifo.LinearFifo(ObjectLineEntry, .{ .Static = 10 });
+// note: requires stable sort
 pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
     return lhs.obj_pos_x < rhs.obj_pos_x;
 }
@@ -148,6 +150,8 @@ const MicroOp = enum {
     fetch_high_bg,
     fetch_high_obj,
     fetch_push_bg,
+    // TODO: Not needed, fetch_high_object does a push and always succeeds.
+    // This also means we can remove the helper function.
     fetch_push_obj,
     fetch_tile_bg,
     fetch_tile_obj,
@@ -195,9 +199,8 @@ pub const State = struct {
     line_cycles: u9 = 0,
     fetcher_data: FetcherData = undefined,
     oam_scan_idx: u6 = 0,
-    // TODO: Rethink what data structure is best for this.
-    // I would like a sorted list (obj_pos_x ascending) and also an easy way to get the first element of the list.
-    oam_line_list: ObjectLineList = ObjectLineList.init(0) catch unreachable,
+    oam_line_list: ObjectLineFifo = ObjectLineFifo.init(),
+    current_object: ObjectLineEntry = undefined,
 
     color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** def.num_2bpp,
 };
@@ -218,9 +221,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             state.draw_window = false;
-            // TODO: This sorting breaks the drawing priority. If the objects have the same x-coordinate the one that comes first in the OAM wins.
-            // Example: Title screen from pokemon blu
-            std.mem.sort(ObjectLineEntry, state.oam_line_list.buffer[0..state.oam_line_list.len], {}, sort_objects);
+            assert(state.oam_line_list.head == 0);
+            std.mem.sort(ObjectLineEntry, state.oam_line_list.buf[0..state.oam_line_list.count], {}, sort_objects);
             state.oam_scan_idx = 0;
             state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
@@ -230,7 +232,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
-            const hblank_len = 455 - 80 - state.line_cycles;
+            const hblank_len = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
             state.uop_fifo.write(hblank[0..hblank_len]) catch unreachable;
             const advance: MicroOp = if(state.lcd_y >= 143) .advance_vblank else .advance_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
@@ -240,7 +242,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .advance_oam_scan => {
             lcd_stat.mode = .oam_scan;
             state.uop_fifo.write(&oam_scan) catch unreachable;
-            state.oam_line_list.resize(0) catch unreachable;
+            state.oam_line_list.discard(state.oam_line_list.readableLength());
+            state.oam_line_list.realign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
             state.line_cycles = 0;
         },
@@ -288,28 +291,17 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
-            // TODO: I would like to use a simpler pop-style, but the objects a sorted by x_position ascending.
-            // This is very over the top!
-            var found: bool = false;
-            var object: ObjectLineEntry = undefined;
-            for(state.oam_line_list.slice()) |i_object| {
-                if(i_object.obj_pos_x == state.lcd_overscan_x) {
-                    object = i_object;
-                    found = true;
-                }
-            }
-            assert(found); // We must find the correct object when we trigger a tile fetch.
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
-            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (object.tile_index % 2);
-            const obj_tile_index: u8 = object.tile_index - obj_tile_index_offset;
-            const tile_offset: u2 = @intCast(object.tile_row / tile_size_y);
+            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (state.current_object.tile_index % 2);
+            const obj_tile_index: u8 = state.current_object.tile_index - obj_tile_index_offset;
+            const tile_offset: u2 = @intCast(state.current_object.tile_row / tile_size_y);
             const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
-            state.fetcher_data.tile_addr = tile_base_addr + ((object.tile_row % tile_size_y) * def.byte_per_line);
-            state.fetcher_data.palette_index = object.palette_index;
-            state.fetcher_data.bg_prio = object.bg_prio;
-            state.fetcher_data.obj_flip_x = object.obj_flip_x;
-            state.fetcher_data.obj_prio = object.obj_prio;
+            state.fetcher_data.tile_addr = tile_base_addr + ((state.current_object.tile_row % tile_size_y) * def.byte_per_line);
+            state.fetcher_data.palette_index = state.current_object.palette_index;
+            state.fetcher_data.bg_prio = state.current_object.bg_prio;
+            state.fetcher_data.obj_flip_x = state.current_object.obj_flip_x;
+            state.fetcher_data.obj_prio = state.current_object.obj_prio;
         },
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -337,7 +329,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
                 const tile_row: u4 = @intCast(object_flip % object_height);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
-                state.oam_line_list.append(.{ 
+                state.oam_line_list.writeItem(.{ 
                     .obj_pos_x = object.x_position, 
                     .tile_row = tile_row,
                     .tile_index = object.tile_index, 
@@ -387,6 +379,15 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
 
 }
 
+fn nextObjectIsAtLcdX(state: *State) bool {
+    if(state.oam_line_list.readableLength() == 0) {
+        return false;
+    }
+
+    const object: ObjectLineEntry = state.oam_line_list.peekItem(0);
+    return object.obj_pos_x == state.lcd_overscan_x;
+}
+
 // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
 // https://github.com/ziglang/zig/issues/8220
 fn fetchPushObj(state: *State, memory: *[def.addr_space]u8) void {
@@ -414,12 +415,18 @@ fn fetchPushObj(state: *State, memory: *[def.addr_space]u8) void {
             state.object_fifo.writeItem(newData) catch unreachable;
         }
     }
-    if(state.draw_window) {
-        state.uop_fifo.write(&draw_window_tile) catch unreachable;
+
+    // next object at the same position as last one.
+    if(nextObjectIsAtLcdX(state)) {
+        checkLcdX(state, memory);
     } else {
-        state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+        if(state.draw_window) {
+            state.uop_fifo.write(&draw_window_tile) catch unreachable;
+        } else {
+            state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+        }
+        tryPushPixel(state, memory);
     }
-    tryPushPixel(state, memory);
 }
 
 fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
@@ -487,6 +494,8 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     const win_overscan_x: u8 = win_x + 1;
     const win_pos_y: u8 = memory[mem_map.window_y];
 
+    const has_next_object = nextObjectIsAtLcdX(state);
+
     // TODO: This now has to be tested every time we push a pixel, can we do this more rarely? Only test when relevant?
     // advance, scroll and window can only happen once per line. and object only up to 10 per line => max 8% hit-rate.
     if(state.lcd_overscan_x == def.overscan_width) {
@@ -501,15 +510,10 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.write(&draw_window_tile) catch unreachable;
         state.background_fifo.discard(state.background_fifo.readableLength());
         state.draw_window = true;
-    } else if(lcd_control.obj_enable) {
-        // TODO: Use the state.oam_scan_idx to speed this up, because the list is sorted.
-        for(state.oam_line_list.slice()) |object| {
-            if(object.obj_pos_x == state.lcd_overscan_x) {
-                state.uop_fifo.discard(state.uop_fifo.readableLength());
-                state.uop_fifo.write(&draw_object_tile) catch unreachable;
-                break;
-            }
-        }
+    } else if(lcd_control.obj_enable and has_next_object) {
+        state.current_object = state.oam_line_list.readItem() orelse unreachable;
+        state.uop_fifo.discard(state.uop_fifo.readableLength());
+        state.uop_fifo.write(&draw_object_tile) catch unreachable;
     }
 }
 
