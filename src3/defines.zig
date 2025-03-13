@@ -10,6 +10,7 @@ pub const tile_width = 8;
 pub const overscan_width = resolution_width + tile_width;
 pub const resolution_tile_width = overscan_width / tile_width;
 
+pub const color_depth = 4;
 pub const byte_per_line = 2;
 pub const resolution_2bpp_width = (resolution_tile_width ) * byte_per_line;
 

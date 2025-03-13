@@ -5,6 +5,7 @@ const CLI = @import("cli.zig");
 const Platform = @import("platform.zig");
 const APU = @import("apu.zig");
 const MMU = @import("mmu.zig");
+const mem_map = @import("mem_map.zig");
 const PPU = @import("ppu.zig");
 
 const state = struct {
@@ -42,6 +43,10 @@ export fn frame() void {
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);
     }
+    // TODO: Window scrolling is broken, can test it with this code:
+    // state.mmu.memory[mem_map.window_x] = (state.mmu.memory[mem_map.window_x] + 1) % 167;
+    // TODO: Background y scrolling is broken, can test it with this code:
+    // state.mmu.memory[mem_map.scroll_y] = (state.mmu.memory[mem_map.scroll_y] + 1) % 255;
 
     Platform.frame(&state.platform, state.ppu.color2bpp, state.apu.gb_sample_buffer);
     // TODO: The ppu currently mixes pixels which will lead to previous frames changing the current frame.

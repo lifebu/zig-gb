@@ -127,6 +127,7 @@ const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_i
 // writeItem() => write(), write() => writeSlice(), readItem() => read(), readableLength() => len(), clear() / discard() => create own function 
 // Use RingBuffer with FixedBufferAllocator.
 // Consider using "AssumeLength" where appropriate.
+// TODO: Combine both types? Or have FifoData and ObjectFifoData?
 const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 
@@ -150,7 +151,6 @@ const MicroOp = enum {
     advance_hblank,
     advance_oam_scan,
     advance_vblank,
-    clear_fifo_bg,
     fetch_low_bg,
     fetch_low_obj,
     fetch_high_bg,
@@ -168,8 +168,7 @@ const MicroOp = enum {
 const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
 
 // oam_scan
-const oam_scan = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) 
-                   ++ [_]MicroOp{ .oam_check, .advance_draw };
+const oam_scan = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) ++ [_]MicroOp{ .oam_check, .advance_draw };
 
 // draw
 const draw_bg_tile = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, };
@@ -226,7 +225,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.draw_window = false;
             assert(state.oam_line_list.head == 0);
             std.mem.sort(ObjectLineEntry, state.oam_line_list.buf[0..state.oam_line_list.count], {}, sort_objects);
-            state.oam_scan_idx = 0;
             state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
         },
@@ -235,11 +233,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
+            lcd_stat.mode = .h_blank;
+            // TODO: Can we write these differently? This is the same code as vblank. Maybe write a function?
             const hblank_len = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
             state.uop_fifo.write(hblank[0..hblank_len]) catch unreachable;
             const advance: MicroOp = if(state.lcd_y >= (def.resolution_height - 1)) .advance_vblank else .advance_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
-            lcd_stat.mode = .h_blank;
             state.lcd_y += 1;
         },
         .advance_oam_scan => {
@@ -252,14 +251,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_vblank => {
             lcd_stat.mode = .v_blank;
+            // TODO: Should not happen here at all.
             state.line_cycles = 0;
             state.uop_fifo.write(&vblank) catch unreachable;
             state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
             const advance: MicroOp = if(state.lcd_y == 0) .advance_oam_scan else .advance_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
-        },
-        .clear_fifo_bg => {
-            state.background_fifo.discard(state.background_fifo.readableLength());
         },
         .fetch_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
@@ -315,6 +312,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
             state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
+            // TODO: Do I even have to set this? Maybe for GBC?
             state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
@@ -325,6 +323,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const obj_tile_index: u8 = state.current_object.tile_index - obj_tile_index_offset;
             const tile_offset: u2 = @intCast(state.current_object.tile_row / tile_size_y);
             const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
+            // TODO: Should we split fetcher_data for objects and bg? Because for objects I can more easily use ObjectLineEntry or something.
+            // Because just copying the data from state.current_object to state.fetcher_data seems uneccessary.
+            // TODO: combine fetcher_data for objects with ObjectLineEntry?
             state.fetcher_data.tile_addr = tile_base_addr + ((state.current_object.tile_row % tile_size_y) * def.byte_per_line);
             state.fetcher_data.palette_index = state.current_object.palette_index;
             state.fetcher_data.bg_prio = state.current_object.bg_prio;
@@ -376,6 +377,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             unreachable;
         },
     }
+    // TODO: We always increment this which leads to an overflow in VBlank. Which requires that we set it to 0 in VBlank.
+    // Can we do this better?
     state.line_cycles += 1;
 
     memory[mem_map.lcd_y] = state.lcd_y;
@@ -397,6 +400,10 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
                 .obj_prio = 0 
             }) catch unreachable;
         }
+        // TODO: For each line we could keep a running copy of the next draw_bg_window_tile.
+        // Instead of a boolean we just us that copy and write it to the uop_fifo.
+        // Change it when we detect a window. This will only happen 0 to 1 time per line.
+        // Remove the bool. Also do this for fetch_high_obj.
         if(state.draw_window) {
             state.uop_fifo.write(&draw_window_tile) catch unreachable;
         } else {
@@ -417,6 +424,8 @@ fn nextObjectIsAtLcdX(state: *State) bool {
     return object.obj_pos_x == state.lcd_overscan_x;
 }
 
+// TODO: Look at getTileMapAddr and getTileAddr and how they are used. Compare them to the object code
+// See if I can simplify or combine some of the logic? (especially objects and bg/window)
 fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
     const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
     const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - tile_size_x + fifo_pixel_count;
@@ -440,6 +449,9 @@ fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdContr
     return tile_addr;
 }
 
+// TODO: convert2bpp is only used in two places were we get the color ids and create a FifoData from them.
+// This is the same for objects and bg/window. Should we combine them?
+// If they use a different type entirely maybe we keep this function?
 fn convert2bpp(first_bitplane: u8, second_bitplane: u8, reverse: bool) [tile_size_x]u2 {
     var first_bitplane_var: u8 = if(reverse) @bitReverse(first_bitplane) else first_bitplane;
     var second_bitplane_var: u8 = if(reverse) @bitReverse(second_bitplane) else second_bitplane;
@@ -452,24 +464,22 @@ fn convert2bpp(first_bitplane: u8, second_bitplane: u8, reverse: bool) [tile_siz
     return result;
 }
 
-fn mixObjectColorId(current_obj_colorid: u2, new_obj_colorid: u2) u2 {
-    return if(current_obj_colorid == color_id_transparent) new_obj_colorid else current_obj_colorid;
-}
-
 fn mixBackgroundColorId(bg_colorid: u2, original_bg_colorid: u2, obj_colorid: u2, original_obj_colorid: u2, bg_prio: ObjectPriority) u2 {
+    // TODO: Can we do this simpler, without conditions? And then not in it's own function?
     if(bg_prio == .obj_over_bg) {
         return if(original_obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
     } else {
         return if(original_bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
     }
 }
-fn getPalette(paletteByte: u8) [4]u2 {
+
+fn getPalette(paletteByte: u8) [def.color_depth]u2 {
     // https://gbdev.io/pandocs/Palettes.html
     const color_id3: u2 = @intCast((paletteByte & (0b11 << 6)) >> 6);
     const color_id2: u2 = @intCast((paletteByte & (0b11 << 4)) >> 4);
     const color_id1: u2 = @intCast((paletteByte & (0b11 << 2)) >> 2);
     const color_id0: u2 = @intCast((paletteByte & (0b11 << 0)) >> 0);
-    return [4]u2{ color_id0, color_id1, color_id2, color_id3 };
+    return [def.color_depth]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
@@ -484,7 +494,9 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
 
     const has_next_object = nextObjectIsAtLcdX(state);
 
-    // TODO: This now has to be tested every time we push a pixel, can we do this more rarely? Only test when relevant?
+    // TODO: This now has to be tested every time we push a pixel, push an object and at the start of each line.
+    // Can we do this more rarely? Only test when relevant?
+    // Can we make this brancheless?
     // advance, scroll and window can only happen once per line. and object only up to 10 per line => max 8% hit-rate.
     if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
@@ -514,11 +526,11 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
 
     const obj_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
     const obj_palette_addr: u16 = mem_map.obj_palettes_dmg + obj_pixel.palette_index;
-    const obj_palette = getPalette(memory[obj_palette_addr]);
+    const obj_palette: [def.color_depth]u2 = getPalette(memory[obj_palette_addr]);
     const obj_color_id: u2 = obj_palette[obj_pixel.color_id];
 
     const bg_pixel: FifoData = state.background_fifo.readItem() orelse unreachable;
-    const bg_palette = getPalette(memory[mem_map.bg_palette]);
+    const bg_palette: [def.color_depth]u2 = getPalette(memory[mem_map.bg_palette]);
     const bg_color_id: u2 = bg_palette[bg_pixel.color_id];
 
     const color_id: u2 = mixBackgroundColorId(bg_color_id, bg_pixel.color_id, obj_color_id, obj_pixel.color_id, obj_pixel.bg_prio);
