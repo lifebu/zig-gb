@@ -193,7 +193,6 @@ pub const State = struct {
     lcd_y: u8 = 0, 
     draw_window: bool = false,
     line_cycles: u9 = 0,
-    line_initial_shift: u3 = 0,
     fetcher_data: FetcherData = undefined,
     oam_scan_idx: u6 = 0,
     // TODO: Rethink what data structure is best for this.
@@ -215,8 +214,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     switch(uop) {
         .advance_draw => {
             lcd_stat.mode = .draw;
-            const scroll_x: u8 = memory[mem_map.scroll_x];
-            state.line_initial_shift = @intCast(scroll_x % 8);
             state.uop_fifo.writeAssumeCapacity(&draw_bg_tile); 
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
@@ -283,7 +280,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_tile_bg => {
             const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
-            // TODO: Subtile scrolling does not work correctly anymore!
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
@@ -342,7 +338,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const tile_row: u4 = @intCast(object_flip % object_height);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
                 state.oam_line_list.append(.{ 
-                    .obj_pos_x = object.x_position + 1, 
+                    .obj_pos_x = object.x_position, 
                     .tile_row = tile_row,
                     .tile_index = object.tile_index, 
                     .palette_index =  @intFromEnum(object.flags.dmg_palette),
@@ -483,19 +479,29 @@ fn getPalette(paletteByte: u8) [4]u2 {
 
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     const lcd_control = LcdControl.fromMem(memory);
+
+    const scroll_x: u8 = memory[mem_map.scroll_x];
+    const scroll_overscan_x: u8 = tile_size_x - (scroll_x % tile_size_x);
+
     const win_x: u8 = memory[mem_map.window_x];
     const win_overscan_x: u8 = win_x + 1;
     const win_pos_y: u8 = memory[mem_map.window_y];
 
+    // TODO: This now has to be tested every time we push a pixel, can we do this more rarely? Only test when relevant?
+    // advance, scroll and window can only happen once per line. and object only up to 10 per line => max 8% hit-rate.
     if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeItem(.advance_hblank) catch unreachable;
+    } else if (state.lcd_overscan_x == scroll_overscan_x)  {
+        state.uop_fifo.discard(state.uop_fifo.readableLength());
+        state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+        state.background_fifo.discard(state.background_fifo.readableLength());
     } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.write(&draw_window_tile) catch unreachable;
         state.background_fifo.discard(state.background_fifo.readableLength());
         state.draw_window = true;
-    } else if(lcd_control.obj_enable or true) {
+    } else if(lcd_control.obj_enable) {
         // TODO: Use the state.oam_scan_idx to speed this up, because the list is sorted.
         for(state.oam_line_list.slice()) |object| {
             if(object.obj_pos_x == state.lcd_overscan_x) {
@@ -513,8 +519,6 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     }
     assert(state.lcd_overscan_x < def.overscan_width); // we tried to put a pixel outside of the screen.
     assert(state.lcd_y < def.resolution_height); // we tried to put a pixel outside of the screen.
-   
-    const bg_pixel: FifoData = state.background_fifo.readItem() orelse unreachable;
 
     // fall back transparent object pixel that will be drawn over if we don't have pixels in the object fifo.
     const empty_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_index = 0 };
@@ -523,6 +527,7 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     const obj_palette = getPalette(memory[obj_palette_addr]);
     const obj_color_id: u2 = obj_palette[obj_pixel.color_id];
 
+    const bg_pixel: FifoData = state.background_fifo.readItem() orelse unreachable;
     const bg_palette = getPalette(memory[mem_map.bg_palette]);
     const bg_color_id: u2 = bg_palette[bg_pixel.color_id];
 
