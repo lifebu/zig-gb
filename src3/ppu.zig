@@ -18,9 +18,14 @@ const tile_map_size_byte = tile_map_size_x * tile_map_size_y;
 const oam_size = 40;
 const obj_size_byte = 4;
 const obj_per_line = 10;
+const obj_double_height = tile_size_y * 2;
 
 const cycles_per_line = 456;
 const cycles_oam_scan = 80;
+const cycles_hblank = 204;
+
+const vblank_scanlines = 10;
+const max_lcd_y = def.resolution_height + vblank_scanlines;
 
 const LcdControl = packed struct {
     // TODO: Add support to disable background with this.
@@ -134,7 +139,7 @@ const ObjectLineEntry = struct {
     obj_flip_x: bool,
     bg_prio: ObjectPriority,
 };
-const ObjectLineFifo = std.fifo.LinearFifo(ObjectLineEntry, .{ .Static = 10 });
+const ObjectLineFifo = std.fifo.LinearFifo(ObjectLineEntry, .{ .Static = obj_per_line });
 // note: requires stable sort
 pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
     return lhs.obj_pos_x < rhs.obj_pos_x;
@@ -172,9 +177,9 @@ const draw_window_tile = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_low_b
 const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, };
 
 // hblank
-const hblank = [_]MicroOp{ .nop } ** 203;
+const hblank = [_]MicroOp{ .nop } ** (cycles_hblank - 1);
 // vblank
-const vblank = [_]MicroOp{ .nop } ** 455;
+const vblank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 const FetcherData = struct {
     tile_addr: u16,
@@ -232,7 +237,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
 
             const hblank_len = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
             state.uop_fifo.write(hblank[0..hblank_len]) catch unreachable;
-            const advance: MicroOp = if(state.lcd_y >= 143) .advance_vblank else .advance_oam_scan;
+            const advance: MicroOp = if(state.lcd_y >= (def.resolution_height - 1)) .advance_vblank else .advance_oam_scan;
             state.uop_fifo.writeItem(advance) catch unreachable;
             lcd_stat.mode = .h_blank;
             state.lcd_y += 1;
@@ -249,7 +254,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             lcd_stat.mode = .v_blank;
             state.line_cycles = 0;
             state.uop_fifo.write(&vblank) catch unreachable;
-            state.lcd_y = (state.lcd_y + 1) % 154;
+            state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
             const advance: MicroOp = if(state.lcd_y == 0) .advance_oam_scan else .advance_vblank;
             state.uop_fifo.writeItem(advance) catch unreachable;
         },
@@ -329,6 +334,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             const win_x: u8 = memory[mem_map.window_x];
+            // TODO: Can we remove this check by converting it into overscan space?
+            // Change then name to win_overscan_x 
             const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
             const win_pos_y: u8 = memory[mem_map.window_y];
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
@@ -347,7 +354,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .oam_check => {
             const object = Object.fromOAM(memory, state.oam_scan_idx);
             const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(lcd_control.obj_size)));
-            const obj_pixel_y: i16 = @as(i16, state.lcd_y) + 16 - @as(i16, object.y_position);
+            const obj_pixel_y: i16 = @as(i16, state.lcd_y) + obj_double_height - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
                 const tile_row: u4 = @intCast(object_flip % object_height);
@@ -412,7 +419,7 @@ fn nextObjectIsAtLcdX(state: *State) bool {
 
 fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
     const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
-    const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - 8 + fifo_pixel_count;
+    const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - tile_size_x + fifo_pixel_count;
     const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))) + pixel_offset_x; 
     const pixel_y: u16 = @as(u16, state.lcd_y) + pixel_offset_y;
 
@@ -520,12 +527,12 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
 
     // TODO: Move the shader code to use a texture of hardware colorIds and not bitplanes!
     // Like the example from sokol chipz
-    const bitplane_idx: u13 = (@as(u13, state.lcd_overscan_x) / def.tile_width) * 2 + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
+    const bitplane_idx: u13 = (@as(u13, state.lcd_overscan_x) / def.tile_width) * def.byte_per_line + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
     // TODO: This breaks after the first frame, because we are "adding" color ids to it, the last frame will be "smeared" on top of this frame.
     const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
     const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
 
-    const tile_pixel_x = state.lcd_overscan_x % 8;
+    const tile_pixel_x = state.lcd_overscan_x % tile_size_x;
     const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
     first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
     second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;

@@ -26,7 +26,7 @@
 				"--tool=callgrind",
 				"--callgrind-out-file=zig-out/callgrind.out",
 				"${workspaceFolder}/zig-out/bin/zig-gb",
-                "playground/link_awake.gb",
+                "playground/pkmn_blu.dump",
 			],
 			"options": {
 				"cwd": "${workspaceFolder}"
