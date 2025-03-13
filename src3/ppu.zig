@@ -151,9 +151,6 @@ const MicroOp = enum {
     fetch_high_bg,
     fetch_high_obj,
     fetch_push_bg,
-    // TODO: Not needed, fetch_high_object does a push and always succeeds.
-    // This also means we can remove the helper function.
-    fetch_push_obj,
     fetch_tile_bg,
     fetch_tile_obj,
     fetch_tile_window,
@@ -274,13 +271,38 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .fetch_high_obj => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
-            fetchPushObj(state, memory);
+
+            // mix with existing pixels.
+            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
+            var object_pixels: [color_ids.len]FifoData = undefined;
+            inline for(0..color_ids.len) |i| {
+                const new_pixel = FifoData{
+                    .color_id = color_ids[i], 
+                    .bg_prio = state.fetcher_data.bg_prio, 
+                    .palette_index = state.fetcher_data.palette_index, 
+                    .obj_prio = state.fetcher_data.obj_prio 
+                };
+                const current_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
+                const pixel_to_use: FifoData = if(current_pixel.color_id == color_id_transparent) new_pixel else current_pixel;
+                object_pixels[i] = pixel_to_use;
+            }
+            assert(state.object_fifo.readableLength() == 0);
+            state.object_fifo.write(&object_pixels) catch unreachable;
+
+            // next object at the same position as last one.
+            if(nextObjectIsAtLcdX(state)) {
+                checkLcdX(state, memory);
+            } else {
+                if(state.draw_window) {
+                    state.uop_fifo.write(&draw_window_tile) catch unreachable;
+                } else {
+                    state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+                }
+                tryPushPixel(state, memory);
+            }
         },
         .fetch_push_bg => {
             fetchPushBg(state, memory);
-        },
-        .fetch_push_obj => {
-            fetchPushObj(state, memory);
         },
         .fetch_tile_bg => {
             const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -377,7 +399,6 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
     }
     tryPushPixel(state, memory);
-
 }
 
 fn nextObjectIsAtLcdX(state: *State) bool {
@@ -387,39 +408,6 @@ fn nextObjectIsAtLcdX(state: *State) bool {
 
     const object: ObjectLineEntry = state.oam_line_list.peekItem(0);
     return object.obj_pos_x == state.lcd_overscan_x;
-}
-
-// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
-// https://github.com/ziglang/zig/issues/8220
-fn fetchPushObj(state: *State, memory: *[def.addr_space]u8) void {
-    // mix with existing pixels.
-    const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
-    var object_pixels: [color_ids.len]FifoData = undefined;
-    inline for(0..color_ids.len) |i| {
-        const new_pixel = FifoData{
-            .color_id = color_ids[i], 
-            .bg_prio = state.fetcher_data.bg_prio, 
-            .palette_index = state.fetcher_data.palette_index, 
-            .obj_prio = state.fetcher_data.obj_prio 
-        };
-        const current_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
-        const pixel_to_use: FifoData = if(current_pixel.color_id == color_id_transparent) new_pixel else current_pixel;
-        object_pixels[i] = pixel_to_use;
-    }
-    assert(state.object_fifo.readableLength() == 0);
-    state.object_fifo.write(&object_pixels) catch unreachable;
-
-    // next object at the same position as last one.
-    if(nextObjectIsAtLcdX(state)) {
-        checkLcdX(state, memory);
-    } else {
-        if(state.draw_window) {
-            state.uop_fifo.write(&draw_window_tile) catch unreachable;
-        } else {
-            state.uop_fifo.write(&draw_bg_tile) catch unreachable;
-        }
-        tryPushPixel(state, memory);
-    }
 }
 
 fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
