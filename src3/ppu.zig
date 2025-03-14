@@ -237,13 +237,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.oam_line_list.discard(state.oam_line_list.readableLength());
             state.oam_line_list.realign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
+            // TODO: I need to reset it here and remove the cycles_oam_scan for hblank. This should be wrong. 
+            // But reseting this at the start of draw mode shows that the timing is wrong (out of sync).
             state.line_cycles = 0;
         },
         .advance_vblank => {
             lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
-            // TODO: Should not happen here at all.
-            state.line_cycles = 0;
         },
         .fetch_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
@@ -360,10 +360,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             unreachable;
         },
     }
-    // TODO: We always increment this which leads to an overflow in VBlank. Which requires that we set it to 0 in VBlank.
-    // Can we do this better?
-    state.line_cycles += 1;
 
+    state.line_cycles +%= 1;
     memory[mem_map.lcd_y] = state.lcd_y;
     lcd_stat.ly_is_lyc = state.lcd_y == memory[mem_map.lcd_y_compare];
     // TODO: Add support for stat interrupt.
