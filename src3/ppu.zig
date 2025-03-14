@@ -179,7 +179,7 @@ const FetcherData = struct {
     second_bitplane: u8,
     palette_index: u3,
     obj_prio: u6, // CGB: OAM index, DMG: Unused
-    obj_flip_x: bool,
+    flip_x: bool,
     bg_prio: ObjectPriority,
 };
 
@@ -261,25 +261,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .fetch_high_obj => {
             state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
 
-            // mix with existing pixels.
-            const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, state.fetcher_data.obj_flip_x);
-            var object_pixels: [color_ids.len]FifoData = undefined;
-            inline for(0..color_ids.len) |i| {
-                const new_pixel = FifoData{
-                    .color_id = color_ids[i], 
-                    .bg_prio = state.fetcher_data.bg_prio, 
-                    .palette_addr = mem_map.obj_palettes_dmg,
-                    .palette_index = state.fetcher_data.palette_index, 
-                    .obj_prio = state.fetcher_data.obj_prio 
-                };
+            var pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.obj_palettes_dmg);
+            inline for(0..pixels.len) |i| {
                 const current_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
-                const pixel_to_use: FifoData = if(current_pixel.color_id == color_id_transparent) new_pixel else current_pixel;
-                object_pixels[i] = pixel_to_use;
+                pixels[i] = if(current_pixel.color_id == color_id_transparent) pixels[i] else current_pixel;
             }
-            assert(state.object_fifo.readableLength() == 0);
-            state.object_fifo.writeAssumeCapacity(&object_pixels);
+            state.object_fifo.writeAssumeCapacity(&pixels);
 
-            // next object at the same position as last one.
             if(nextObjectIsAtLcdX(state)) {
                 checkLcdX(state, memory);
             } else {
@@ -295,8 +283,10 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
+            // TODO: Instead of setting everything in the fetch_tile_x functions we reset the fetcher_data to default. And only set what we actually need?
             state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
             state.fetcher_data.palette_index = 0;
+            state.fetcher_data.flip_x = false;
             tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
@@ -312,7 +302,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.fetcher_data.tile_addr = tile_base_addr + ((state.current_object.tile_row % tile_size_y) * def.byte_per_line);
             state.fetcher_data.palette_index = state.current_object.palette_index;
             state.fetcher_data.bg_prio = state.current_object.bg_prio;
-            state.fetcher_data.obj_flip_x = state.current_object.obj_flip_x;
+            state.fetcher_data.flip_x = state.current_object.obj_flip_x;
             state.fetcher_data.obj_prio = state.current_object.obj_prio;
         },
         .fetch_tile_window => {
@@ -325,6 +315,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
             state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
             state.fetcher_data.palette_index = 0;
+            state.fetcher_data.flip_x = false;
             tryPushPixel(state, memory);
         },
         .halt => {
@@ -381,16 +372,8 @@ fn advanceBlank(state: *State, length: usize) void {
 // https://github.com/ziglang/zig/issues/8220
 fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) { // push succeeded
-        const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
-        inline for(color_ids) |color_id| {
-            state.background_fifo.writeItemAssumeCapacity(FifoData{ 
-                .color_id = color_id, 
-                .bg_prio = .obj_over_bg, 
-                .palette_addr = mem_map.bg_palette,
-                .palette_index = state.fetcher_data.palette_index, 
-                .obj_prio = 0 
-            });
-        }
+        const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
+        state.background_fifo.writeAssumeCapacity(&pixels);
         state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
     } else { // push failed 
         state.uop_fifo.writeItemAssumeCapacity(.fetch_push_bg);
@@ -432,17 +415,21 @@ fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdContr
     return tile_addr;
 }
 
-// TODO: convert2bpp is only used in two places were we get the color ids and create a FifoData from them.
-// This is the same for objects and bg/window. Should we combine them?
-// If they use a different type entirely maybe we keep this function?
-fn convert2bpp(first_bitplane: u8, second_bitplane: u8, reverse: bool) [tile_size_x]u2 {
-    var first_bitplane_var: u8 = if(reverse) @bitReverse(first_bitplane) else first_bitplane;
-    var second_bitplane_var: u8 = if(reverse) @bitReverse(second_bitplane) else second_bitplane;
-    var result: [tile_size_x]u2 = undefined;
+fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoData {
+    var first_bitplane_var: u8 = if(fetcher_data.flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
+    var second_bitplane_var: u8 = if(fetcher_data.flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
+
+    var result: [tile_size_x]FifoData = undefined;
     inline for(0..tile_size_x) |i| {
         first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
         second_bitplane_var, const second_bit: u2 = @shlWithOverflow(second_bitplane_var, 1);
-        result[i] = first_bit + (second_bit << 1); // LSB first
+        const color_id: u2 = first_bit + (second_bit << 1); // LSB first 
+
+        result[i] = FifoData { 
+            .color_id = color_id, .bg_prio = fetcher_data.bg_prio, 
+            .palette_addr = palette_addr, .palette_index = fetcher_data.palette_index, 
+            .obj_prio = fetcher_data.obj_prio 
+        };
     }
     return result;
 }

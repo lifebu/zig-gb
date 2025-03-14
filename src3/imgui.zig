@@ -34,6 +34,7 @@ pub fn render(state: *State) void {
             imgui.igEndMenu();
         }
 
+        // TODO: Once we have a config file I can save the last folder that was opened and open the file dialog there.
         if(state.dump_dialog_open) {
             const menu_height = 18;
             imgui.igSetNextWindowPos(.{ .x = 0, .y = menu_height }, imgui.ImGuiCond_Once);
