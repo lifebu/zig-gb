@@ -127,22 +127,25 @@ const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_i
 // writeItem() => write(), write() => writeSlice(), readItem() => read(), readableLength() => len(), clear() / discard() => create own function 
 // Use RingBuffer with FixedBufferAllocator.
 // Consider using "AssumeLength" where appropriate.
-// TODO: Combine both types? Or have FifoData and ObjectFifoData?
 const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
 
-const ObjectLineEntry = struct {
-    obj_pos_x: u8,
-    tile_row: u4, // single_height: [0, 7], double_height: [0, 15]
-    tile_index: u8,
-    palette_index: u3,
-    obj_prio: u6, // CGB: OAM index, DMG: Unused
-    obj_flip_x: bool,
-    bg_prio: ObjectPriority,
+const FetcherData = struct {
+    palette_index: u3 = 0,
+    tile_addr: u16 = 0,
+    first_bitplane: u8 = 0, 
+    second_bitplane: u8 = 0,
+
+    obj_pos_x: u8 = 0,
+    obj_tile_row: u4 = 0, // single_height: [0, 7], double_height: [0, 15]
+    obj_flip_x: bool = false,
+    bg_prio: ObjectPriority = .obj_over_bg,
+    obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
+    obj_tile_index: u8 = 0,
 };
-const ObjectLineFifo = std.fifo.LinearFifo(ObjectLineEntry, .{ .Static = obj_per_line });
+const ObjectLineFifo = std.fifo.LinearFifo(FetcherData, .{ .Static = obj_per_line });
 // note: requires stable sort
-pub fn sort_objects(_: void, lhs: ObjectLineEntry, rhs: ObjectLineEntry) bool {
+pub fn sort_objects(_: void, lhs: FetcherData, rhs: FetcherData) bool {
     return lhs.obj_pos_x < rhs.obj_pos_x;
 }
 
@@ -173,16 +176,6 @@ const draw_window_tile = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_low_b
 const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, };
 const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
-const FetcherData = struct {
-    tile_addr: u16 = 0,
-    first_bitplane: u8 = 0, 
-    second_bitplane: u8 = 0,
-    palette_index: u3 = 0,
-    obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
-    flip_x: bool = false,
-    bg_prio: ObjectPriority = .obj_over_bg,
-};
-
 pub const State = struct {
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
@@ -196,7 +189,6 @@ pub const State = struct {
     fetcher_data: FetcherData = .{},
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineFifo = ObjectLineFifo.init(),
-    current_object: ObjectLineEntry = undefined,
 
     color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** def.num_2bpp,
 };
@@ -218,7 +210,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             assert(state.oam_line_list.head == 0);
-            std.mem.sort(ObjectLineEntry, state.oam_line_list.buf[0..state.oam_line_list.count], {}, sort_objects);
+            std.mem.sort(FetcherData, state.oam_line_list.buf[0..state.oam_line_list.count], {}, sort_objects);
             state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
         },
@@ -289,22 +281,16 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
+            const current_object: FetcherData = state.oam_line_list.readItem() orelse unreachable;
+            state.fetcher_data = current_object;
+
             const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
-            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (state.current_object.tile_index % 2);
-            const obj_tile_index: u8 = state.current_object.tile_index - obj_tile_index_offset;
-            const tile_offset: u2 = @intCast(state.current_object.tile_row / tile_size_y);
+            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (current_object.obj_tile_index % 2);
+            const obj_tile_index: u8 = current_object.obj_tile_index - obj_tile_index_offset;
+            const tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
             const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
-            // TODO: Should we split fetcher_data for objects and bg? Because for objects I can more easily use ObjectLineEntry or something.
-            // Because just copying the data from state.current_object to state.fetcher_data seems uneccessary.
-            // TODO: combine fetcher_data for objects with ObjectLineEntry?
-            state.fetcher_data = FetcherData{
-                .tile_addr = tile_base_addr + ((state.current_object.tile_row % tile_size_y) * def.byte_per_line),
-                .palette_index = state.current_object.palette_index,
-                .bg_prio = state.current_object.bg_prio,
-                .flip_x = state.current_object.obj_flip_x,
-                .obj_prio = state.current_object.obj_prio,
-            };
+            state.fetcher_data.tile_addr = tile_base_addr + ((current_object.obj_tile_row % tile_size_y) * def.byte_per_line);
         },
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -335,14 +321,14 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
                 const tile_row: u4 = @intCast(object_flip % object_height);
                 // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
-                state.oam_line_list.writeItem(.{ 
-                    .obj_pos_x = object.x_position, 
-                    .tile_row = tile_row,
-                    .tile_index = object.tile_index, 
-                    .palette_index =  @intFromEnum(object.flags.dmg_palette),
-                    .obj_prio = state.oam_scan_idx, // CGB: OAM index, DMG: Unused
-                    .obj_flip_x = object.flags.x_flip,
+                state.oam_line_list.writeItem(FetcherData{ 
                     .bg_prio = object.flags.priority,
+                    .obj_flip_x = object.flags.x_flip,
+                    .obj_pos_x = object.x_position, 
+                    .obj_prio = state.oam_scan_idx, // CGB: OAM index, DMG: Unused
+                    .obj_tile_index = object.tile_index, 
+                    .obj_tile_row = tile_row,
+                    .palette_index =  @intFromEnum(object.flags.dmg_palette),
                 }) catch {};
             }
             state.oam_scan_idx += 1;
@@ -387,7 +373,7 @@ fn nextObjectIsAtLcdX(state: *State) bool {
         return false;
     }
 
-    const object: ObjectLineEntry = state.oam_line_list.peekItem(0);
+    const object: FetcherData = state.oam_line_list.peekItem(0);
     return object.obj_pos_x == state.lcd_overscan_x;
 }
 
@@ -417,8 +403,8 @@ fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdContr
 }
 
 fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoData {
-    var first_bitplane_var: u8 = if(fetcher_data.flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
-    var second_bitplane_var: u8 = if(fetcher_data.flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
+    var first_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
+    var second_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
 
     var result: [tile_size_x]FifoData = undefined;
     inline for(0..tile_size_x) |i| {
@@ -481,7 +467,6 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
     } else if(lcd_control.obj_enable and has_next_object) {
-        state.current_object = state.oam_line_list.readItem() orelse unreachable;
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(&draw_object_tile);
     }
