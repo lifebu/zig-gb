@@ -174,13 +174,13 @@ const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop
 const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 const FetcherData = struct {
-    tile_addr: u16,
-    first_bitplane: u8, 
-    second_bitplane: u8,
-    palette_index: u3,
-    obj_prio: u6, // CGB: OAM index, DMG: Unused
-    flip_x: bool,
-    bg_prio: ObjectPriority,
+    tile_addr: u16 = 0,
+    first_bitplane: u8 = 0, 
+    second_bitplane: u8 = 0,
+    palette_index: u3 = 0,
+    obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
+    flip_x: bool = false,
+    bg_prio: ObjectPriority = .obj_over_bg,
 };
 
 pub const State = struct {
@@ -193,7 +193,7 @@ pub const State = struct {
     // Starts a line with background tiles, will be overwritten with window tiles when we encounter it.
     draw_bg_window_tile: []const MicroOp = undefined,
     line_cycles: u9 = 0,
-    fetcher_data: FetcherData = undefined,
+    fetcher_data: FetcherData = .{},
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineFifo = ObjectLineFifo.init(),
     current_object: ObjectLineEntry = undefined,
@@ -283,10 +283,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
-            // TODO: Instead of setting everything in the fetch_tile_x functions we reset the fetcher_data to default. And only set what we actually need?
-            state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
-            state.fetcher_data.palette_index = 0;
-            state.fetcher_data.flip_x = false;
+            state.fetcher_data = FetcherData{ 
+                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr) 
+            };
             tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
@@ -299,11 +298,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             // TODO: Should we split fetcher_data for objects and bg? Because for objects I can more easily use ObjectLineEntry or something.
             // Because just copying the data from state.current_object to state.fetcher_data seems uneccessary.
             // TODO: combine fetcher_data for objects with ObjectLineEntry?
-            state.fetcher_data.tile_addr = tile_base_addr + ((state.current_object.tile_row % tile_size_y) * def.byte_per_line);
-            state.fetcher_data.palette_index = state.current_object.palette_index;
-            state.fetcher_data.bg_prio = state.current_object.bg_prio;
-            state.fetcher_data.flip_x = state.current_object.obj_flip_x;
-            state.fetcher_data.obj_prio = state.current_object.obj_prio;
+            state.fetcher_data = FetcherData{
+                .tile_addr = tile_base_addr + ((state.current_object.tile_row % tile_size_y) * def.byte_per_line),
+                .palette_index = state.current_object.palette_index,
+                .bg_prio = state.current_object.bg_prio,
+                .flip_x = state.current_object.obj_flip_x,
+                .obj_prio = state.current_object.obj_prio,
+            };
         },
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
@@ -313,9 +314,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
             const win_pos_y: u8 = memory[mem_map.window_y];
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
-            state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
-            state.fetcher_data.palette_index = 0;
-            state.fetcher_data.flip_x = false;
+            state.fetcher_data = FetcherData{ 
+                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr) 
+            };
             tryPushPixel(state, memory);
         },
         .halt => {
