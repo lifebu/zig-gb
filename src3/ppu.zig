@@ -457,14 +457,14 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeItemAssumeCapacity(.advance_hblank);
-    } else if (state.lcd_overscan_x == scroll_overscan_x)  {
-        state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeAssumeCapacity(&draw_bg_tile);
-        state.background_fifo.discard(state.background_fifo.readableLength());
     } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
         state.draw_bg_window_tile = &draw_window_tile;
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
+        state.background_fifo.discard(state.background_fifo.readableLength());
+    } else if (state.lcd_overscan_x == scroll_overscan_x)  {
+        state.uop_fifo.discard(state.uop_fifo.readableLength());
+        state.uop_fifo.writeAssumeCapacity(&draw_bg_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
     } else if(lcd_control.obj_enable and has_next_object) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
