@@ -276,7 +276,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr) 
+                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr, scroll_y) 
             };
             tryPushPixel(state, memory);
         },
@@ -301,7 +301,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const win_pos_y: u8 = memory[mem_map.window_y];
             const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr) 
+                // TODO: Something else then 0?
+                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr, 0) 
             };
             tryPushPixel(state, memory);
         },
@@ -379,11 +380,11 @@ fn nextObjectIsAtLcdX(state: *State) bool {
 
 // TODO: Look at getTileMapAddr and getTileAddr and how they are used. Compare them to the object code
 // See if I can simplify or combine some of the logic? (especially objects and bg/window)
-fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pixel_offset_y: u8) u16 {
+fn getTileMapAddr(state: *State, tilemap_base_addr: u16, scroll_x: u8, scroll_y: u8) u16 {
     const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
     const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - tile_size_x + fifo_pixel_count;
-    const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))) + pixel_offset_x; 
-    const pixel_y: u16 = @as(u16, state.lcd_y) + pixel_offset_y;
+    const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))) + scroll_x; 
+    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y;
 
     const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
     const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
@@ -392,13 +393,14 @@ fn getTileMapAddr(state: *State, tilemap_base_addr: u16, pixel_offset_x: u8, pix
     return tilemap_addr;
 } 
 
-fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdControl, tilemap_addr: u16) u16 {
+fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdControl, tilemap_addr: u16, scroll_y: u8) u16 {
     const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
     const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
     const tile_index: u16 = memory[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
     const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
-    const tile_addr: u16 = tile_base_addr + ((state.lcd_y % tile_size_y) * def.byte_per_line);
+    const pixel_y = state.lcd_y +% scroll_y;
+    const tile_addr: u16 = tile_base_addr + ((pixel_y % tile_size_y) * def.byte_per_line);
     return tile_addr;
 }
 
