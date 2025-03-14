@@ -22,7 +22,6 @@ const obj_double_height = tile_size_y * 2;
 
 const cycles_per_line = 456;
 const cycles_oam_scan = 80;
-const cycles_hblank = 204;
 
 const vblank_scanlines = 10;
 const max_lcd_y = def.resolution_height + vblank_scanlines;
@@ -168,18 +167,11 @@ const MicroOp = enum {
 };
 const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
 
-// oam_scan
 const oam_scan = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) ++ [_]MicroOp{ .oam_check, .advance_draw };
-
-// draw
 const draw_bg_tile = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, };
 const draw_window_tile = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg };
 const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, };
-
-// hblank
-const hblank = [_]MicroOp{ .nop } ** (cycles_hblank - 1);
-// vblank
-const vblank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
+const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 const FetcherData = struct {
     tile_addr: u16,
@@ -236,12 +228,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
             lcd_stat.mode = .h_blank;
-            // TODO: Can we write these differently? This is the same code as vblank. Maybe write a function?
-            const hblank_len = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
-            state.uop_fifo.writeAssumeCapacity(hblank[0..hblank_len]);
-            const advance: MicroOp = if(state.lcd_y >= (def.resolution_height - 1)) .advance_vblank else .advance_oam_scan;
-            state.uop_fifo.writeItemAssumeCapacity(advance);
-            state.lcd_y += 1;
+            const length = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
+            advanceBlank(state, length);
         },
         .advance_oam_scan => {
             lcd_stat.mode = .oam_scan;
@@ -253,12 +241,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_vblank => {
             lcd_stat.mode = .v_blank;
+            advanceBlank(state, blank.len);
             // TODO: Should not happen here at all.
             state.line_cycles = 0;
-            state.uop_fifo.writeAssumeCapacity(&vblank);
-            state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
-            const advance: MicroOp = if(state.lcd_y == 0) .advance_oam_scan else .advance_vblank;
-            state.uop_fifo.writeItemAssumeCapacity(advance);
         },
         .fetch_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
@@ -311,7 +296,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const scroll_y: u8 = memory[mem_map.scroll_y];
             const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
             state.fetcher_data.tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr);
-            // TODO: Do I even have to set this? Maybe for GBC?
             state.fetcher_data.palette_index = 0;
             tryPushPixel(state, memory);
         },
@@ -388,6 +372,15 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
 
 // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
 // https://github.com/ziglang/zig/issues/8220
+fn advanceBlank(state: *State, length: usize) void {
+    state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
+    state.uop_fifo.writeAssumeCapacity(blank[0..length]);
+    const advance: MicroOp = if(state.lcd_y >= def.resolution_height) .advance_vblank else .advance_oam_scan;
+    state.uop_fifo.writeItemAssumeCapacity(advance);
+}
+
+// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
+// https://github.com/ziglang/zig/issues/8220
 fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) { // push succeeded
         const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
@@ -396,7 +389,7 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
                 .color_id = color_id, 
                 .bg_prio = .obj_over_bg, 
                 .palette_addr = mem_map.bg_palette,
-                .palette_index = 0, 
+                .palette_index = state.fetcher_data.palette_index, 
                 .obj_prio = 0 
             });
         }
@@ -457,7 +450,6 @@ fn convert2bpp(first_bitplane: u8, second_bitplane: u8, reverse: bool) [tile_siz
 }
 
 fn mixBackgroundAndObject(bg_pixel: FifoData, obj_pixel: FifoData) FifoData {
-    // TODO: Can we do this simpler, without conditions? And then not in it's own function?
     if(obj_pixel.bg_prio == .obj_over_bg) {
         return if(obj_pixel.color_id == color_id_transparent) bg_pixel else obj_pixel;
     } else {
