@@ -118,11 +118,12 @@ const Object = packed struct {
 
 const FifoData = struct {
     color_id: u2,
+    palette_addr: u16,
     palette_index: u3, // CGB: 0-7, DMG: 0-1 
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     bg_prio: ObjectPriority,
 };
-const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_index = 0 };
+const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_addr = 0, .palette_index = 0 };
 // TODO: Consider creating custom fifo that uses a ring-buffer. In testing, the readItem function costs 51% of all cycles.
 // writeItem() => write(), write() => writeSlice(), readItem() => read(), readableLength() => len(), clear() / discard() => create own function 
 // Use RingBuffer with FixedBufferAllocator.
@@ -282,6 +283,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const new_pixel = FifoData{
                     .color_id = color_ids[i], 
                     .bg_prio = state.fetcher_data.bg_prio, 
+                    .palette_addr = mem_map.obj_palettes_dmg,
                     .palette_index = state.fetcher_data.palette_index, 
                     .obj_prio = state.fetcher_data.obj_prio 
                 };
@@ -390,9 +392,10 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) { // push succeeded
         const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
         inline for(color_ids) |color_id| {
-            state.background_fifo.writeItemAssumeCapacity(.{ 
+            state.background_fifo.writeItemAssumeCapacity(FifoData{ 
                 .color_id = color_id, 
                 .bg_prio = .obj_over_bg, 
+                .palette_addr = mem_map.bg_palette,
                 .palette_index = 0, 
                 .obj_prio = 0 
             });
@@ -453,12 +456,12 @@ fn convert2bpp(first_bitplane: u8, second_bitplane: u8, reverse: bool) [tile_siz
     return result;
 }
 
-fn mixBackgroundColorId(bg_colorid: u2, original_bg_colorid: u2, obj_colorid: u2, original_obj_colorid: u2, bg_prio: ObjectPriority) u2 {
+fn mixBackgroundAndObject(bg_pixel: FifoData, obj_pixel: FifoData) FifoData {
     // TODO: Can we do this simpler, without conditions? And then not in it's own function?
-    if(bg_prio == .obj_over_bg) {
-        return if(original_obj_colorid == color_id_transparent) bg_colorid else obj_colorid;
+    if(obj_pixel.bg_prio == .obj_over_bg) {
+        return if(obj_pixel.color_id == color_id_transparent) bg_pixel else obj_pixel;
     } else {
-        return if(original_bg_colorid == color_id_transparent) obj_colorid else bg_colorid;
+        return if(bg_pixel.color_id == color_id_transparent) obj_pixel else bg_pixel;
     }
 }
 
@@ -514,15 +517,13 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     assert(state.lcd_y < def.resolution_height); // we tried to put a pixel outside of the screen.
 
     const obj_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
-    const obj_palette_addr: u16 = mem_map.obj_palettes_dmg + obj_pixel.palette_index;
-    const obj_palette: [def.color_depth]u2 = getPalette(memory[obj_palette_addr]);
-    const obj_color_id: u2 = obj_palette[obj_pixel.color_id];
-
     const bg_pixel: FifoData = state.background_fifo.readItem() orelse unreachable;
-    const bg_palette: [def.color_depth]u2 = getPalette(memory[mem_map.bg_palette]);
-    const bg_color_id: u2 = bg_palette[bg_pixel.color_id];
 
-    const color_id: u2 = mixBackgroundColorId(bg_color_id, bg_pixel.color_id, obj_color_id, obj_pixel.color_id, obj_pixel.bg_prio);
+    const used_pixel: FifoData = mixBackgroundAndObject(bg_pixel, obj_pixel);
+    const palette_addr: u16 = used_pixel.palette_addr + used_pixel.palette_index;
+    const palette: [def.color_depth]u2 = getPalette(memory[palette_addr]);
+    const color_id: u2 = palette[used_pixel.color_id];
+
     const first_hw_color_bit: u8 = @intCast(color_id & 0b01);
     const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
 
