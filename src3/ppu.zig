@@ -197,7 +197,8 @@ pub const State = struct {
     // In overscan space: [0, 167]
     lcd_overscan_x: u8 = 0, 
     lcd_y: u8 = 0, 
-    draw_window: bool = false,
+    // Starts a line with background tiles, will be overwritten with window tiles when we encounter it.
+    draw_bg_window_tile: []const MicroOp = undefined,
     line_cycles: u9 = 0,
     fetcher_data: FetcherData = undefined,
     oam_scan_idx: u6 = 0,
@@ -208,7 +209,7 @@ pub const State = struct {
 };
 
 pub fn init(state: *State) void {
-    state.uop_fifo.write(&oam_scan) catch unreachable;
+    state.uop_fifo.writeAssumeCapacity(&oam_scan);
 }
 
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
@@ -219,10 +220,10 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     switch(uop) {
         .advance_draw => {
             lcd_stat.mode = .draw;
-            state.uop_fifo.writeAssumeCapacity(&draw_bg_tile); 
+            state.draw_bg_window_tile = &draw_bg_tile;
+            state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile); 
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
-            state.draw_window = false;
             assert(state.oam_line_list.head == 0);
             std.mem.sort(ObjectLineEntry, state.oam_line_list.buf[0..state.oam_line_list.count], {}, sort_objects);
             state.lcd_overscan_x = 0;
@@ -236,14 +237,14 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             lcd_stat.mode = .h_blank;
             // TODO: Can we write these differently? This is the same code as vblank. Maybe write a function?
             const hblank_len = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
-            state.uop_fifo.write(hblank[0..hblank_len]) catch unreachable;
+            state.uop_fifo.writeAssumeCapacity(hblank[0..hblank_len]);
             const advance: MicroOp = if(state.lcd_y >= (def.resolution_height - 1)) .advance_vblank else .advance_oam_scan;
-            state.uop_fifo.writeItem(advance) catch unreachable;
+            state.uop_fifo.writeItemAssumeCapacity(advance);
             state.lcd_y += 1;
         },
         .advance_oam_scan => {
             lcd_stat.mode = .oam_scan;
-            state.uop_fifo.write(&oam_scan) catch unreachable;
+            state.uop_fifo.writeAssumeCapacity(&oam_scan);
             state.oam_line_list.discard(state.oam_line_list.readableLength());
             state.oam_line_list.realign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
@@ -253,10 +254,10 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             lcd_stat.mode = .v_blank;
             // TODO: Should not happen here at all.
             state.line_cycles = 0;
-            state.uop_fifo.write(&vblank) catch unreachable;
+            state.uop_fifo.writeAssumeCapacity(&vblank);
             state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
             const advance: MicroOp = if(state.lcd_y == 0) .advance_oam_scan else .advance_vblank;
-            state.uop_fifo.writeItem(advance) catch unreachable;
+            state.uop_fifo.writeItemAssumeCapacity(advance);
         },
         .fetch_low_bg => {
             state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
@@ -289,17 +290,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 object_pixels[i] = pixel_to_use;
             }
             assert(state.object_fifo.readableLength() == 0);
-            state.object_fifo.write(&object_pixels) catch unreachable;
+            state.object_fifo.writeAssumeCapacity(&object_pixels);
 
             // next object at the same position as last one.
             if(nextObjectIsAtLcdX(state)) {
                 checkLcdX(state, memory);
             } else {
-                if(state.draw_window) {
-                    state.uop_fifo.write(&draw_window_tile) catch unreachable;
-                } else {
-                    state.uop_fifo.write(&draw_bg_tile) catch unreachable;
-                }
+                state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
                 tryPushPixel(state, memory);
             }
         },
@@ -345,7 +342,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .halt => {
-            state.uop_fifo.writeItem(.halt) catch unreachable;
+            state.uop_fifo.writeItemAssumeCapacity(.halt);
         },
         .nop => {
         },
@@ -393,24 +390,16 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) { // push succeeded
         const color_ids: [tile_size_x]u2 = convert2bpp(state.fetcher_data.first_bitplane, state.fetcher_data.second_bitplane, false);
         inline for(color_ids) |color_id| {
-            state.background_fifo.writeItem(.{ 
+            state.background_fifo.writeItemAssumeCapacity(.{ 
                 .color_id = color_id, 
                 .bg_prio = .obj_over_bg, 
                 .palette_index = 0, 
                 .obj_prio = 0 
-            }) catch unreachable;
+            });
         }
-        // TODO: For each line we could keep a running copy of the next draw_bg_window_tile.
-        // Instead of a boolean we just us that copy and write it to the uop_fifo.
-        // Change it when we detect a window. This will only happen 0 to 1 time per line.
-        // Remove the bool. Also do this for fetch_high_obj.
-        if(state.draw_window) {
-            state.uop_fifo.write(&draw_window_tile) catch unreachable;
-        } else {
-            state.uop_fifo.write(&draw_bg_tile) catch unreachable;
-        }
+        state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
     } else { // push failed 
-        state.uop_fifo.writeItem(.fetch_push_bg) catch unreachable;
+        state.uop_fifo.writeItemAssumeCapacity(.fetch_push_bg);
     }
     tryPushPixel(state, memory);
 }
@@ -500,20 +489,20 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     // advance, scroll and window can only happen once per line. and object only up to 10 per line => max 8% hit-rate.
     if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeItem(.advance_hblank) catch unreachable;
+        state.uop_fifo.writeItemAssumeCapacity(.advance_hblank);
     } else if (state.lcd_overscan_x == scroll_overscan_x)  {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.write(&draw_bg_tile) catch unreachable;
+        state.uop_fifo.writeAssumeCapacity(&draw_bg_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
     } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
+        state.draw_bg_window_tile = &draw_window_tile;
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.write(&draw_window_tile) catch unreachable;
+        state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
-        state.draw_window = true;
     } else if(lcd_control.obj_enable and has_next_object) {
         state.current_object = state.oam_line_list.readItem() orelse unreachable;
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.write(&draw_object_tile) catch unreachable;
+        state.uop_fifo.writeAssumeCapacity(&draw_object_tile);
     }
 }
 
