@@ -43,14 +43,6 @@ export fn frame() void {
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);
     }
-    // TODO: Window x scrolling is broken, can test it with this code:
-    // state.mmu.memory[mem_map.window_x] = (state.mmu.memory[mem_map.window_x] + 1) % 167;
-    // TODO: Window y scrolling is broken, can test it with this code:
-    // state.mmu.memory[mem_map.window_y] = (state.mmu.memory[mem_map.window_y] + 1) % 144;
-    // TODO: Background x scrolling is broken, can test it with this code:
-    // state.mmu.memory[mem_map.scroll_x] = (state.mmu.memory[mem_map.scroll_x] + 1) % 255;
-    // TODO: Background y scrolling is broken, can test it with this code:
-    // state.mmu.memory[mem_map.scroll_y] = (state.mmu.memory[mem_map.scroll_y] + 1) % 255;
 
     Platform.frame(&state.platform, state.ppu.color2bpp, state.apu.gb_sample_buffer);
     // TODO: The ppu currently mixes pixels which will lead to previous frames changing the current frame.

@@ -295,14 +295,37 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .fetch_tile_window => {
             const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
             const win_x: u8 = memory[mem_map.window_x];
-            // TODO: Can we remove this check by converting it into overscan space?
-            // Change then name to win_overscan_x 
-            const win_pos_x: u8 = if(win_x >= 7) win_x - 7 else 0;
+            const win_overscan_x: u8 = win_x + 1;
             const win_pos_y: u8 = memory[mem_map.window_y];
-            const tilemap_addr: u16 = getTileMapAddr(state, windowmap_base_addr, win_pos_x, win_pos_y);
+            // TODO: When we scroll the window the wrong tiles get loaded. I need to rework the window fetching part.
+            // For that I need to flatten the getTileMapAddr function and change it to work like in src.
+            // I should also use this opportunity again to evaluate wich part of the 3 feth_tile microops I will split into functions.
+            // TODO: This is the same as the getTileMapAddr() and getTileAddr() function, but i subtract win_pos_y and win_pos_x
+            // Maybe I can just add an amount that will overflow instead?
+            const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
+            const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - win_overscan_x + fifo_pixel_count;
+            assert(lcd_x >= 0);
+            // Change
+            const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))); 
+            // Change
+            const pixel_y: u16 = @as(u16, state.lcd_y) - win_pos_y;
+
+            const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
+            const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
+            assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
+            const tilemap_addr: u16 = windowmap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
+            
+            // TODO: This is the same as the function, but i subtract win_pos_y
+            const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
+            const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
+            const tile_index: u16 = memory[tilemap_addr];
+            const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
+            const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
+            // Change
+            const pixel_y_2 = state.lcd_y -% win_pos_y;
+            const tile_addr: u16 = tile_base_addr + ((pixel_y_2 % tile_size_y) * def.byte_per_line);
             state.fetcher_data = FetcherData{ 
-                // TODO: Something else then 0?
-                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr, 0) 
+                .tile_addr = tile_addr,
             };
             tryPushPixel(state, memory);
         },
@@ -464,7 +487,8 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
-    } else if (state.lcd_overscan_x == scroll_overscan_x)  {
+    // TODO: Need to disable this check once we already hit the window. This way is pretty hacky though.
+    } else if (state.draw_bg_window_tile[0] != .fetch_tile_window and state.lcd_overscan_x == scroll_overscan_x)  {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(&draw_bg_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
