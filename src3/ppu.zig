@@ -14,6 +14,8 @@ const color_id_transparent = 0;
 const tile_map_size_x = 32;
 const tile_map_size_y = 32;
 const tile_map_size_byte = tile_map_size_x * tile_map_size_y;
+const tile_map_pixel_size_x = tile_map_size_x * tile_size_x;
+const tile_map_pixel_size_y = tile_map_size_y * tile_size_y;
 
 const oam_size = 40;
 const obj_size_byte = 4;
@@ -26,6 +28,10 @@ const cycles_oam_scan = 80;
 const vblank_scanlines = 10;
 const max_lcd_y = def.resolution_height + vblank_scanlines;
 
+const TileMapAddress = enum(u1) {
+    map_9800,
+    map_9C00,
+};
 const LcdControl = packed struct {
     // TODO: Add support to disable background with this.
     bg_window_enable: bool = false,
@@ -34,19 +40,13 @@ const LcdControl = packed struct {
         single_height,
         double_height,
     } = .single_height,
-    bg_map_area: enum(u1) {
-        first_map,
-        second_map,
-    } = .first_map,
+    bg_map_area: TileMapAddress = .map_9800,
     bg_window_tile_data: enum(u1) {
-        second_tile_data,
-        first_tile_data,
-    } = .second_tile_data,
+        tile_8800,
+        tile_8000,
+    } = .tile_8800,
     window_enable: bool = false,
-    window_map_area: enum(u1) {
-        first_map,
-        second_map,
-    } = .first_map,
+    window_map_area: TileMapAddress = .map_9800,
     // TODO: Add support for lcd_enable. 
     // When set to true, add .halt uop to uop_fifo. 
     // When set to false, start add initialize ppu (like on start). 
@@ -271,12 +271,12 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             fetchPushBg(state, memory);
         },
         .fetch_tile_bg => {
-            const tilemap_base_addr: u16 = if(lcd_control.bg_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
+            const tilemap_addr_type: TileMapAddress = lcd_control.bg_map_area;
             const scroll_x: u8 = memory[mem_map.scroll_x];
             const scroll_y: u8 = memory[mem_map.scroll_y];
-            const tilemap_addr: u16 = getTileMapAddr(state, tilemap_base_addr, scroll_x, scroll_y);
+            const overscan_x_tile_offset: u5 = tile_map_size_x - 1;
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileAddr(state, memory, lcd_control, tilemap_addr, scroll_y) 
+                .tile_addr = getTileMapTileAddr(state, memory, tilemap_addr_type, overscan_x_tile_offset, scroll_x, scroll_y),
             };
             tryPushPixel(state, memory);
         },
@@ -284,48 +284,24 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             const current_object: FetcherData = state.oam_line_list.readItem() orelse unreachable;
             state.fetcher_data = current_object;
 
-            const obj_tile_base_addr: u16 = mem_map.first_tile_address;
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
             const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (current_object.obj_tile_index % 2);
             const obj_tile_index: u8 = current_object.obj_tile_index - obj_tile_index_offset;
-            const tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
-            const tile_base_addr: u16 = obj_tile_base_addr + (@as(u16, obj_tile_index + tile_offset) * tile_size_byte);
-            state.fetcher_data.tile_addr = tile_base_addr + ((current_object.obj_tile_row % tile_size_y) * def.byte_per_line);
+            const obj_height_tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
+            const tile_addr_offset: u16 = obj_tile_index + obj_height_tile_offset;
+            const tile_addr: u16 = mem_map.tile_8000 + tile_addr_offset * tile_size_byte;
+            const tile_line_addr: u16 = tile_addr + ((current_object.obj_tile_row % tile_size_y) * def.byte_per_line);
+            state.fetcher_data.tile_addr = tile_line_addr;
         },
         .fetch_tile_window => {
-            const windowmap_base_addr: u16 = if(lcd_control.window_map_area == .first_map) mem_map.first_tile_map_address else mem_map.second_tile_map_address;
-            const win_x: u8 = memory[mem_map.window_x];
-            const win_overscan_x: u8 = win_x + 1;
-            const win_pos_y: u8 = memory[mem_map.window_y];
-            // TODO: When we scroll the window the wrong tiles get loaded. I need to rework the window fetching part.
-            // For that I need to flatten the getTileMapAddr function and change it to work like in src.
-            // I should also use this opportunity again to evaluate wich part of the 3 feth_tile microops I will split into functions.
-            // TODO: This is the same as the getTileMapAddr() and getTileAddr() function, but i subtract win_pos_y and win_pos_x
-            // Maybe I can just add an amount that will overflow instead?
-            const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
-            const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - win_overscan_x + fifo_pixel_count;
-            assert(lcd_x >= 0);
-            // Change
-            const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))); 
-            // Change
-            const pixel_y: u16 = @as(u16, state.lcd_y) - win_pos_y;
-
-            const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
-            const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
-            assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
-            const tilemap_addr: u16 = windowmap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
-            
-            // TODO: This is the same as the function, but i subtract win_pos_y
-            const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
-            const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
-            const tile_index: u16 = memory[tilemap_addr];
-            const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
-            const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
-            // Change
-            const pixel_y_2 = state.lcd_y -% win_pos_y;
-            const tile_addr: u16 = tile_base_addr + ((pixel_y_2 % tile_size_y) * def.byte_per_line);
+            const tilemap_addr_type: TileMapAddress = lcd_control.window_map_area;
+            const win_overscan_x: u16 = memory[mem_map.window_x] + 1;
+            const win_y: u16 = memory[mem_map.window_y];
+            // Note: this works because we use modulo later to get the tile map address and tile line address.
+            const scroll_x: u16 = tile_map_pixel_size_x - win_overscan_x; 
+            const scroll_y: u16 = tile_map_pixel_size_y - win_y;
             state.fetcher_data = FetcherData{ 
-                .tile_addr = tile_addr,
+                .tile_addr = getTileMapTileAddr(state, memory, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
             tryPushPixel(state, memory);
         },
@@ -401,31 +377,33 @@ fn nextObjectIsAtLcdX(state: *State) bool {
     return object.obj_pos_x == state.lcd_overscan_x;
 }
 
-// TODO: Look at getTileMapAddr and getTileAddr and how they are used. Compare them to the object code
-// See if I can simplify or combine some of the logic? (especially objects and bg/window)
-fn getTileMapAddr(state: *State, tilemap_base_addr: u16, scroll_x: u8, scroll_y: u8) u16 {
-    const fifo_pixel_count: u8 = @intCast(state.background_fifo.readableLength());
-    const lcd_x: i9 = @as(i9, state.lcd_overscan_x) - tile_size_x + fifo_pixel_count;
-    const pixel_x: u16 = @as(u16, @intCast(@max(0, lcd_x))) + scroll_x; 
-    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y;
+fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
+    const lcd_control = LcdControl.fromMem(memory);
 
-    const tilemap_x: u16 = (pixel_x / tile_size_x) % tile_map_size_x;
+    const fifo_pixel_count: u3 = @intCast(state.background_fifo.readableLength());
+    const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
+    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y; 
+
+    const tilemap_x: u16 = ((pixel_x / tile_size_x) +% tile_x_offset) % tile_map_size_x;
     const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
     assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
-    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
-    return tilemap_addr;
-} 
 
-fn getTileAddr(state: *State, memory: *[def.addr_space]u8, lcd_control: LcdControl, tilemap_addr: u16, scroll_y: u8) u16 {
-    const bg_window_tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .second_tile_data) mem_map.second_tile_address else mem_map.first_tile_address;
-    const signed_mode: bool = bg_window_tile_base_addr == mem_map.second_tile_address;
+    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) mem_map.tile_map_9800 else mem_map.tile_map_9C00;
+    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
+
+
+    const tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
+    const tile_y = state.lcd_y +% scroll_y;
+
+    const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
     const tile_index: u16 = memory[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
-    const tile_base_addr: u16 = bg_window_tile_base_addr + tile_addr_offset * tile_size_byte;
-    const pixel_y = state.lcd_y +% scroll_y;
-    const tile_addr: u16 = tile_base_addr + ((pixel_y % tile_size_y) * def.byte_per_line);
-    return tile_addr;
-}
+
+    const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
+    const tile_line_addr: u16 = tile_addr + ((tile_y % tile_size_y) * def.byte_per_line);
+
+    return tile_line_addr;
+} 
 
 fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoData {
     var first_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;

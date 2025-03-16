@@ -85,8 +85,8 @@ pub const interrupt_serial: u8  = 0x08;
 pub const interrupt_joypad: u8  = 0x10; 
 
 // VRAM
-pub const first_tile_map_address = 0x9800;
-pub const second_tile_map_address = 0x9C00;
+pub const tile_map_9800 = 0x9800;
+pub const tile_map_9C00 = 0x9C00;
 
-pub const first_tile_address = 0x8000;
-pub const second_tile_address = 0x8800;
+pub const tile_8000 = 0x8000;
+pub const tile_8800 = 0x8800;

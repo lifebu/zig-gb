@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/zig-gb",
             "args": [
-                "playground/pkmn_blu.dump",
+                "playground/kirby2.dump",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
