@@ -1,4 +1,9 @@
 
+// Order:
+// Constants and Definitions.
+// Types
+// Functions (init/deinit). Core functions -> Helper. (Alphabetically)
+
 const namespace_name = @import("dir_name/file_name.zig"); // NameSpace = set of function and structs.
 const TypeName = @import("dir_name/TypeName.zig"); // TypeName = top-level fields (@This, struct).
 // snake_case_variable_name

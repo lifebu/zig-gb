@@ -4,8 +4,6 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
-// TODO: Think about the order of declarations I want to have in this file, what does zig standard do?
-// constants, declaration, function?
 const tile_size_x = 8;
 const tile_size_y = 8;
 const tile_size_byte = 16;
@@ -104,15 +102,6 @@ const Object = packed struct {
         const address: u16 = mem_map.oam_low + (@as(u16, obj_idx) * obj_size_byte);
         return @ptrCast(&memory[address]);
     }
-
-    pub fn print(self: Object, obj_idx: u6) void {
-        std.debug.print("Object ({any}): ({any}, {any}): tile: {any}, prio: {s}, y_flip: {any}, x_flip: {any}, dmg_palette: {s}, vram_bank: {any}, cgb_palette: {any}\n", .{ 
-            obj_idx, self.x_position, self.y_position, self.tile_index, 
-            std.enums.tagName(@TypeOf(self.flags.priority), self.flags.priority).?, 
-            self.flags.y_flip, self.flags.x_flip, 
-            std.enums.tagName(@TypeOf(self.flags.dmg_palette), self.flags.dmg_palette).?, self.flags.vram_bank, self.flags.cgb_palette 
-        });
-    }
 };
 
 const FifoData = struct {
@@ -142,12 +131,13 @@ const FetcherData = struct {
     bg_prio: ObjectPriority = .obj_over_bg,
     obj_prio: u6 = 0, // CGB: OAM index, DMG: Unused
     obj_tile_index: u8 = 0,
+
+    // note: requires stable sort
+    fn sortObjects(_: void, lhs: FetcherData, rhs: FetcherData) bool {
+        return lhs.obj_pos_x < rhs.obj_pos_x;
+    }
 };
 const ObjectLineFifo = std.fifo.LinearFifo(FetcherData, .{ .Static = obj_per_line });
-// note: requires stable sort
-pub fn sort_objects(_: void, lhs: FetcherData, rhs: FetcherData) bool {
-    return lhs.obj_pos_x < rhs.obj_pos_x;
-}
 
 const MicroOp = enum {
     advance_draw,
@@ -177,18 +167,20 @@ const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop
 const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 pub const State = struct {
+    // Starts a line with background tiles, will be overwritten with window tiles when we encounter it.
+    draw_bg_window_tile: []const MicroOp = undefined,
+    uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
+    line_cycles: u9 = 0,
+
+    oam_scan_idx: u6 = 0,
+    oam_line_list: ObjectLineFifo = ObjectLineFifo.init(),
+
     background_fifo: BackgroundFifo = BackgroundFifo.init(), 
     object_fifo: ObjectFiFo = ObjectFiFo.init(),
-    uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
     // In overscan space: [0, 167]
     lcd_overscan_x: u8 = 0, 
     lcd_y: u8 = 0, 
-    // Starts a line with background tiles, will be overwritten with window tiles when we encounter it.
-    draw_bg_window_tile: []const MicroOp = undefined,
-    line_cycles: u9 = 0,
     fetcher_data: FetcherData = .{},
-    oam_scan_idx: u6 = 0,
-    oam_line_list: ObjectLineFifo = ObjectLineFifo.init(),
 
     color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** def.num_2bpp,
 };
@@ -210,7 +202,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
             assert(state.oam_line_list.head == 0);
-            std.mem.sort(FetcherData, state.oam_line_list.buf[0..state.oam_line_list.count], {}, sort_objects);
+            std.mem.sort(FetcherData, state.oam_line_list.buf[0..state.oam_line_list.count], {}, FetcherData.sortObjects);
             state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
         },
@@ -355,92 +347,6 @@ fn advanceBlank(state: *State, length: usize) void {
     state.uop_fifo.writeItemAssumeCapacity(advance);
 }
 
-// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
-// https://github.com/ziglang/zig/issues/8220
-fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
-    if(state.background_fifo.readableLength() == 0) { // push succeeded
-        const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
-        state.background_fifo.writeAssumeCapacity(&pixels);
-        state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
-    } else { // push failed 
-        state.uop_fifo.writeItemAssumeCapacity(.fetch_push_bg);
-    }
-    tryPushPixel(state, memory);
-}
-
-fn nextObjectIsAtLcdX(state: *State) bool {
-    if(state.oam_line_list.readableLength() == 0) {
-        return false;
-    }
-
-    const object: FetcherData = state.oam_line_list.peekItem(0);
-    return object.obj_pos_x == state.lcd_overscan_x;
-}
-
-fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
-    const lcd_control = LcdControl.fromMem(memory);
-
-    const fifo_pixel_count: u3 = @intCast(state.background_fifo.readableLength());
-    const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
-    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y; 
-
-    const tilemap_x: u16 = ((pixel_x / tile_size_x) +% tile_x_offset) % tile_map_size_x;
-    const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
-    assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
-
-    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) mem_map.tile_map_9800 else mem_map.tile_map_9C00;
-    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
-
-
-    const tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
-    const tile_y = state.lcd_y +% scroll_y;
-
-    const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
-    const tile_index: u16 = memory[tilemap_addr];
-    const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
-
-    const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
-    const tile_line_addr: u16 = tile_addr + ((tile_y % tile_size_y) * def.byte_per_line);
-
-    return tile_line_addr;
-} 
-
-fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoData {
-    var first_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
-    var second_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
-
-    var result: [tile_size_x]FifoData = undefined;
-    inline for(0..tile_size_x) |i| {
-        first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
-        second_bitplane_var, const second_bit: u2 = @shlWithOverflow(second_bitplane_var, 1);
-        const color_id: u2 = first_bit + (second_bit << 1); // LSB first 
-
-        result[i] = FifoData { 
-            .color_id = color_id, .bg_prio = fetcher_data.bg_prio, 
-            .palette_addr = palette_addr, .palette_index = fetcher_data.palette_index, 
-            .obj_prio = fetcher_data.obj_prio 
-        };
-    }
-    return result;
-}
-
-fn mixBackgroundAndObject(bg_pixel: FifoData, obj_pixel: FifoData) FifoData {
-    if(obj_pixel.bg_prio == .obj_over_bg) {
-        return if(obj_pixel.color_id == color_id_transparent) bg_pixel else obj_pixel;
-    } else {
-        return if(bg_pixel.color_id == color_id_transparent) obj_pixel else bg_pixel;
-    }
-}
-
-fn getPalette(paletteByte: u8) [def.color_depth]u2 {
-    // https://gbdev.io/pandocs/Palettes.html
-    const color_id3: u2 = @intCast((paletteByte & (0b11 << 6)) >> 6);
-    const color_id2: u2 = @intCast((paletteByte & (0b11 << 4)) >> 4);
-    const color_id1: u2 = @intCast((paletteByte & (0b11 << 2)) >> 2);
-    const color_id0: u2 = @intCast((paletteByte & (0b11 << 0)) >> 0);
-    return [def.color_depth]u2{ color_id0, color_id1, color_id2, color_id3 };
-}
-
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     const lcd_control = LcdControl.fromMem(memory);
 
@@ -474,6 +380,92 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(&draw_object_tile);
     }
+}
+
+fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoData {
+    var first_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
+    var second_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
+
+    var result: [tile_size_x]FifoData = undefined;
+    inline for(0..tile_size_x) |i| {
+        first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
+        second_bitplane_var, const second_bit: u2 = @shlWithOverflow(second_bitplane_var, 1);
+        const color_id: u2 = first_bit + (second_bit << 1); // LSB first 
+
+        result[i] = FifoData { 
+            .color_id = color_id, .bg_prio = fetcher_data.bg_prio, 
+            .palette_addr = palette_addr, .palette_index = fetcher_data.palette_index, 
+            .obj_prio = fetcher_data.obj_prio 
+        };
+    }
+    return result;
+}
+
+// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
+// https://github.com/ziglang/zig/issues/8220
+fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
+    if(state.background_fifo.readableLength() == 0) { // push succeeded
+        const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
+        state.background_fifo.writeAssumeCapacity(&pixels);
+        state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
+    } else { // push failed 
+        state.uop_fifo.writeItemAssumeCapacity(.fetch_push_bg);
+    }
+    tryPushPixel(state, memory);
+}
+
+fn getPalette(paletteByte: u8) [def.color_depth]u2 {
+    // https://gbdev.io/pandocs/Palettes.html
+    const color_id3: u2 = @intCast((paletteByte & (0b11 << 6)) >> 6);
+    const color_id2: u2 = @intCast((paletteByte & (0b11 << 4)) >> 4);
+    const color_id1: u2 = @intCast((paletteByte & (0b11 << 2)) >> 2);
+    const color_id0: u2 = @intCast((paletteByte & (0b11 << 0)) >> 0);
+    return [def.color_depth]u2{ color_id0, color_id1, color_id2, color_id3 };
+}
+
+fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
+    const lcd_control = LcdControl.fromMem(memory);
+
+    const fifo_pixel_count: u3 = @intCast(state.background_fifo.readableLength());
+    const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
+    const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y; 
+
+    const tilemap_x: u16 = ((pixel_x / tile_size_x) +% tile_x_offset) % tile_map_size_x;
+    const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
+    assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
+
+    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) mem_map.tile_map_9800 else mem_map.tile_map_9C00;
+    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
+
+
+    const tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
+    const tile_y = state.lcd_y +% scroll_y;
+
+    const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
+    const tile_index: u16 = memory[tilemap_addr];
+    const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
+
+    const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
+    const tile_line_addr: u16 = tile_addr + ((tile_y % tile_size_y) * def.byte_per_line);
+
+    return tile_line_addr;
+} 
+
+fn mixBackgroundAndObject(bg_pixel: FifoData, obj_pixel: FifoData) FifoData {
+    if(obj_pixel.bg_prio == .obj_over_bg) {
+        return if(obj_pixel.color_id == color_id_transparent) bg_pixel else obj_pixel;
+    } else {
+        return if(bg_pixel.color_id == color_id_transparent) obj_pixel else bg_pixel;
+    }
+}
+
+fn nextObjectIsAtLcdX(state: *State) bool {
+    if(state.oam_line_list.readableLength() == 0) {
+        return false;
+    }
+
+    const object: FetcherData = state.oam_line_list.peekItem(0);
+    return object.obj_pos_x == state.lcd_overscan_x;
 }
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
