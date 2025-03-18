@@ -19,13 +19,21 @@ pub const IVec4 = extern struct {
     w: i32,
 };
 
-pub fn shaderRGBA(r: u8, g: u8, b: u8, a: u8) Vec4 {
+pub fn shaderRgbaVec4(r: u8, g: u8, b: u8, a: u8) Vec4 {
     return Vec4{ 
         .x = @as(f32, @floatFromInt(r)) / 255.0,
         .y = @as(f32, @floatFromInt(g)) / 255.0,
         .z = @as(f32, @floatFromInt(b)) / 255.0,
         .w = @as(f32, @floatFromInt(a)) / 255.0,
     };
+}
+
+pub fn shaderRgbaU32(r: u8, g: u8, b: u8, a: u8) u32 {
+    const r32: u32 = @as(u32, r);
+    const g32: u32 = @as(u32, g) << 8;
+    const b32: u32 = @as(u32, b) << 16;
+    const a32: u32 = @as(u32, a) << 24;
+    return r32 | g32 | b32 | a32;
 }
 
 // TODO: IVec uses i32 which can store 4 u8s. So we can compress the amount of data send to the GPU further?
