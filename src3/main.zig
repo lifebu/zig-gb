@@ -36,9 +36,10 @@ fn imgui_cb(dump_path: []u8) void {
 }
 
 export fn frame() void {
-    // Note: GB actually runs at 59.73Hz
-    const cycles_in_60fps = def.system_freq / 60; 
-    for(0..cycles_in_60fps) |_| {
+    // Note: GB runs at 59.73Hz. This software runs at 60Hz.
+    // TODO: It would be better to just let the system run to the end of the next vblank.
+    const cycles_per_frame = 70224; 
+    for(0..cycles_per_frame) |_| {
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);

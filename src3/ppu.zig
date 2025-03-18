@@ -166,7 +166,8 @@ const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 pub const State = struct {
     current_bg_window_uops: []const MicroOp = undefined,
     uop_fifo: MicroOpFifo = .{}, 
-    line_cycles: u9 = 0,
+    draw_cycles: u9 = 0,
+    line_penalty: u9 = 0,
 
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineFifo = .{},
@@ -201,6 +202,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(state.oam_line_list.isAligned()); // Sort requires contiguous memory.
             std.mem.sort(FetcherData, state.oam_line_list.buffer[0..state.oam_line_list.length()], {}, FetcherData.sortObjects);
             state.lcd_overscan_x = 0;
+            // Advance is done in the last cycle of oam_scan. We set it to the max value so that it overflows to 0. 
+            state.draw_cycles = std.math.maxInt(u9);
+            state.line_penalty = 0;
             checkLcdX(state, memory);
         },
         .advance_hblank => {
@@ -208,7 +212,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
             lcd_stat.mode = .h_blank;
-            const length = cycles_per_line - 1 - cycles_oam_scan - state.line_cycles;
+            // TODO: The actual length of draw_cycles is not what is expected (172 + state.line_penalty)
+            // If you add the following line to main, you can see the timing as a line going through (best to use pkmn_silv title screen):
+            // state.ppu.colorIds = [_]u8{ 0 } ** def.overscan_resolution;
+            // In practice the error is between 76-135 dots (0,1-0,2% error).
+            const length = cycles_per_line - 1 - state.draw_cycles - cycles_oam_scan;
             advanceBlank(state, length);
         },
         .advance_oam_scan => {
@@ -216,7 +224,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_fifo.write(&oam_scan);
             state.oam_line_list.clearRealign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
-            state.line_cycles = 0;
         },
         .advance_vblank => {
             lcd_stat.mode = .v_blank;
@@ -246,6 +253,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.object_fifo.write(&pixels);
 
             if(nextObjectIsAtLcdX(state)) {
+                // subtract penalty that will be applied by checkLcdX() again.
+                const fifo_length: i9 = @intCast(state.background_fifo.length()); 
+                state.line_penalty -= @max(0, 6 - fifo_length);
                 checkLcdX(state, memory);
             } else {
                 state.uop_fifo.write(state.current_bg_window_uops);
@@ -324,7 +334,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
     }
 
-    state.line_cycles +%= 1;
+    state.draw_cycles +%= 1;
     memory[mem_map.lcd_y] = state.lcd_y;
     lcd_stat.ly_is_lyc = state.lcd_y == memory[mem_map.lcd_y_compare];
     // TODO: Add support for stat interrupt.
@@ -350,21 +360,29 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
 
     const has_next_object = nextObjectIsAtLcdX(state);
 
+    // End of line
     if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.clear();
         state.uop_fifo.writeItem(.advance_hblank);
+    // Encountered window
     } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
         state.current_bg_window_uops = &draw_window_tile;
         state.uop_fifo.clear();
         state.uop_fifo.write(state.current_bg_window_uops);
         state.background_fifo.clear();
+        state.line_penalty += 6;
+    // Background scrolling
     } else if (state.current_bg_window_uops[0] != draw_window_tile[0] and state.lcd_overscan_x == scroll_overscan_x)  {
         state.uop_fifo.clear();
         state.uop_fifo.write(&draw_bg_tile);
         state.background_fifo.clear();
+        state.line_penalty += scroll_x % 8;
+    // Found Object
     } else if((lcd_control.obj_enable or true) and has_next_object) {
         state.uop_fifo.clear();
         state.uop_fifo.write(&draw_object_tile);
+        const fifo_length: i9 = @intCast(state.background_fifo.length()); 
+        state.line_penalty += 6 + @max(0, 6 - fifo_length);
     }
 }
 
