@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const def = @import("defines.zig");
+const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
 
 const tile_size_x = 8;
@@ -112,12 +113,8 @@ const FifoData = struct {
     bg_prio: ObjectPriority,
 };
 const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_addr = 0, .palette_index = 0 };
-// TODO: Consider creating custom fifo that uses a ring-buffer. In testing, the readItem function costs 51% of all cycles.
-// writeItem() => write(), write() => writeSlice(), readItem() => read(), readableLength() => len(), clear() / discard() => create own function 
-// Use RingBuffer with FixedBufferAllocator.
-// Consider using "AssumeLength" where appropriate.
-const BackgroundFifo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
-const ObjectFiFo = std.fifo.LinearFifo(FifoData, .{ .Static = tile_size_x });
+const BackgroundFifo = Fifo.RingbufferFifo(FifoData, tile_size_x);
+const ObjectFiFo = Fifo.RingbufferFifo(FifoData, tile_size_x);
 
 const FetcherData = struct {
     palette_index: u3 = 0,
@@ -137,7 +134,7 @@ const FetcherData = struct {
         return lhs.obj_pos_x < rhs.obj_pos_x;
     }
 };
-const ObjectLineFifo = std.fifo.LinearFifo(FetcherData, .{ .Static = obj_per_line });
+const ObjectLineFifo = Fifo.RingbufferFifo(FetcherData, obj_per_line);
 
 const MicroOp = enum {
     advance_draw,
@@ -158,7 +155,7 @@ const MicroOp = enum {
     oam_check,
     push_pixel,
 };
-const MicroOpFifo = std.fifo.LinearFifo(MicroOp, .{ .Static = cycles_per_line });
+const MicroOpFifo = Fifo.RingbufferFifo(MicroOp, cycles_per_line);
 
 const oam_scan = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) ++ [_]MicroOp{ .oam_check, .advance_draw };
 const draw_bg_tile = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, };
@@ -168,14 +165,14 @@ const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 pub const State = struct {
     current_bg_window_uops: []const MicroOp = undefined,
-    uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
+    uop_fifo: MicroOpFifo = .{}, 
     line_cycles: u9 = 0,
 
     oam_scan_idx: u6 = 0,
-    oam_line_list: ObjectLineFifo = ObjectLineFifo.init(),
+    oam_line_list: ObjectLineFifo = .{},
 
-    background_fifo: BackgroundFifo = BackgroundFifo.init(), 
-    object_fifo: ObjectFiFo = ObjectFiFo.init(),
+    background_fifo: BackgroundFifo = .{}, 
+    object_fifo: ObjectFiFo = .{},
     // In overscan space: [0, 167]
     lcd_overscan_x: u8 = 0, 
     lcd_y: u8 = 0, 
@@ -186,7 +183,7 @@ pub const State = struct {
 
 pub fn init(state: *State) void {
     // TODO: Once we have an actual system and cpu think about what we need to do to initialize the PPU.
-    state.uop_fifo.writeAssumeCapacity(&oam_scan);
+    state.uop_fifo.write(&oam_scan);
 }
 
 pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
@@ -198,11 +195,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         .advance_draw => {
             lcd_stat.mode = .draw;
             state.current_bg_window_uops = &draw_bg_tile;
-            state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops); 
-            state.background_fifo.discard(state.background_fifo.readableLength());
-            state.object_fifo.discard(state.object_fifo.readableLength());
-            assert(state.oam_line_list.head == 0); // Sort requires contiguous memory. Ringbuffer Fifo only allows this when head is at index ß.
-            std.mem.sort(FetcherData, state.oam_line_list.buf[0..state.oam_line_list.count], {}, FetcherData.sortObjects);
+            state.uop_fifo.write(state.current_bg_window_uops); 
+            state.background_fifo.clear();
+            state.object_fifo.clear();
+            assert(state.oam_line_list.isAligned()); // Sort requires contiguous memory.
+            std.mem.sort(FetcherData, state.oam_line_list.buffer[0..state.oam_line_list.length()], {}, FetcherData.sortObjects);
             state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
         },
@@ -217,9 +214,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
         },
         .advance_oam_scan => {
             lcd_stat.mode = .oam_scan;
-            state.uop_fifo.writeAssumeCapacity(&oam_scan);
-            state.oam_line_list.discard(state.oam_line_list.readableLength());
-            state.oam_line_list.realign(); // required for std.mem.sort
+            state.uop_fifo.write(&oam_scan);
+            state.oam_line_list.clearRealign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
             // TODO: I need to reset it here and remove the cycles_oam_scan for hblank. This should be wrong. 
             // But reseting this at the start of draw mode shows that the timing is wrong (out of sync).
@@ -250,13 +246,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                 const current_pixel: FifoData = state.object_fifo.readItem() orelse transparent_pixel;
                 pixels[i] = if(current_pixel.color_id == color_id_transparent) pixels[i] else current_pixel;
             }
-            state.object_fifo.writeAssumeCapacity(&pixels);
+            state.object_fifo.write(&pixels);
 
             // TODO: This check is not that great, because we do it twice. Once more in checkLcdX. But there we need it as well.
             if(nextObjectIsAtLcdX(state)) {
                 checkLcdX(state, memory);
             } else {
-                state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops);
+                state.uop_fifo.write(state.current_bg_window_uops);
                 tryPushPixel(state, memory);
             }
         },
@@ -299,7 +295,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             tryPushPixel(state, memory);
         },
         .halt => {
-            state.uop_fifo.writeItemAssumeCapacity(.halt);
+            state.uop_fifo.writeItem(.halt);
         },
         .nop => {
         },
@@ -313,8 +309,8 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
                 const tile_row: u4 = @intCast(object_flip % object_height);
-                // starting from the 11th object, this will throw an error. Fine, we only need the first 10.
-                state.oam_line_list.writeItem(FetcherData{ 
+                // after 10 objects, they will be discarded. We only need the first 10.
+                state.oam_line_list.writeItemDiscardWhenFull(FetcherData{ 
                     .bg_prio = object.flags.priority,
                     .obj_flip_x = object.flags.x_flip,
                     .obj_pos_x = object.x_position, 
@@ -322,7 +318,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
                     .obj_tile_index = object.tile_index, 
                     .obj_tile_row = tile_row,
                     .palette_index =  @intFromEnum(object.flags.dmg_palette),
-                }) catch {};
+                });
             }
             state.oam_scan_idx += 1;
         },
@@ -343,9 +339,9 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
 // https://github.com/ziglang/zig/issues/8220
 fn advanceBlank(state: *State, length: usize) void {
     state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
-    state.uop_fifo.writeAssumeCapacity(blank[0..length]);
+    state.uop_fifo.write(blank[0..length]);
     const advance: MicroOp = if(state.lcd_y >= def.resolution_height) .advance_vblank else .advance_oam_scan;
-    state.uop_fifo.writeItemAssumeCapacity(advance);
+    state.uop_fifo.writeItem(advance);
 }
 
 fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
@@ -365,21 +361,21 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
     // Can we make this brancheless?
     // advance, scroll and window can only happen once per line. and object only up to 10 per line => max 8% hit-rate.
     if(state.lcd_overscan_x == def.overscan_width) {
-        state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeItemAssumeCapacity(.advance_hblank);
+        state.uop_fifo.clear();
+        state.uop_fifo.writeItem(.advance_hblank);
     } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
         state.current_bg_window_uops = &draw_window_tile;
-        state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops);
-        state.background_fifo.discard(state.background_fifo.readableLength());
+        state.uop_fifo.clear();
+        state.uop_fifo.write(state.current_bg_window_uops);
+        state.background_fifo.clear();
     // TODO: Need to disable this check once we already hit the window. This way is pretty hacky though.
     } else if (state.current_bg_window_uops[0] != .fetch_tile_window and state.lcd_overscan_x == scroll_overscan_x)  {
-        state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeAssumeCapacity(&draw_bg_tile);
-        state.background_fifo.discard(state.background_fifo.readableLength());
+        state.uop_fifo.clear();
+        state.uop_fifo.write(&draw_bg_tile);
+        state.background_fifo.clear();
     } else if((lcd_control.obj_enable or true) and has_next_object) {
-        state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeAssumeCapacity(&draw_object_tile);
+        state.uop_fifo.clear();
+        state.uop_fifo.write(&draw_object_tile);
     }
 }
 
@@ -405,12 +401,12 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoDa
 // TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
 // https://github.com/ziglang/zig/issues/8220
 fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
-    if(state.background_fifo.readableLength() == 0) { // push succeeded
+    if(state.background_fifo.isEmpty()) { // push succeeded
         const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
-        state.background_fifo.writeAssumeCapacity(&pixels);
-        state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops);
+        state.background_fifo.write(&pixels);
+        state.uop_fifo.write(state.current_bg_window_uops);
     } else { // push failed 
-        state.uop_fifo.writeItemAssumeCapacity(.fetch_push_bg);
+        state.uop_fifo.writeItem(.fetch_push_bg);
     }
     tryPushPixel(state, memory);
 }
@@ -427,7 +423,7 @@ fn getPalette(paletteByte: u8) [def.color_depth]u2 {
 fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
     const lcd_control = LcdControl.fromMem(memory);
 
-    const fifo_pixel_count: u3 = @intCast(state.background_fifo.readableLength());
+    const fifo_pixel_count: u3 = @intCast(state.background_fifo.length());
     const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
     const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y; 
 
@@ -461,16 +457,16 @@ fn mixBackgroundAndObject(bg_pixel: FifoData, obj_pixel: FifoData) FifoData {
 }
 
 fn nextObjectIsAtLcdX(state: *State) bool {
-    if(state.oam_line_list.readableLength() == 0) {
+    if(state.oam_line_list.isEmpty()) {
         return false;
     }
 
-    const object: FetcherData = state.oam_line_list.peekItem(0);
+    const object: FetcherData = state.oam_line_list.peekItem();
     return object.obj_pos_x == state.lcd_overscan_x;
 }
 
 fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
-    if(state.background_fifo.readableLength() == 0) {
+    if(state.background_fifo.isEmpty()) {
         return;
     }
     assert(state.lcd_overscan_x < def.overscan_width); // we tried to put a pixel outside of the screen.
