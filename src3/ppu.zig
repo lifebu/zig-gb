@@ -167,8 +167,7 @@ const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop
 const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 pub const State = struct {
-    // Starts a line with background tiles, will be overwritten with window tiles when we encounter it.
-    draw_bg_window_tile: []const MicroOp = undefined,
+    current_bg_window_uops: []const MicroOp = undefined,
     uop_fifo: MicroOpFifo = MicroOpFifo.init(), 
     line_cycles: u9 = 0,
 
@@ -186,6 +185,7 @@ pub const State = struct {
 };
 
 pub fn init(state: *State) void {
+    // TODO: Once we have an actual system and cpu think about what we need to do to initialize the PPU.
     state.uop_fifo.writeAssumeCapacity(&oam_scan);
 }
 
@@ -197,11 +197,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     switch(uop) {
         .advance_draw => {
             lcd_stat.mode = .draw;
-            state.draw_bg_window_tile = &draw_bg_tile;
-            state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile); 
+            state.current_bg_window_uops = &draw_bg_tile;
+            state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops); 
             state.background_fifo.discard(state.background_fifo.readableLength());
             state.object_fifo.discard(state.object_fifo.readableLength());
-            assert(state.oam_line_list.head == 0);
+            assert(state.oam_line_list.head == 0); // Sort requires contiguous memory. Ringbuffer Fifo only allows this when head is at index ß.
             std.mem.sort(FetcherData, state.oam_line_list.buf[0..state.oam_line_list.count], {}, FetcherData.sortObjects);
             state.lcd_overscan_x = 0;
             checkLcdX(state, memory);
@@ -252,10 +252,11 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             }
             state.object_fifo.writeAssumeCapacity(&pixels);
 
+            // TODO: This check is not that great, because we do it twice. Once more in checkLcdX. But there we need it as well.
             if(nextObjectIsAtLcdX(state)) {
                 checkLcdX(state, memory);
             } else {
-                state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
+                state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops);
                 tryPushPixel(state, memory);
             }
         },
@@ -367,16 +368,16 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeItemAssumeCapacity(.advance_hblank);
     } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
-        state.draw_bg_window_tile = &draw_window_tile;
+        state.current_bg_window_uops = &draw_window_tile;
         state.uop_fifo.discard(state.uop_fifo.readableLength());
-        state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
+        state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops);
         state.background_fifo.discard(state.background_fifo.readableLength());
     // TODO: Need to disable this check once we already hit the window. This way is pretty hacky though.
-    } else if (state.draw_bg_window_tile[0] != .fetch_tile_window and state.lcd_overscan_x == scroll_overscan_x)  {
+    } else if (state.current_bg_window_uops[0] != .fetch_tile_window and state.lcd_overscan_x == scroll_overscan_x)  {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(&draw_bg_tile);
         state.background_fifo.discard(state.background_fifo.readableLength());
-    } else if(lcd_control.obj_enable and has_next_object) {
+    } else if((lcd_control.obj_enable or true) and has_next_object) {
         state.uop_fifo.discard(state.uop_fifo.readableLength());
         state.uop_fifo.writeAssumeCapacity(&draw_object_tile);
     }
@@ -407,7 +408,7 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.readableLength() == 0) { // push succeeded
         const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
         state.background_fifo.writeAssumeCapacity(&pixels);
-        state.uop_fifo.writeAssumeCapacity(state.draw_bg_window_tile);
+        state.uop_fifo.writeAssumeCapacity(state.current_bg_window_uops);
     } else { // push failed 
         state.uop_fifo.writeItemAssumeCapacity(.fetch_push_bg);
     }
