@@ -105,28 +105,7 @@ pub fn deinit() void {
     sokol.audio.shutdown();
 }
 
-// TODO: Try to get rid of this extra conversion!
-fn convertImage(color2bpp: [def.num_2bpp]u8) [def.overscan_width * def.resolution_height]u8 {
-    const num_tiles = def.resolution_tile_width * def.resolution_height;
-    var result: [def.overscan_width * def.resolution_height]u8 = undefined;
-    for(0..num_tiles) |i2bpp| {
-        const first_bitplane_idx: usize = i2bpp * 2;
-        var first_bitplane: u8 = color2bpp[first_bitplane_idx]; 
-        var second_bitplane: u8 = color2bpp[first_bitplane_idx + 1]; 
-
-        for(0..8) |iBit| {
-            first_bitplane, const first_bit: u2 = @shlWithOverflow(first_bitplane, 1);
-            second_bitplane, const second_bit: u2 = @shlWithOverflow(second_bitplane, 1);
-            const color_id: u2 = first_bit + (second_bit << 1); // LSB first 
-            const result_index: usize = i2bpp * 8 + iBit;
-            const result_u8 = @as(u8, color_id) * (256 / 4);
-            result[result_index] = result_u8;
-        }
-    }
-    return result;
-}
-
-pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]f32) void {
+pub fn frame(state: *State, colorids: [def.overscan_resolution]u8, _: [def.num_gb_samples]f32) void {
     // TODO: To avoid popping we might need to dynamically adjust the number of samples we write.
     //_ = sokol.audio.push(&samples[0], samples.len);
 
@@ -145,9 +124,8 @@ pub fn frame(state: *State, color2bpp: [def.num_2bpp]u8, _: [def.num_gb_samples]
     const new_title = std.fmt.bufPrintZ(&window_title, "Zig GB Emulator. FPS: {d:.2}", .{1.0 / delta_ms}) catch unreachable;
     sokol.app.setWindowTitle(new_title);
 
-    const converted_image = convertImage(color2bpp);
     var img_data = sokol.gfx.ImageData{};
-    img_data.subimage[0][0] = sokol.gfx.asRange(&converted_image);
+    img_data.subimage[0][0] = sokol.gfx.asRange(&colorids);
     sokol.gfx.updateImage(state.colorids, img_data);
 
     sokol.gfx.beginPass(.{ .action = state.pass_action, .swapchain = sokol.glue.swapchain() });

@@ -24,8 +24,11 @@ layout(binding=0) uniform sampler texture_sampler;
 in vec2 uv;
 out vec4 frag_color;
 
-void main() {    
-    float color_id = texture(sampler2D(color_texture, texture_sampler), uv).x;
+const float COLOR_DEPTH = 4.0;
+const float COLOR_DEPTH_CONVERSION = 256.0 / COLOR_DEPTH; 
+
+void main() { 
+    float color_id = texture(sampler2D(color_texture, texture_sampler), uv).x * COLOR_DEPTH_CONVERSION;
     vec3 hw_color = texture(sampler2D(palette_texture, texture_sampler), vec2(color_id, 0)).xyz;
     frag_color = vec4(hw_color, 1.0);
 }

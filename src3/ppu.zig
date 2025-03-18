@@ -178,7 +178,7 @@ pub const State = struct {
     lcd_y: u8 = 0, 
     fetcher_data: FetcherData = .{},
 
-    color2bpp: [def.num_2bpp]u8 = [_]u8{ 0 } ** def.num_2bpp,
+    colorIds: [def.overscan_resolution]u8 = [_]u8{ 0 } ** def.overscan_resolution,
 };
 
 pub fn init(state: *State) void {
@@ -480,21 +480,8 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     const palette: [def.color_depth]u2 = getPalette(memory[palette_addr]);
     const color_id: u2 = palette[used_pixel.color_id];
 
-    const first_hw_color_bit: u8 = @intCast(color_id & 0b01);
-    const second_hw_color_bit: u8 = @intCast((color_id & 0b10) >> 1);
-
-    // TODO: Move the shader code to use a texture of hardware colorIds and not bitplanes!
-    // Like the example from sokol chipz
-    const bitplane_idx: u13 = (@as(u13, state.lcd_overscan_x) / def.tile_width) * def.byte_per_line + (@as(u13, state.lcd_y) * def.resolution_2bpp_width);
-    // TODO: This breaks after the first frame, because we are "adding" color ids to it, the last frame will be "smeared" on top of this frame.
-    const first_bitplane: *u8 = &state.color2bpp[bitplane_idx];
-    const second_bitplane: *u8 = &state.color2bpp[bitplane_idx + 1];
-
-    const tile_pixel_x = state.lcd_overscan_x % tile_size_x;
-    const tile_pixel_shift: u3 = @intCast(tile_size_x - tile_pixel_x - 1);
-    first_bitplane.* |= first_hw_color_bit << tile_pixel_shift;
-    second_bitplane.* |= second_hw_color_bit << tile_pixel_shift;
-
+    const color_index: u16 = state.lcd_overscan_x + @as(u16, def.overscan_width) * state.lcd_y;
+    state.colorIds[color_index] = color_id;
     state.lcd_overscan_x += 1;
     checkLcdX(state, memory);
 }
