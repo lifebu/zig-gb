@@ -81,7 +81,7 @@
 - ALU: Both Inputs, Function.
 
 ## Timing:
-0: ADDR => IDU 
+0: ADDR + IDU 
 1: DBUS
 2: ALU/MISC
 3: DECODE
