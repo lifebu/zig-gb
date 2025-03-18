@@ -204,7 +204,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             checkLcdX(state, memory);
         },
         .advance_hblank => {
-            // TODO: Add more asserts everywhere to make sure this works correctly!
             assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
@@ -217,8 +216,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.uop_fifo.write(&oam_scan);
             state.oam_line_list.clearRealign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
-            // TODO: I need to reset it here and remove the cycles_oam_scan for hblank. This should be wrong. 
-            // But reseting this at the start of draw mode shows that the timing is wrong (out of sync).
             state.line_cycles = 0;
         },
         .advance_vblank => {
@@ -248,7 +245,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             }
             state.object_fifo.write(&pixels);
 
-            // TODO: This check is not that great, because we do it twice. Once more in checkLcdX. But there we need it as well.
             if(nextObjectIsAtLcdX(state)) {
                 checkLcdX(state, memory);
             } else {
@@ -335,8 +331,6 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
     lcd_stat.toMem(memory);
 }
 
-// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
-// https://github.com/ziglang/zig/issues/8220
 fn advanceBlank(state: *State, length: usize) void {
     state.lcd_y = (state.lcd_y + 1) % max_lcd_y;
     state.uop_fifo.write(blank[0..length]);
@@ -356,10 +350,6 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
 
     const has_next_object = nextObjectIsAtLcdX(state);
 
-    // TODO: This now has to be tested every time we push a pixel, push an object and at the start of each line.
-    // Can we do this more rarely? Only test when relevant?
-    // Can we make this brancheless?
-    // advance, scroll and window can only happen once per line. and object only up to 10 per line => max 8% hit-rate.
     if(state.lcd_overscan_x == def.overscan_width) {
         state.uop_fifo.clear();
         state.uop_fifo.writeItem(.advance_hblank);
@@ -368,8 +358,7 @@ fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
         state.uop_fifo.clear();
         state.uop_fifo.write(state.current_bg_window_uops);
         state.background_fifo.clear();
-    // TODO: Need to disable this check once we already hit the window. This way is pretty hacky though.
-    } else if (state.current_bg_window_uops[0] != .fetch_tile_window and state.lcd_overscan_x == scroll_overscan_x)  {
+    } else if (state.current_bg_window_uops[0] != draw_window_tile[0] and state.lcd_overscan_x == scroll_overscan_x)  {
         state.uop_fifo.clear();
         state.uop_fifo.write(&draw_bg_tile);
         state.background_fifo.clear();
@@ -398,8 +387,6 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoDa
     return result;
 }
 
-// TODO: zig 0.14.0 has labeled switches that I can use for fallthrough.
-// https://github.com/ziglang/zig/issues/8220
 fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.isEmpty()) { // push succeeded
         const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
@@ -433,7 +420,6 @@ fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_t
 
     const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) mem_map.tile_map_9800 else mem_map.tile_map_9C00;
     const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
-
 
     const tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
     const tile_y = state.lcd_y +% scroll_y;
