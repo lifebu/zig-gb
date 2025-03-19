@@ -10,7 +10,7 @@ const longest_instruction_cycles = 24;
 const MicroOp = enum(u8) {
     unused,
     // General
-    decode,
+    decode_push_pins,
     halt,
     nop,
     set_addr_idu, 
@@ -78,12 +78,12 @@ fn createInstructionSet() [256]MicroOpArray {
     
     // TODO: Need to check my documentation if that is what I need to do.
     // ## Timing:
-    // 0: ADDR => IDU 
+    // 0: ADDR + IDU 
     // 1: DBUS
     // 2: ALU/MISC
-    // 3: DECODE
+    // 3: DECODE + SET_PINS
     returnVal[0].appendSlice(&[_]MicroOpData{
-        MicroOpData{ .operation = .decode, .params = DecodeParams.toU8(.{ .instruction_register = true }) },
+        MicroOpData{ .operation = .decode_push_pins, .params = DecodeParams.toU8(.{ .instruction_register = true }) },
         MicroOpData{ .operation = .nop, .params = 0 },
         MicroOpData{ .operation = .nop, .params = 0 },
         MicroOpData{ .operation = .nop, .params = 0 },
@@ -93,8 +93,87 @@ fn createInstructionSet() [256]MicroOpArray {
 }
 const instruction_set = createInstructionSet();
 
+// IF and IE flags.
+const InterruptFlags = packed struct(u8) {
+    // priority: highest to lowest.
+    v_blank: bool = false,
+    lcd_stat: bool = false,
+    timer: bool = false,
+    serial: bool = false,
+    joypad: bool = false,
+    _: u3 = 0,
+
+    pub fn fromMem(memory: *[def.addr_space]u8) InterruptFlags {
+        return @bitCast(memory[mem_map.interrupt_flag]);
+    } 
+    pub fn toMem(self: InterruptFlags, memory: *[def.addr_space]u8) void {
+        memory[mem_map.interrupt_flag] = @bitCast(self);
+    }
+    // TODO: Maybe a function where I combine two Flags (IF and IE) and it returns which interrupt is pending?
+};
+
+const CpuPins = struct {
+    // input-output
+    databus: u8 = 0,
+    // output only
+    address_bus: u16 = 0,
+    request: enum(u3) {
+        disconnected = 0,           // (---)
+        unused_memory_only = 1,     // (--M)
+        alu_to_bus = 2,             // (-W-)
+        register_to_bus = 3,        // (-WM)
+        alu_to_register = 4,        // (R--)
+        bus_to_register = 5,        // (R-M)
+        bus_to_alu_input = 6,       // (RW-)
+        unused_all = 7,             // (RWM)
+    } = .disconnected,
+}; 
+
+const FlagRegister = packed union {
+    F: u8,
+    Flags: packed struct {
+        _: u4 = 0,
+        // TODO: u1 or bool?
+        carry: bool = false,
+        half_bcd: bool = false,
+        n_bcd: bool = false,
+        zero: bool = false,
+    },
+};
+
+const Registers = packed union {
+    r16: packed struct {
+        af: u16 = 0,
+        bc: u16 = 0,
+        de: u16 = 0,
+        hl: u16 = 0,
+    },
+    // gb and x86 are little-endian
+    r8: packed struct {
+        f: FlagRegister = . { .F = 0 },
+        a: u8 = 0,
+        c: u8 = 0,
+        b: u8 = 0,
+        e: u8 = 0,
+        d: u8 = 0,
+        l: u8 = 0,
+        h: u8 = 0,
+    },
+};
+
 pub const State = struct {
     uop_fifo: MicroOpFifo = .{}, 
+    // Pins will be broadcast to the mmu and rest of system, so that they can react.
+    current_pins: CpuPins = .{},
+
+    // Register file
+    instruction_register: u8 = 0,
+    registers: Registers = .{ .r16 = .{} },
+    program_counter: u16 = 0,
+    stack_pointer: u16 = 0,
+
+    interrupt_enable: InterruptFlags = .{},
+    interrupt_master_enable: bool = false,
 };
 
 pub fn init(state: *State) void {
@@ -104,7 +183,7 @@ pub fn init(state: *State) void {
 pub fn cycle(state: *State, _: *[def.addr_space]u8) void {
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
-        .decode => {
+        .decode_push_pins => {
             const decode_param: DecodeParams = DecodeParams.fromU8(uop.params);
             assert(decode_param.instruction_register);
             // TODO: When and how do we add new instructions to the uop_fifo? Extra decode operation? Add r8,r8 does not have a decode step?
