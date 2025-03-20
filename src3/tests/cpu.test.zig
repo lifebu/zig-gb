@@ -26,6 +26,7 @@ const TestType = struct {
     initial: CPUState,
     final: CPUState,
     // TODO: Need to figure out the actual type?
+    // TODO: Check the CPU pins between each M-Cycle.
     cycles: [][]std.json.Value,
 };
 
@@ -47,12 +48,11 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
         memory[address] = value;
     }
 
-    var splitIter = std.mem.splitScalar(u8, test_case.name, ' ');
-    const opcode_str = splitIter.next().?;
-    const opcode_int: u8 = try std.fmt.parseInt(u8, opcode_str, 10);
-    // TODO: Does this even work for prefix opcodes?
-    const micro_ops = CPU.instruction_set[opcode_int].slice();
-    cpu.uop_fifo.write(micro_ops);
+    // Execute a nop instruction to load the first instruction.
+    cpu.uop_fifo.write(CPU.instruction_set[@intFromEnum(CPU.OpCodes.nop)].slice());
+    inline for (0..4) |_| {
+        CPU.cycle(cpu, memory);
+    }
 }
 
 fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool) !void {

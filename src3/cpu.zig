@@ -7,6 +7,26 @@ const mem_map = @import("mem_map.zig");
 
 const longest_instruction_cycles = 24;
 
+// TODO: Add when needed.
+pub const OpCodes = enum(u8) {
+    nop = 0,
+    ld_bc_imm16,
+    ld_bc_mem_a,
+    inc_bc,
+    inc_b,
+    dec_b,
+    ld_b_imm8,
+    rlca,
+    ld_imm16_mem_sp,
+    add_hl_bc,
+    ld_a_bc_mem,
+    dec_bc,
+    inc_c,
+    dec_c,
+    ld_c_imm8,
+    rrca,
+};
+
 const MicroOp = enum(u8) {
     unused,
     // General
@@ -70,7 +90,6 @@ const MicroOpData = struct {
 };
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOpData, longest_instruction_cycles);
 
-
 const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
 // TODO: Would be nicer to create this immediately instead of creating a function, but like this it is easier to implement the instructions in any order.
 fn createInstructionSet() [256]MicroOpArray {
@@ -82,7 +101,7 @@ fn createInstructionSet() [256]MicroOpArray {
     // 1: DBUS
     // 2: ALU/MISC
     // 3: DECODE + SET_PINS
-    returnVal[0].appendSlice(&[_]MicroOpData{
+    returnVal[@intFromEnum(OpCodes.nop)].appendSlice(&[_]MicroOpData{
         MicroOpData{ .operation = .decode_push_pins, .params = DecodeParams.toU8(.{ .instruction_register = true }) },
         MicroOpData{ .operation = .nop, .params = 0 },
         MicroOpData{ .operation = .nop, .params = 0 },
@@ -177,7 +196,7 @@ pub const State = struct {
 };
 
 pub fn init(state: *State) void {
-    state.uop_fifo.write(instruction_set[0].slice());
+    state.uop_fifo.write(instruction_set[@intFromEnum(OpCodes.nop)].slice());
 }
 
 pub fn cycle(state: *State, _: *[def.addr_space]u8) void {
@@ -187,7 +206,7 @@ pub fn cycle(state: *State, _: *[def.addr_space]u8) void {
             const decode_param: DecodeParams = DecodeParams.fromU8(uop.params);
             assert(decode_param.instruction_register);
             // TODO: When and how do we add new instructions to the uop_fifo? Extra decode operation? Add r8,r8 does not have a decode step?
-            state.uop_fifo.write(instruction_set[0].slice());
+            state.uop_fifo.write(instruction_set[@intFromEnum(OpCodes.nop)].slice());
         },
         .nop => {
         },
