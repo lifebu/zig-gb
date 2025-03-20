@@ -51,6 +51,8 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     // tests
+    // TODO: Put this in it's own build script?
+    // TODO: Think about a beter test setup using modules.
     const exe_unit_tests = b.addTest(.{
         .root_source_file = b.path(src_folder ++ "test.zig"),
         .target = target,

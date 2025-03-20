@@ -91,7 +91,7 @@ fn createInstructionSet() [256]MicroOpArray {
 
     return returnVal;
 }
-const instruction_set = createInstructionSet();
+pub const instruction_set = createInstructionSet();
 
 // IF and IE flags.
 const InterruptFlags = packed struct(u8) {
@@ -130,8 +130,8 @@ const CpuPins = struct {
 }; 
 
 const FlagRegister = packed union {
-    F: u8,
-    Flags: packed struct {
+    f: u8,
+    flags: packed struct {
         _: u4 = 0,
         // TODO: u1 or bool?
         carry: bool = false,
@@ -150,7 +150,7 @@ const Registers = packed union {
     },
     // gb and x86 are little-endian
     r8: packed struct {
-        f: FlagRegister = . { .F = 0 },
+        f: FlagRegister = . { .f = 0 },
         a: u8 = 0,
         c: u8 = 0,
         b: u8 = 0,

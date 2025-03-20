@@ -1,3 +1,4 @@
+// TODO: Divide the code into modules with different source folders. So I don't have to use relative paths (see floooh/chipz)
 const def = @import("../defines.zig");
 
 pub const Vec2 = extern struct {
