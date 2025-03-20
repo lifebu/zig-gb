@@ -29,7 +29,7 @@ const TestType = struct {
     cycles: [][]std.json.Value,
 };
 
-fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, idx: u16, test_case: *const TestType) !void {
+fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType) !void {
     cpu.program_counter = test_case.initial.program_counter;
     cpu.stack_pointer = test_case.initial.stack_pointer;
     cpu.registers.r8.a = test_case.initial.a;
@@ -46,14 +46,17 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, idx: u16, test_ca
         const value: u8 = @intCast(ramPair[1]);
         memory[address] = value;
     }
-    if(idx >= 0xCB) {
-        unreachable; // When we reach the prefix, this setup will break.
-    }
-    const micro_ops = CPU.instruction_set[@intCast(idx)].slice();
+
+    var splitIter = std.mem.splitScalar(u8, test_case.name, ' ');
+    const opcode_str = splitIter.next().?;
+    const opcode_int: u8 = try std.fmt.parseInt(u8, opcode_str, 10);
+    // TODO: Does this even work for prefix opcodes?
+    const micro_ops = CPU.instruction_set[opcode_int].slice();
     cpu.uop_fifo.write(micro_ops);
 }
 
-fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType) !void {
+fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool) !void {
+    try std.testing.expectEqual(false, not_enough_uops);
     try std.testing.expectEqual(cpu.program_counter, test_case.final.program_counter);
     try std.testing.expectEqual(cpu.stack_pointer, test_case.final.stack_pointer);
     try std.testing.expectEqual(cpu.registers.r8.a, test_case.final.a);
@@ -75,7 +78,7 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
     if(std.mem.eql(u8, opcode_name, "76") or std.mem.eql(u8, opcode_name, "10")) {
         return; // Those tests have wrong cycle counts and divert from the actual documentation.
     }
-    try std.testing.expect(cpu.uop_fifo.isEmpty());
+    try std.testing.expectEqual(true, cpu.uop_fifo.isEmpty());
 }
 
 fn printTestCase(cpuState: *const CPUState) void {
@@ -121,17 +124,22 @@ pub fn runSingleStepTests() !void {
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
-            try initializeCpu(&cpu, &memory, idx, &test_case);
+            try initializeCpu(&cpu, &memory, &test_case);
 
+            var not_enough_uops: bool = false;
             for(test_case.cycles.len) |_| {
-                try std.testing.expect(!cpu.uop_fifo.isEmpty()); // We ran out of instructions.
+                if(cpu.uop_fifo.isEmpty()) {
+                    not_enough_uops = true;
+                    break;
+                }
                 CPU.cycle(&cpu, &memory);
             }
 
-            testOutput(&cpu, &memory, &test_case) catch |err| {
+            testOutput(&cpu, &memory, &test_case, not_enough_uops) catch |err| {
                 std.debug.print("Test Failed: {s}\n", .{ test_case.name });
                 std.debug.print("Initial\n", .{});
                 printTestCase(&test_case.initial);
+                std.debug.print("\n", .{});
                 std.debug.print("Expected\n", .{});
                 printTestCase(&test_case.final);
                 std.debug.print("Cycles: {d}\n", .{test_case.cycles.len * 4});
@@ -154,7 +162,9 @@ pub fn runSingleStepTests() !void {
                     const value: u8 = memory[address];
                     std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
                 }
-                std.debug.print("CPU uop fifo is Empty: {any}\n", .{ cpu.uop_fifo.isEmpty() });
+                std.debug.print("\n", .{});
+                std.debug.print("CPU had not enough uops: {any}\n", .{ not_enough_uops });
+                std.debug.print("CPU uop fifo is empty: {any}\n", .{ cpu.uop_fifo.isEmpty() });
                 std.debug.print("\n", .{});
 
                 return err;
