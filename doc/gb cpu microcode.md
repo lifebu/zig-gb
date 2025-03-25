@@ -162,7 +162,7 @@ https://github.com/SingleStepTests/sm83
 
 ## Instructions:
 - FETCH(~ 4): SET_ADDR, IDU+, NOP, NOP
-- NOP(1 4): DECODE->IR, NOP, NOP, NOP
+- NOP(1 4): SET_ADDR & IDU+, SET_DBUS, NOP, DECODE+PUSH_PINS
 	- Between M-Cycles: [[PC, OPCODE, "R-M"]] (Fetch output).
 - LD r16, imm16(? ?):
 - LD [r16mem], A(? ?):

@@ -76,10 +76,59 @@ const DecodeParams = packed struct(u8) {
     interrupt: bool = false,
     _: u6 = 0,
 
-    pub fn toU8(self: DecodeParams) u8 {
+    const Self = @This();
+    pub fn toU8(self: Self) u8 {
         return @bitCast(self);
     }
-    pub fn fromU8(value: u8) DecodeParams {
+    pub fn fromU8(value: u8) Self {
+        return @bitCast(value);
+    }
+};
+
+// TODO: ALl those enums are really not that great. How can we more easily define what idu has to do? What address to take?
+const IduOperation = enum(u2) {
+    none = 0,
+    increment = 1,
+    decrement = 2,
+};
+// TODO: Define this as an offset into the register file?
+// Which would mean that stack_pointer and program_counter must also be in the register file.
+// This would make it way easier to get a pointer to the value.
+// Can I define a compile time function in the register file that takes in a compile-time string name 
+// and a runtime instance and returns the pointer to a struct member?
+const AddressType = enum(u3) {
+    stack_pointer, 
+    program_counter, 
+    hl, 
+    bc, 
+    de, 
+    wz,
+    // TODO: Missing:
+    // 0xFF00+C, 0xFF00+Z
+
+    // TODO: Define this as an offset into the register set?
+    const Self = @This();
+    pub fn getValue(self: Self, state: *State) *u16 {
+        return switch(self) {
+            .stack_pointer => &state.stack_pointer,
+            .program_counter => &state.program_counter,
+            .hl => &state.registers.r16.hl,
+            .bc => &state.registers.r16.bc,
+            .de => &state.registers.r16.de,
+            .wz => &state.registers.r16.wz,
+        };
+    }
+};
+const SetAddrIduParams = packed struct(u8) {
+    addr_bus: AddrBusRequest,
+    address: AddressType, 
+    idu_op: IduOperation,
+
+    const Self = @This();
+    pub fn toU8(self: Self) u8 {
+        return @bitCast(self);
+    }
+    pub fn fromU8(value: u8) Self {
         return @bitCast(value);
     }
 };
@@ -102,10 +151,14 @@ fn createInstructionSet() [256]MicroOpArray {
     // 2: ALU/MISC
     // 3: DECODE + SET_PINS
     returnVal[@intFromEnum(OpCodes.nop)].appendSlice(&[_]MicroOpData{
+        MicroOpData{ .operation = .set_addr_idu, .params = SetAddrIduParams.toU8(.{
+            .address = .program_counter,
+            .addr_bus = .bus_to_register,
+            .idu_op = .increment,
+        }) },
+        MicroOpData{ .operation = .nop, .params = 0 },
+        MicroOpData{ .operation = .nop, .params = 0 },
         MicroOpData{ .operation = .decode_push_pins, .params = DecodeParams.toU8(.{ .instruction_register = true }) },
-        MicroOpData{ .operation = .nop, .params = 0 },
-        MicroOpData{ .operation = .nop, .params = 0 },
-        MicroOpData{ .operation = .nop, .params = 0 },
     }) catch unreachable;
 
     return returnVal;
@@ -122,30 +175,50 @@ const InterruptFlags = packed struct(u8) {
     joypad: bool = false,
     _: u3 = 0,
 
-    pub fn fromMem(memory: *[def.addr_space]u8) InterruptFlags {
+    const Self = @This();
+    pub fn fromMem(memory: *[def.addr_space]u8) Self {
         return @bitCast(memory[mem_map.interrupt_flag]);
     } 
-    pub fn toMem(self: InterruptFlags, memory: *[def.addr_space]u8) void {
+    pub fn toMem(self: Self, memory: *[def.addr_space]u8) void {
         memory[mem_map.interrupt_flag] = @bitCast(self);
     }
     // TODO: Maybe a function where I combine two Flags (IF and IE) and it returns which interrupt is pending?
 };
 
+// TODO: This is the first order I came up with, but the numbers can be changed for:
+// alu_to_register, alu_to_bus, bus_to_alu_input  
+// Think about the best order for this.
+const AddrBusRequest = enum(u3) {
+    disconnected = 0,           // (---)
+    unused_memory_only = 1,     // (--M)
+    alu_to_bus = 2,             // (-W-)
+    register_to_bus = 3,        // (-WM)
+    alu_to_register = 4,        // (R--)
+    bus_to_register = 5,        // (R-M)
+    bus_to_alu_input = 6,       // (RW-)
+    unused_all = 7,             // (RWM)
+
+    const Self = @This();
+    pub fn print(self: Self) []u8 {
+        var self_var: u8 = @intFromEnum(self);
+        self_var, const read_set = @shlWithOverflow(self_var, 1);
+        self_var, const write_set = @shlWithOverflow(self_var, 1);
+        self_var, const memory_set = @shlWithOverflow(self_var, 1);
+        var buf: [3]u8 = undefined;
+        _ = std.fmt.bufPrint(&buf, "{s}{s}{s}", .{ 
+            if(read_set == 1) "R" else "-", 
+            if(write_set == 1) "W" else "-", 
+            if(memory_set == 1) "M" else "-" 
+        }) catch unreachable;
+        return &buf;
+    }
+};
 const CpuPins = struct {
     // input-output
     databus: u8 = 0,
     // output only
     address_bus: u16 = 0,
-    request: enum(u3) {
-        disconnected = 0,           // (---)
-        unused_memory_only = 1,     // (--M)
-        alu_to_bus = 2,             // (-W-)
-        register_to_bus = 3,        // (-WM)
-        alu_to_register = 4,        // (R--)
-        bus_to_register = 5,        // (R-M)
-        bus_to_alu_input = 6,       // (RW-)
-        unused_all = 7,             // (RWM)
-    } = .disconnected,
+    request: AddrBusRequest = .disconnected,
 }; 
 
 const FlagRegister = packed union {
@@ -166,6 +239,7 @@ const Registers = packed union {
         bc: u16 = 0,
         de: u16 = 0,
         hl: u16 = 0,
+        wz: u16 = 0,
     },
     // gb and x86 are little-endian
     r8: packed struct {
@@ -177,6 +251,8 @@ const Registers = packed union {
         d: u8 = 0,
         l: u8 = 0,
         h: u8 = 0,
+        z: u8 = 0,
+        w: u8 = 0,
     },
 };
 
@@ -202,6 +278,21 @@ pub fn init(state: *State) void {
 pub fn cycle(state: *State, _: *[def.addr_space]u8) void {
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
+        .set_addr_idu => {
+            const params: SetAddrIduParams = SetAddrIduParams.fromU8(uop.params);
+            state.current_pins.request = params.addr_bus;
+            const value: *u16 = params.address.getValue(state);
+            state.current_pins.address_bus = value.*; 
+            // TODO: Instead of this switch case I can do the following:
+            // Define an idu factor that will always be added with overflow to the value.
+            // It will be set in createInstructionSet() 
+            // It is either 0, 1 or (std.math.maxInt(u16) - 1) (effectively -1).
+            switch(params.idu_op) {
+                .none => {},
+                .increment => { value.* +%= 1; },
+                .decrement => { value.* -%= 1; },
+            }
+        },
         .decode_push_pins => {
             const decode_param: DecodeParams = DecodeParams.fromU8(uop.params);
             assert(decode_param.instruction_register);

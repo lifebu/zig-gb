@@ -18,6 +18,7 @@ const CPUState = struct {
     l: u8 = 0,
     ime: u1 = 0,
     ie: u1 = 0,
+    // TODO: Can we define this array of arrays as an array of structs?
     ram: [][]u16, // address (u16), value (u8)
 };
 
@@ -27,8 +28,11 @@ const TestType = struct {
     final: CPUState,
     // TODO: Need to figure out the actual type?
     // TODO: Check the CPU pins between each M-Cycle.
+    // TODO: To check the pins, I need a simple mmu that gives the cpu the requested data before I test it.
     cycles: [][]std.json.Value,
 };
+
+// TODO: Need to rethink all of the functions and how they are structured. The code is pretty awfull.
 
 fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType) !void {
     cpu.program_counter = test_case.initial.program_counter;
@@ -48,15 +52,13 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
         memory[address] = value;
     }
 
-    // Execute a nop instruction to load the first instruction.
+    // Load a nop instruction to fetch the required instruction.
     cpu.uop_fifo.write(CPU.instruction_set[@intFromEnum(CPU.OpCodes.nop)].slice());
-    inline for (0..4) |_| {
-        CPU.cycle(cpu, memory);
-    }
 }
 
-fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool) !void {
+fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
     try std.testing.expectEqual(false, not_enough_uops);
+    try std.testing.expectEqual(false, m_cycle_failed);
     try std.testing.expectEqual(cpu.program_counter, test_case.final.program_counter);
     try std.testing.expectEqual(cpu.stack_pointer, test_case.final.stack_pointer);
     try std.testing.expectEqual(cpu.registers.r8.a, test_case.final.a);
@@ -126,16 +128,40 @@ pub fn runSingleStepTests() !void {
         for(test_config) |test_case| {
             try initializeCpu(&cpu, &memory, &test_case);
 
+            const num_m_cycles = 1 + test_case.cycles.len;
+
+            // TODO: This is a pretty bad solution.
             var not_enough_uops: bool = false;
-            for(test_case.cycles.len) |_| {
-                if(cpu.uop_fifo.isEmpty()) {
+            // TODO: Should we also include the state of the cpu pins when we failed?
+            var m_cycle_fail_index: usize = 0;
+            var m_cycle_failed: bool = false;
+
+            for(0..num_m_cycles) |m_cycle| {
+                if(cpu.uop_fifo.length() < 4) {
                     not_enough_uops = true;
                     break;
                 }
-                CPU.cycle(&cpu, &memory);
+
+                inline for(0..4) |_| {
+                    CPU.cycle(&cpu, &memory);
+                }
+                // TODO: Run MMU!
+                
+                const m_cycle_values = test_case.cycles[m_cycle];
+                const expected_address: u16 = @intCast(m_cycle_values[0].integer);
+                const expected_dbus: u8 = @intCast(m_cycle_values[1].integer);
+                const expected_request: []const u8 = m_cycle_values[2].string;
+                if(expected_address != cpu.current_pins.address_bus 
+                        or expected_dbus != cpu.current_pins.databus 
+                        or std.mem.eql(u8, expected_request, cpu.current_pins.request.print())) {
+                    m_cycle_failed = true;
+                    m_cycle_fail_index = m_cycle;
+                    break;
+                }
             }
 
-            testOutput(&cpu, &memory, &test_case, not_enough_uops) catch |err| {
+            // TODO: Maybe instead of a giant block of text I can just print out the issues that I had?
+            testOutput(&cpu, &memory, &test_case, not_enough_uops, m_cycle_failed) catch |err| {
                 std.debug.print("Test Failed: {s}\n", .{ test_case.name });
                 std.debug.print("Initial\n", .{});
                 printTestCase(&test_case.initial);
@@ -143,6 +169,7 @@ pub fn runSingleStepTests() !void {
                 std.debug.print("Expected\n", .{});
                 printTestCase(&test_case.final);
                 std.debug.print("Cycles: {d}\n", .{test_case.cycles.len * 4});
+                // TODO: Print the M-Cycle data?
                 std.debug.print("\n", .{});
 
                 std.debug.print("Got\n", .{});
@@ -166,6 +193,19 @@ pub fn runSingleStepTests() !void {
                 std.debug.print("CPU had not enough uops: {any}\n", .{ not_enough_uops });
                 std.debug.print("CPU uop fifo is empty: {any}\n", .{ cpu.uop_fifo.isEmpty() });
                 std.debug.print("\n", .{});
+                if(m_cycle_failed) {
+                    std.debug.print("M-Cycle test failed\n", .{});
+                    std.debug.print("Expected\n", .{});
+                    const m_cycle_values = test_case.cycles[m_cycle_fail_index];
+                    std.debug.print("addr: {X:0>4}, dbus: {X:0>2}, request: {s}\n", .{ 
+                        m_cycle_values[0].integer, m_cycle_values[1].integer, m_cycle_values[2].string 
+                    });
+
+                    std.debug.print("Got\n", .{});
+                    std.debug.print("addr: {X:0>4}, dbus: {X:0>2}, request: {s}\n", .{ 
+                        cpu.current_pins.address_bus, cpu.current_pins.databus, cpu.current_pins.request.print() 
+                    });
+                }
 
                 return err;
             };
