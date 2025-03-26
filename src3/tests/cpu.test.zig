@@ -4,10 +4,11 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 const mem_map = @import("../mem_map.zig");
+const MMU = @import("../mmu.zig");
 
 const CPUState = struct {
-    program_counter: u16 = 0,
-    stack_pointer: u16 = 0,
+    pc: u16 = 0,
+    sp: u16 = 0,
     a: u8 = 0,
     b: u8 = 0,
     c: u8 = 0,
@@ -35,8 +36,8 @@ const TestType = struct {
 // TODO: Need to rethink all of the functions and how they are structured. The code is pretty awfull.
 
 fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType) !void {
-    cpu.program_counter = test_case.initial.program_counter;
-    cpu.stack_pointer = test_case.initial.stack_pointer;
+    cpu.registers.r16.pc = test_case.initial.pc;
+    cpu.registers.r16.sp = test_case.initial.sp;
     cpu.registers.r8.a = test_case.initial.a;
     cpu.registers.r8.f.f = test_case.initial.f;
     cpu.registers.r8.b = test_case.initial.b;
@@ -53,14 +54,16 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     }
 
     // Load a nop instruction to fetch the required instruction.
-    cpu.uop_fifo.write(CPU.instruction_set[@intFromEnum(CPU.OpCodes.nop)].slice());
+    const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
+    const uops = opcode_bank[@intFromEnum(CPU.OpCodes.nop)];
+    cpu.uop_fifo.write(uops.slice());
 }
 
 fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
     try std.testing.expectEqual(false, not_enough_uops);
     try std.testing.expectEqual(false, m_cycle_failed);
-    try std.testing.expectEqual(cpu.program_counter, test_case.final.program_counter);
-    try std.testing.expectEqual(cpu.stack_pointer, test_case.final.stack_pointer);
+    try std.testing.expectEqual(cpu.registers.r16.pc, test_case.final.pc);
+    try std.testing.expectEqual(cpu.registers.r16.sp, test_case.final.sp);
     try std.testing.expectEqual(cpu.registers.r8.a, test_case.final.a);
     try std.testing.expectEqual(cpu.registers.r8.f.f, test_case.final.f);
     try std.testing.expectEqual(cpu.registers.r8.b, test_case.final.b);
@@ -93,7 +96,7 @@ fn printTestCase(cpuState: *const CPUState) void {
     std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpuState.b, cpuState.c });
     std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpuState.d, cpuState.e });
     std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpuState.h, cpuState.l });
-    std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpuState.stack_pointer, cpuState.program_counter });
+    std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpuState.sp, cpuState.pc });
     for (cpuState.ram) |ramPair| {
         std.debug.assert(ramPair.len == 2);
         const address: u16 = ramPair[0];
@@ -121,12 +124,12 @@ pub fn runSingleStepTests() !void {
         const json = try std.json.parseFromSlice([]TestType, alloc, test_file, .{ .ignore_unknown_fields = true });
         defer json.deinit();
 
-        var memory: [def.addr_space]u8 = [1]u8{0} ** def.addr_space;
         var cpu: CPU.State = .{};
+        var mmu: MMU.State = .{}; 
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
-            try initializeCpu(&cpu, &memory, &test_case);
+            try initializeCpu(&cpu, &mmu.memory, &test_case);
 
             const num_m_cycles = 1 + test_case.cycles.len;
 
@@ -143,17 +146,20 @@ pub fn runSingleStepTests() !void {
                 }
 
                 inline for(0..4) |_| {
-                    CPU.cycle(&cpu, &memory);
+                    CPU.cycle(&cpu, &mmu);
+                    MMU.cycle(&mmu);
                 }
-                // TODO: Run MMU!
                 
                 const m_cycle_values = test_case.cycles[m_cycle];
                 const expected_address: u16 = @intCast(m_cycle_values[0].integer);
                 const expected_dbus: u8 = @intCast(m_cycle_values[1].integer);
                 const expected_request: []const u8 = m_cycle_values[2].string;
-                if(expected_address != cpu.current_pins.address_bus 
-                        or expected_dbus != cpu.current_pins.databus 
-                        or std.mem.eql(u8, expected_request, cpu.current_pins.request.print())) {
+                
+                const got_address: u16 = mmu.request.getAddress();
+
+                if(expected_address != got_address 
+                        or expected_dbus != mmu.request.data 
+                        or std.mem.eql(u8, expected_request, mmu.request.print())) {
                     m_cycle_failed = true;
                     m_cycle_fail_index = m_cycle;
                     break;
@@ -161,7 +167,7 @@ pub fn runSingleStepTests() !void {
             }
 
             // TODO: Maybe instead of a giant block of text I can just print out the issues that I had?
-            testOutput(&cpu, &memory, &test_case, not_enough_uops, m_cycle_failed) catch |err| {
+            testOutput(&cpu, &mmu.memory, &test_case, not_enough_uops, m_cycle_failed) catch |err| {
                 std.debug.print("Test Failed: {s}\n", .{ test_case.name });
                 std.debug.print("Initial\n", .{});
                 printTestCase(&test_case.initial);
@@ -182,11 +188,11 @@ pub fn runSingleStepTests() !void {
                 std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpu.registers.r8.b, cpu.registers.r8.c });
                 std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpu.registers.r8.d, cpu.registers.r8.e });
                 std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpu.registers.r8.h, cpu.registers.r8.l });
-                std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpu.stack_pointer, cpu.program_counter });
+                std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpu.registers.r16.sp, cpu.registers.r16.pc });
                 for (test_case.final.ram) |ramPair| {
                     std.debug.assert(ramPair.len == 2);
                     const address: u16 = ramPair[0];
-                    const value: u8 = memory[address];
+                    const value: u8 = mmu.memory[address];
                     std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
                 }
                 std.debug.print("\n", .{});
@@ -203,7 +209,7 @@ pub fn runSingleStepTests() !void {
 
                     std.debug.print("Got\n", .{});
                     std.debug.print("addr: {X:0>4}, dbus: {X:0>2}, request: {s}\n", .{ 
-                        cpu.current_pins.address_bus, cpu.current_pins.databus, cpu.current_pins.request.print() 
+                        mmu.request.getAddress(), mmu.request.data, mmu.request.print() 
                     });
                 }
 

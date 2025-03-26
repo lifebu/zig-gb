@@ -43,7 +43,8 @@ export fn frame() void {
     // TODO: It would be better to just let the system run to the end of the next vblank.
     const cycles_per_frame = 70224; 
     for(0..cycles_per_frame) |_| {
-        CPU.cycle(&state.cpu, &state.mmu.memory);
+        // TODO: Disable cpu for now, because it is incomplete and will lead to crashes.
+        // CPU.cycle(&state.cpu, &state.mmu);
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);

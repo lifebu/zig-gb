@@ -76,7 +76,11 @@
     - We can also implement the interrupt handler as instructions instead of uops (this needs decoding).
     - PC needs to be restored later, so we need to save it.
     - So for the CPU, the interrupt handler is just like normal code.
-- How do we allow/disallow memory access to u8/u16 via the MMU? 
+- How do we allow/disallow memory access to u8/u16 via the MMU?
+- How do we write back data we requested from memory into the register file?
+    - Example: We requested an address and the mmu has given us a result.
+    - When do we check this? We can check this in SET_ADDR, because it is always the first instruction in each M-Cycle.
+        => If this is not guaranteed, we can add an WRITE_BACK uop to fill this position.
 - How do other subsystems react to writes from the CPU? (OnWrite Behaviour).
     - Maybe if we have a globally accessible nullable pin-set of the cpu?
     - THe other subsystems can each tick check if we have a pin-set and react to it?
@@ -84,6 +88,8 @@
     - The cpu requests that memory will be changed.
     - Every subsystem can check if they allow it. If not, they remove the request from the mmu.
     - The mmu is the last in the line and if no one has objected so far, it will apply the request.
+    - Instead of using a nullable pin-set we can use a default value that always succeeds.
+        - A read request on an address the cpu has always access to?
 - How exactly do UOps Parameter work?
     => Does this mean we don't decode variants, but we cast parameters?
 - How does Stop/Halt work?
@@ -91,6 +97,9 @@
     - A lot of ALU Ops change them almost the same.
 - How to write the tests?
     https://github.com/floooh/chipz/blob/main/tests/z80ctc.test.zig
+- How does the cc check work?
+    - The uop table has the set of instructions if the check succeeds.
+    - When the check fails, the rest of the uops are discarded and we decode a nop instruction.
 
 # uOps
 ## Encoding:
