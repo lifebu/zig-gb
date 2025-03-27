@@ -54,7 +54,6 @@ const MicroOp = enum(u6) {
     // General
     decode,
     apply_pins,
-    push_pins,
     halt,
     nop,
     addr_idu, 
@@ -147,6 +146,12 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
         .{ .operation = .apply_pins, .params = .none },
+        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = 0 }} },
+    }) catch unreachable;
+    returnVal[opcode_bank_default][@intFromEnum(OpCodes.inc_b)].appendSlice(&[_]MicroOpData{
+        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+        .{ .operation = .alu_inc , .params = .{ .alu = AluParams{ .input_1 = .b, .input_2 = .b, .output = .b } } },
         .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = 0 }} },
     }) catch unreachable;
 
@@ -267,11 +272,20 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.address_bus = addr_source.*;
             addr_source.* += params.idu;
         },
+        .alu_inc => {
+            const params: AluParams = uop.params.alu;
+            const input_1: u8 = state.registers.getU8(params.input_1).*;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = input_1 +% 1;
+
+            state.registers.r8.f.flags.zero = output.* == 0; 
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = (((input_1 & 0x0F) +% 1) & 0x10) == 0x10; 
+
+            applyPins(state, mmu);
+        },
         .apply_pins => {
-            if(mmu.request.read) |_| {
-                state.dbus_target.* = mmu.request.data;
-                mmu.request.read = null;
-            }
+            applyPins(state, mmu);
         },
         .dbus => {
             const params: DBusParams = uop.params.dbus;
@@ -293,6 +307,13 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             std.debug.print("CPU_MICRO_OP_NOT_IMPLEMENTED: {any}\n", .{uop});
             unreachable;
         },
+    }
+}
+
+fn applyPins(state: *State, mmu: *MMU.State) void {
+    if(mmu.request.read) |_| {
+        state.dbus_target.* = mmu.request.data;
+        mmu.request.read = null;
     }
 }
 
