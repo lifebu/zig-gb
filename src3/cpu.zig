@@ -110,7 +110,10 @@ const DBusParams = packed struct(u12) {
 };
 const AluParams = packed struct(u12) {
     input_1: RegisterFileID,
-    input_2: RegisterFileID,
+    input_2: packed union {
+        rfid: RegisterFileID,
+        value: u4,
+    },
     output: RegisterFileID,
 };
 const DecodeParams = packed struct(u12) {
@@ -154,7 +157,7 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     returnVal[opcode_bank_default][@intFromEnum(OpCodes.inc_b)].appendSlice(&[_]MicroOpData{ // INC b
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-        .{ .operation = .alu_inc , .params = .{ .alu = AluParams{ .input_1 = .b, .input_2 = .b, .output = .b } } },
+        .{ .operation = .alu_inc , .params = .{ .alu = AluParams{ .input_1 = .b, .input_2 = .{ .rfid = .b}, .output = .b } } },
         .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
     }) catch unreachable;
     returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
@@ -164,13 +167,21 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_prefix }} },
     }) catch unreachable;
 
-    returnVal[opcode_bank_prefix][0xD2].appendSlice(&[_]MicroOpData{ // SET 2,D
-        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-        .{ .operation = .alu_set, .params = .{ .alu = AluParams{ .input_1 = .d, .input_2 = .d, .output = .d }} },
-        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
-    }) catch unreachable;
-
+    // SET bit,r8
+    var set_bit_opcode: u8 = 0xC0;
+    for(0..7) |bit_index| {
+        // TODO: We are missing the Set bit, [HL] Variant instead of the second h.
+        const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
+        for(rfid_variants) |rfid| {
+            returnVal[opcode_bank_prefix][set_bit_opcode].appendSlice(&[_]MicroOpData{
+                .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+                .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+                .{ .operation = .alu_set, .params = .{ .alu = AluParams{ .input_1 = rfid, .input_2 = .{ .value = bit_index }, .output = rfid }} },
+                .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
+            }) catch unreachable;
+            set_bit_opcode += 1;
+        }
+    }
     return returnVal;
 }
 pub const opcode_banks = createOpcodeBanks();
@@ -304,10 +315,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .alu_set => {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
-            // TODO: I need to parameterize which bit to set. Can I use one of the input parameters as just a number (u4)? Use input_2 here!
-            // Maybe we use a tagged union again?
-            const bit_index: u3 = @intCast(2); 
-            const mask: u8 = 1 << bit_index;
+            const bit_index: u3 = @intCast(params.input_2.value); 
+            const mask: u8 = @as(u8, 1) << bit_index;
             const result: u8 = input | mask;
             const output: *u8 = state.registers.getU8(params.output);
             output.* = result;
