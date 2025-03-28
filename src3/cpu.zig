@@ -74,7 +74,6 @@ const MicroOp = enum(u6) {
     alu_daa_adjust, 
     alu_dec, 
     alu_inc, 
-    alu_not, 
     alu_or, 
     alu_res, 
     alu_rl, 
@@ -120,6 +119,20 @@ const DecodeParams = packed struct(u12) {
     bank_idx: u2 = opcode_bank_default,
     _: u10 = 0,
 };
+const MiscParams = packed struct(u12) {
+    write_back: RegisterFileID = .a,
+    ime_value: bool = false,
+    rst_offset: u3 = 0,
+    // TODO: Is this the best way to implement this?
+    cc: enum(u2) {
+        not_zero,
+        zero,
+        not_carry,
+        carry,
+    } = .not_zero,
+    _: u2,
+};
+const rst_addresses = [8]u16{ 0x0000, 0x0008, 0x0010, 0x018, 0x020, 0x028, 0x030, 0x038 };
 const MicroOpData = struct {
     operation: MicroOp,
     params: union(enum) {
@@ -127,6 +140,7 @@ const MicroOpData = struct {
         addr_idu: AddrIduParms,
         dbus: DBusParams,
         alu: AluParams,
+        misc: MiscParams,
         decode: DecodeParams,
     },
 };
@@ -144,6 +158,10 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
     
+    // TODO: I think I have to switch ALU/MISC with DBUS + Push Pins. Why? Set ,b [HL] requires that the output of the ALU can be used for this cycles memory request.
+    // This also means before we decode, we need to apply the pins, because Decode requires that the pins have been applied before decode runs.
+    // But then Again some instructions might need read result immediate as ALU input.
+    // So the order of DBUS and ALU can be switched depending on the need?
     // 0: ADDR + IDU 
     // 1: DBUS + Push Pins
     // 2: ALU/MISC + Apply Pins
@@ -291,6 +309,122 @@ pub fn init(state: *State) void {
 pub fn cycle(state: *State, mmu: *MMU.State) void {
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
+        // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
+        .alu_adc => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const a: u8 = state.registers.r8.a;
+            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
+            const input_carry, const carry_overflow = @addWithOverflow(input, carry);
+            const result, const overflow = @addWithOverflow(a, input_carry);
+            
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            const input_hbcd: bool = (((input & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const input_carry_hbcd: bool = (((a & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
+            state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
+            state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
+
+            state.registers.r8.a = result;
+            applyPins(state, mmu);
+        },
+        .alu_add => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const a: u8 = state.registers.r8.a;
+            const result, const overflow = @addWithOverflow(a, input);
+
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = ((a & 0x0F) +% (input & 0x0F)) > 0x0F;
+            state.registers.r8.f.flags.carry = overflow == 1;
+
+            state.registers.r8.a = result;
+            applyPins(state, mmu);
+        },
+        .alu_and => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            state.registers.r8.a &= input;
+
+            state.registers.r8.f.flags.zero = state.registers.r8.a == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = true;
+            state.registers.r8.f.flags.carry = false;
+            applyPins(state, mmu);
+        },
+        .alu_assign => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = input;
+            applyPins(state, mmu);
+        },
+        .alu_bit => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const bit_index: u3 = @intCast(params.input_2.value); 
+            const result: u8 = input & (@as(u8, 1) << bit_index);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = true;
+            state.registers.r8.f.flags.zero = result == 0;
+            applyPins(state, mmu);
+        },
+        .alu_ccf => {
+            state.registers.r8.f.flags.carry = !state.registers.r8.f.flags.carry;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_cp => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const a: u8 = state.registers.r8.a;
+            _, const overflow = @subWithOverflow(a, input);
+
+            state.registers.r8.f.flags.zero = a == 0;
+            state.registers.r8.f.flags.n_bcd = true;
+            state.registers.r8.f.flags.half_bcd = (((a & 0x0F) -% (input & 0x0F)) & 0x10) == 0x10;
+            state.registers.r8.f.flags.carry = overflow == 1;
+            applyPins(state, mmu);
+        },
+        .alu_daa_adjust => {
+            const a: u8 = state.registers.r8.a;
+            const half_bcd = state.registers.r8.f.flags.half_bcd;
+            const carry = state.registers.r8.f.flags.carry;
+            const subtract = state.registers.r8.f.flags.n_bcd;
+
+            var offset: u8 = 0;
+            var should_carry: bool = false;
+            if((!subtract and ((a & 0xF) > 0x09)) or half_bcd) {
+                offset |= 0x06;
+            }
+            if((!subtract and (a > 0x99)) or carry) {
+                offset |= 0x60;
+                should_carry = true;
+            }
+            const result = if (subtract) a -% offset else a +% offset;
+            state.registers.r8.a = result;
+
+            state.registers.r8.f.flags.carry = should_carry;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_dec => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* -%= 1;
+
+            state.registers.r8.f.flags.zero = output.* == 0;
+            state.registers.r8.f.flags.n_bcd = true;
+            state.registers.r8.f.flags.half_bcd = (((input & 0x0F) -% 1) & 0x10) == 0x10; 
+            applyPins(state, mmu);
+        },
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
             const params: AddrIduParms = uop.params.addr_idu;
@@ -298,6 +432,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const addr_source: *u16 = state.registers.getU16(params.addr);
             state.address_bus = addr_source.*;
             addr_source.* += params.idu;
+            applyPins(state, mmu);
         },
         .alu_inc => {
             const params: AluParams = uop.params.alu;
@@ -309,19 +444,218 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.zero = output.* == 0; 
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = (((input & 0x0F) +% 1) & 0x10) == 0x10; 
+            applyPins(state, mmu);
+        },
+        .alu_or => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            state.registers.r8.a |= input;
 
+            state.registers.r8.f.flags.zero = state.registers.r8.a == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            state.registers.r8.f.flags.carry = false;
+            applyPins(state, mmu);
+        }, 
+        .alu_res => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const bit_index: u3 = @intCast(params.input_2.value); 
+            const result: u8 = input & ~(@as(u8, 1) << bit_index);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+            applyPins(state, mmu);
+        }, 
+        .alu_rl => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: bool = (input & 0x80) == 0x80;
+            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
+            const result: u8 = (input << 1) | carry;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        }, 
+        .alu_rlc => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: u8 = input & 0x80;
+            const result: u8 = (input << 1) | (shifted_bit >> 7);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit == 0x80;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_rr => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: bool = (input & 0x01) == 0x01;
+            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
+            const result: u8 = (input >> 1) | (carry << 7);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_rrc => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: u8 = (input & 0x01);
+            const result: u8 = (input >> 1) | (shifted_bit << 7);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit == 1;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_sbc => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
+            const input_carry, const carry_overflow = @addWithOverflow(input, carry);
+            const a: u8 = state.registers.r8.a;
+            const result, const overflow = @subWithOverflow(a, input_carry);
+
+            state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = true;
+            const input_hbcd: bool = (((input & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const input_cary_hbcd: bool = (((a & 0x0F) -% (input_carry & 0x0F)) & 0x10) == 0x10;
+            state.registers.r8.f.flags.half_bcd = input_hbcd or input_cary_hbcd;
+
+            state.registers.r8.a = result;
+            applyPins(state, mmu);
+        },
+        .alu_scf => {
+            state.registers.r8.f.flags.carry = true;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
         },
         .alu_set => {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
             const bit_index: u3 = @intCast(params.input_2.value); 
-            const mask: u8 = @as(u8, 1) << bit_index;
-            const result: u8 = input | mask;
+            const result: u8 = input | (@as(u8, 1) << bit_index);
             const output: *u8 = state.registers.getU8(params.output);
             output.* = result;
+            applyPins(state, mmu);
+        },
+        .alu_sl => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: bool = (input & 0x80) == 0x80;
+            const result: u8 = input << 1;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit;
+            state.registers.r8.f.flags.zero = input == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        }, 
+        .alu_sr => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: bool = (input & 0x01) == 0x01;
+            const result: u8 = (input >> 1) | (input & 0x80);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit;
+            state.registers.r8.f.flags.zero = input == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_srl => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const shifted_bit: bool = (input & 0x01) == 0x01;
+            const result: u8 = (input >> 1);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit;
+            state.registers.r8.f.flags.zero = input == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        }, 
+        .alu_sub => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const a: u8 = state.registers.r8.a;
+            const result, const overflow = @subWithOverflow(a, input);
+
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = true;
+            state.registers.r8.f.flags.half_bcd = (((a & 0x0F) -% (input & 0x0F)) & 0x10) == 0x10;
+            state.registers.r8.f.flags.carry = overflow == 1;
+
+            state.registers.r8.a = result;
+            applyPins(state, mmu);
+        }, 
+        .alu_swap => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const result = (input << 4) | (input >> 4);
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = false;
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
+        .alu_xor => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            state.registers.r8.a ^= input;
+
+            state.registers.r8.f.flags.zero = state.registers.r8.a == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            state.registers.r8.f.flags.carry = false;
+            applyPins(state, mmu);
         },
         .apply_pins => {
+            applyPins(state, mmu);
+        },
+        .change_ime => {
+            state.interrupt_master_enable = uop.params.misc.ime_value;
+            applyPins(state, mmu);
+        },
+        .conditional_check => {
+            const params: MiscParams = uop.params.misc;
+            const flag: bool = switch(params.cc) {
+                .not_zero => !state.registers.r8.f.flags.zero,
+                .zero => state.registers.r8.f.flags.zero,
+                .not_carry => !state.registers.r8.f.flags.carry,
+                .carry => state.registers.r8.f.flags.carry,
+            };
+            if(flag) {}
+            // TODO: Need to think about how we need to implement the CC. 
+            // If true we keep the rest of the uops.
+            // If false we load the next instruction?
             applyPins(state, mmu);
         },
         .dbus => {
@@ -339,6 +673,18 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.uop_fifo.write(uops.slice());
         },
         .nop => {
+        },
+        .set_pc => {
+            const params: MiscParams = uop.params.misc;
+            const new_pc: u16 = rst_addresses[params.rst_offset];
+            state.registers.r16.pc = new_pc;
+            applyPins(state, mmu);
+        },
+        .wz_writeback => {
+            const params: MiscParams = uop.params.misc;
+            const input: u16 = state.registers.getU16(params.write_back).*;
+            state.registers.r16.wz = input; 
+            applyPins(state, mmu);
         },
         else => { 
             std.debug.print("CPU_MICRO_OP_NOT_IMPLEMENTED: {any}\n", .{uop});
