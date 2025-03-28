@@ -6,14 +6,17 @@ const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 
+// TODO: Think about how we split this file into multiple files.
+// I think having a defines.zig + instruction_set.zig would be best.
+
 // Note: This assumes little-endian
 const RegisterFileID = enum(u4) {
     c,
     b,
-    d,
     e,
-    h,
+    d,
     l,
+    h,
     z,
     w,
     pcl,
@@ -111,7 +114,7 @@ const AluParams = packed struct(u12) {
     output: RegisterFileID,
 };
 const DecodeParams = packed struct(u12) {
-    bank_idx: u2,
+    bank_idx: u2 = opcode_bank_default,
     _: u10 = 0,
 };
 const MicroOpData = struct {
@@ -142,17 +145,30 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 1: DBUS + Push Pins
     // 2: ALU/MISC + Apply Pins
     // 3: DECODE
-    returnVal[opcode_bank_default][@intFromEnum(OpCodes.nop)].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][@intFromEnum(OpCodes.nop)].appendSlice(&[_]MicroOpData{ // NOP
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
         .{ .operation = .apply_pins, .params = .none },
-        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = 0 }} },
+        .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
     }) catch unreachable;
-    returnVal[opcode_bank_default][@intFromEnum(OpCodes.inc_b)].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][@intFromEnum(OpCodes.inc_b)].appendSlice(&[_]MicroOpData{ // INC b
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
         .{ .operation = .alu_inc , .params = .{ .alu = AluParams{ .input_1 = .b, .input_2 = .b, .output = .b } } },
-        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = 0 }} },
+        .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+    }) catch unreachable;
+    returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
+        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+        .{ .operation = .apply_pins, .params = .none },
+        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_prefix }} },
+    }) catch unreachable;
+
+    returnVal[opcode_bank_prefix][0xD2].appendSlice(&[_]MicroOpData{ // SET 2,D
+        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+        .{ .operation = .alu_set, .params = .{ .alu = AluParams{ .input_1 = .d, .input_2 = .d, .output = .d }} },
+        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
     }) catch unreachable;
 
     return returnVal;
@@ -274,15 +290,27 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         .alu_inc => {
             const params: AluParams = uop.params.alu;
-            const input_1: u8 = state.registers.getU8(params.input_1).*;
+            const input: u8 = state.registers.getU8(params.input_1).*;
             const output: *u8 = state.registers.getU8(params.output);
-            output.* = input_1 +% 1;
+            output.* = input +% 1;
 
+            // TODO: Maybe we create a more compact way to change the flags? Like a function?
             state.registers.r8.f.flags.zero = output.* == 0; 
             state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = (((input_1 & 0x0F) +% 1) & 0x10) == 0x10; 
+            state.registers.r8.f.flags.half_bcd = (((input & 0x0F) +% 1) & 0x10) == 0x10; 
 
             applyPins(state, mmu);
+        },
+        .alu_set => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            // TODO: I need to parameterize which bit to set. Can I use one of the input parameters as just a number (u4)? Use input_2 here!
+            // Maybe we use a tagged union again?
+            const bit_index: u3 = @intCast(2); 
+            const mask: u8 = 1 << bit_index;
+            const result: u8 = input | mask;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
         },
         .apply_pins => {
             applyPins(state, mmu);
