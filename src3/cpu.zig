@@ -31,27 +31,6 @@ const RegisterFileID = enum(u4) {
 
 const longest_instruction_cycles = 24;
 
-// TODO: Add when needed.
-// TODO: Do I really want this?
-pub const OpCodes = enum(u8) {
-    nop = 0,
-    ld_bc_imm16,
-    ld_bc_mem_a,
-    inc_bc,
-    inc_b,
-    dec_b,
-    ld_b_imm8,
-    rlca,
-    ld_imm16_mem_sp,
-    add_hl_bc,
-    ld_a_bc_mem,
-    dec_bc,
-    inc_c,
-    dec_c,
-    ld_c_imm8,
-    rrca,
-};
-
 const MicroOp = enum(u6) {
     unused,
     // General
@@ -99,7 +78,7 @@ const MicroOp = enum(u6) {
 const AddrIduParms = packed struct(u12) {
     addr: RegisterFileID,  
     low_offset: bool,
-    idu: u2,
+    idu: i2,
     _: u5 = 0, 
 };
 const DBusParams = packed struct(u12) {
@@ -130,7 +109,7 @@ const MiscParams = packed struct(u12) {
         not_carry,
         carry,
     } = .not_zero,
-    _: u2,
+    _: u2 = 0,
 };
 const rst_addresses = [8]u16{ 0x0000, 0x0008, 0x0010, 0x018, 0x020, 0x028, 0x030, 0x038 };
 const MicroOpData = struct {
@@ -169,13 +148,56 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 3: DECODE
 
     // TODO: A lot of operations are one m-cycle. They all have the same setup (nop + alu_op). Should we combine them?
-    returnVal[opcode_bank_default][@intFromEnum(OpCodes.nop)].appendSlice(&[_]MicroOpData{ // NOP
+    returnVal[opcode_bank_default][0x00].appendSlice(&[_]MicroOpData{ // NOP
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
         .{ .operation = .apply_pins, .params = .none },
         .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
     }) catch unreachable;
-    returnVal[opcode_bank_default][@intFromEnum(OpCodes.inc_b)].appendSlice(&[_]MicroOpData{ // INC b
+
+    // LD r16, imm16
+    var ld_r16_imm_opcode: u8 = 0x01;
+    const ld_r16_imm_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
+    for (ld_r16_imm_rfids) |rfid| {
+        returnVal[opcode_bank_default][ld_r16_imm_opcode].appendSlice(&[_]MicroOpData{
+            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .z }} },
+            .{ .operation = .apply_pins, .params = .none },
+            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+            //
+            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .w }} },
+            .{ .operation = .apply_pins, .params = .none },
+            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+            //
+            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+            .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .write_back = rfid } } },
+            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+        }) catch unreachable;
+        ld_r16_imm_opcode += 0x10;
+    }
+
+    // LD r16mem, a
+    var ld_r16mem_a_opcode: u8 = 0x02;
+    const ld_r16mem_a_rfids = [_]RegisterFileID{ .c, .e, .l, .l }; 
+    const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
+    for(ld_r16mem_a_rfids, ld_r16mem_a_idu) |rfid, idu| {
+        returnVal[opcode_bank_default][ld_r16mem_a_opcode].appendSlice(&[_]MicroOpData{ // INC b
+            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = rfid, .idu = idu, .low_offset =  false, }} },
+            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .z }} },
+            .{ .operation = .apply_pins, .params = .none },
+            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+            //
+            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+            .{ .operation = .alu_assign, .params = .{ .alu = AluParams{ .input_1 = .z, .input_2 = .{ .rfid = .z }, .output = .a } } },
+            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+        }) catch unreachable;
+        ld_r16mem_a_opcode += 0x10;
+    }
+
+    returnVal[opcode_bank_default][0x04].appendSlice(&[_]MicroOpData{ // INC b
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
         .{ .operation = .alu_inc , .params = .{ .alu = AluParams{ .input_1 = .b, .input_2 = .{ .rfid = .b}, .output = .b } } },
@@ -456,7 +478,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             // TODO: Implement low_offset.
             const addr_source: *u16 = state.registers.getU16(params.addr);
             state.address_bus = addr_source.*;
-            addr_source.* += params.idu;
+
+            // +% -1 <=> +% 65535
+            addr_source.* +%= @bitCast(@as(i16, params.idu));
             applyPins(state, mmu);
         },
         .alu_inc => {

@@ -56,7 +56,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     cpu.uop_fifo.clear();
     // Load a nop instruction to fetch the required instruction.
     const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
-    const uops = opcode_bank[@intFromEnum(CPU.OpCodes.nop)];
+    const uops = opcode_bank[0];
     cpu.uop_fifo.write(uops.slice());
 }
 
