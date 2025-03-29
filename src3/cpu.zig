@@ -155,6 +155,7 @@ pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
 // TODO: Would be nicer to create this immediately instead of creating a function, but like this it is easier to implement the instructions in any order.
 fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
+    @setEvalBranchQuota(1500);
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
     
@@ -166,6 +167,8 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 1: DBUS + Push Pins
     // 2: ALU/MISC + Apply Pins
     // 3: DECODE
+
+    // TODO: A lot of operations are one m-cycle. They all have the same setup (nop + alu_op). Should we combine them?
     returnVal[opcode_bank_default][@intFromEnum(OpCodes.nop)].appendSlice(&[_]MicroOpData{ // NOP
         .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
         .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
@@ -185,19 +188,41 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_prefix }} },
     }) catch unreachable;
 
-    // SET bit,r8
-    var set_bit_opcode: u8 = 0xC0;
-    for(0..7) |bit_index| {
+
+    // TODO: We don't have SLA and SRA. So what is the difference, do we need a new uop for this?
+    const bit_shift_uops = [_]MicroOp{ .alu_rlc, .alu_rrc, .alu_rl, .alu_rr, .alu_sl, .alu_sr, .alu_swap, .alu_srl }; 
+    var bit_shift_opcode: u16 = 0x00;
+    for(bit_shift_uops) |bit_shift_uop| {
         // TODO: We are missing the Set bit, [HL] Variant instead of the second h.
         const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
         for(rfid_variants) |rfid| {
-            returnVal[opcode_bank_prefix][set_bit_opcode].appendSlice(&[_]MicroOpData{
+            returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
                 .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
                 .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-                .{ .operation = .alu_set, .params = .{ .alu = AluParams{ .input_1 = rfid, .input_2 = .{ .value = bit_index }, .output = rfid }} },
+                .{ .operation = bit_shift_uop, .params = .{ .alu = AluParams{ .input_1 = rfid, .input_2 = .{ .rfid = rfid }, .output = rfid }} },
                 .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
             }) catch unreachable;
-            set_bit_opcode += 1;
+            bit_shift_opcode += 1;
+        }
+    }
+
+    const bit_uops = [_]MicroOp{ .alu_bit, .alu_res, .alu_set };  
+    // TODO: This should not be necessary. It should be enough to start at 0x40 and iterate over all of them. But this has a bug, why?
+    const bit_opcodes = [_]u8{ 0x40, 0x80, 0xC0 };
+    for(bit_uops, 0..) |bit_uop, i| {
+        var bit_opcode: u8 = bit_opcodes[i];
+        for(0..7) |bit_index| {
+            // TODO: We are missing the Set bit, [HL] Variant instead of the second h.
+            const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
+            for(rfid_variants) |rfid| {
+                returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                    .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
+                    .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
+                    .{ .operation = bit_uop, .params = .{ .alu = AluParams{ .input_1 = rfid, .input_2 = .{ .value = bit_index }, .output = rfid }} },
+                    .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
+                }) catch unreachable;
+                bit_opcode += 1;
+            }
         }
     }
     return returnVal;
