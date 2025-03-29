@@ -98,17 +98,18 @@ const DecodeParams = packed struct(u12) {
     bank_idx: u2 = opcode_bank_default,
     _: u10 = 0,
 };
+// TODO: Is this the best way to implement this?
+const ConditionCheck = enum(u2) {
+    not_zero,
+    zero,
+    not_carry,
+    carry,
+};
 const MiscParams = packed struct(u12) {
     write_back: RegisterFileID = .a,
     ime_value: bool = false,
     rst_offset: u3 = 0,
-    // TODO: Is this the best way to implement this?
-    cc: enum(u2) {
-        not_zero,
-        zero,
-        not_carry,
-        carry,
-    } = .not_zero,
+    cc: ConditionCheck = .not_zero,
     _: u2 = 0,
 };
 const rst_addresses = [8]u16{ 0x0000, 0x0008, 0x0010, 0x018, 0x020, 0x028, 0x030, 0x038 };
@@ -126,6 +127,40 @@ const MicroOpData = struct {
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOpData, longest_instruction_cycles);
 const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
 
+fn AddrIdu(addr: RegisterFileID, idu: i2, low_offset: bool) MicroOpData {
+    return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = idu, .low_offset = low_offset } } };
+}
+fn Alu(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, output: RegisterFileID) MicroOpData {
+    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .rfid = input_2 }, .output = output } } };
+}
+fn AluValue(func: MicroOp, input_1: RegisterFileID, input_2: u4, output: RegisterFileID) MicroOpData {
+    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .value = input_2 }, .output = output } } };
+}
+fn ApplyPins() MicroOpData {
+    return .{ .operation = .apply_pins, .params = .none };
+}
+fn Dbus(source: RegisterFileID, target: RegisterFileID) MicroOpData {
+    return .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = source, .target = target } } };
+}
+fn Decode(bank_idx: u2) MicroOpData {
+    return .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = bank_idx } } };
+}
+fn MiscWB(rfid: RegisterFileID) MicroOpData {
+    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .write_back = rfid } } };
+}
+fn MiscCC(cc: ConditionCheck) MicroOpData {
+    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .cc = cc } } };
+}
+fn MiscRST(rst_offset: u3) MicroOpData {
+    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .rst_offset = rst_offset } } };
+}
+fn MiscIME(ime: bool) MicroOpData {
+    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .ime_value = ime } } };
+}
+fn Nop() MicroOpData {
+    return .{ .operation = .nop, .params = .none };
+}
+
 pub const opcode_bank_default = 0;
 pub const opcode_bank_prefix = 1;
 // 0x76 = HALT, 0x10 = STOP, 0x00-0x04: Interrupt Handler
@@ -133,8 +168,9 @@ pub const opcode_bank_pseudo = 2;
 pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
 // TODO: Would be nicer to create this immediately instead of creating a function, but like this it is easier to implement the instructions in any order.
-fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
-    @setEvalBranchQuota(1500);
+fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
+    // TODO: Consider doing this on inizialization and not during compile time?
+    @setEvalBranchQuota(5000);
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
     
@@ -149,10 +185,7 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // TODO: A lot of operations are one m-cycle. They all have the same setup (nop + alu_op). Should we combine them?
     returnVal[opcode_bank_default][0x00].appendSlice(&[_]MicroOpData{ // NOP
-        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-        .{ .operation = .apply_pins, .params = .none },
-        .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD r16, imm16
@@ -160,20 +193,9 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r16_imm_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
     for (ld_r16_imm_rfids) |rfid| {
         returnVal[opcode_bank_default][ld_r16_imm_opcode].appendSlice(&[_]MicroOpData{
-            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .z }} },
-            .{ .operation = .apply_pins, .params = .none },
-            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
-            //
-            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .w }} },
-            .{ .operation = .apply_pins, .params = .none },
-            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
-            //
-            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-            .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .write_back = rfid } } },
-            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),  ApplyPins(),  Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .w),  ApplyPins(),  Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), MiscWB(rfid), Decode(opcode_bank_default),
         }) catch unreachable;
         ld_r16_imm_opcode += 0x10;
     }
@@ -184,32 +206,18 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
     for(ld_r16mem_a_rfids, ld_r16mem_a_idu) |rfid, idu| {
         returnVal[opcode_bank_default][ld_r16mem_a_opcode].appendSlice(&[_]MicroOpData{ // INC b
-            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = rfid, .idu = idu, .low_offset =  false, }} },
-            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .z }} },
-            .{ .operation = .apply_pins, .params = .none },
-            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
-            //
-            .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-            .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-            .{ .operation = .alu_assign, .params = .{ .alu = AluParams{ .input_1 = .z, .input_2 = .{ .rfid = .z }, .output = .a } } },
-            .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+            AddrIdu(rfid, idu, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
         ld_r16mem_a_opcode += 0x10;
     }
 
     returnVal[opcode_bank_default][0x04].appendSlice(&[_]MicroOpData{ // INC b
-        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-        .{ .operation = .alu_inc , .params = .{ .alu = AluParams{ .input_1 = .b, .input_2 = .{ .rfid = .b}, .output = .b } } },
-        .{ .operation = .decode, .params = .{ .decode = DecodeParams{}} },
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_inc, .b, .b, .b), Decode(opcode_bank_default),
     }) catch unreachable;
     returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
-        .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-        .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-        .{ .operation = .apply_pins, .params = .none },
-        .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_prefix }} },
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
     }) catch unreachable;
-
 
     // TODO: We don't have SLA and SRA. So what is the difference, do we need a new uop for this?
     const bit_shift_uops = [_]MicroOp{ .alu_rlc, .alu_rrc, .alu_rl, .alu_rr, .alu_sl, .alu_sr, .alu_swap, .alu_srl }; 
@@ -219,10 +227,7 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
         for(rfid_variants) |rfid| {
             returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
-                .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-                .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-                .{ .operation = bit_shift_uop, .params = .{ .alu = AluParams{ .input_1 = rfid, .input_2 = .{ .rfid = rfid }, .output = rfid }} },
-                .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
+                AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(bit_shift_uop, rfid, rfid, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
             bit_shift_opcode += 1;
         }
@@ -238,10 +243,7 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
             for(rfid_variants) |rfid| {
                 returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
-                    .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = .pcl, .idu = 1, .low_offset =  false, }} },
-                    .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = .dbus, .target = .ir }} },
-                    .{ .operation = bit_uop, .params = .{ .alu = AluParams{ .input_1 = rfid, .input_2 = .{ .value = bit_index }, .output = rfid }} },
-                    .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = opcode_bank_default }} },
+                    AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, bit_index, rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
                 bit_opcode += 1;
             }
@@ -249,7 +251,7 @@ fn createOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
     return returnVal;
 }
-pub const opcode_banks = createOpcodeBanks();
+pub const opcode_banks = genOpcodeBanks();
 
 // IF and IE flags.
 const InterruptFlags = packed struct(u8) {
