@@ -182,54 +182,83 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 1: DBUS + Push Pins
     // 2: ALU/MISC + Apply Pins
     // 3: DECODE
+    var curr_opcode: u8 = 0;
 
-    // TODO: A lot of operations are one m-cycle. They all have the same setup (nop + alu_op). Should we combine them?
-    returnVal[opcode_bank_default][0x00].appendSlice(&[_]MicroOpData{ // NOP
+    // NOP
+    returnVal[opcode_bank_default][0x00].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD r16, imm16
-    var ld_r16_imm_opcode: u8 = 0x01;
+    curr_opcode = 0x01;
     const ld_r16_imm_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
     for (ld_r16_imm_rfids) |rfid| {
-        returnVal[opcode_bank_default][ld_r16_imm_opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),  ApplyPins(),  Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .w),  ApplyPins(),  Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), MiscWB(rfid), Decode(opcode_bank_default),
         }) catch unreachable;
-        ld_r16_imm_opcode += 0x10;
+        curr_opcode += 0x10;
     }
 
     // LD r16mem, a
-    var ld_r16mem_a_opcode: u8 = 0x02;
+    curr_opcode = 0x02;
     const ld_r16mem_a_rfids = [_]RegisterFileID{ .c, .e, .l, .l }; 
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
     for(ld_r16mem_a_rfids, ld_r16mem_a_idu) |rfid, idu| {
-        returnVal[opcode_bank_default][ld_r16mem_a_opcode].appendSlice(&[_]MicroOpData{ // INC b
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, idu, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
-        ld_r16mem_a_opcode += 0x10;
+        curr_opcode += 0x10;
     }
 
-    returnVal[opcode_bank_default][0x04].appendSlice(&[_]MicroOpData{ // INC b
-        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_inc, .b, .b, .b), Decode(opcode_bank_default),
-    }) catch unreachable;
+    // Inc r16
+    curr_opcode = 0x03;
+    const inc_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
+    for(inc_r16_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(rfid, 1, false), Nop(), Nop(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 0x10;
+    }
+
+    // INC r8
+    const inc_r8_opcodes = [_]u8{ 0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C };
+    // TODO: Missing the [HL] Variant (0x34)
+    const inc_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(inc_r8_opcodes, inc_r8_rfids) |opcode, rfid| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_inc, rfid, rfid, rfid), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
+    // DEC r8
+    const dec_r8_opcodes = [_]u8{ 0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D };
+    // TODO: Missing the [HL] Variant (0x34)
+    const dec_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(dec_r8_opcodes, dec_r8_rfids) |opcode, rfid| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_dec, rfid, rfid, rfid), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
     returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
     }) catch unreachable;
 
     // TODO: We don't have SLA and SRA. So what is the difference, do we need a new uop for this?
     const bit_shift_uops = [_]MicroOp{ .alu_rlc, .alu_rrc, .alu_rl, .alu_rr, .alu_sl, .alu_sr, .alu_swap, .alu_srl }; 
-    var bit_shift_opcode: u16 = 0x00;
+    curr_opcode = 0x00;
     for(bit_shift_uops) |bit_shift_uop| {
         // TODO: We are missing the Set bit, [HL] Variant instead of the second h.
         const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
         for(rfid_variants) |rfid| {
-            returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
+            returnVal[opcode_bank_prefix][curr_opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(bit_shift_uop, rfid, rfid, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
-            bit_shift_opcode += 1;
+            curr_opcode += 1;
         }
     }
 
@@ -358,7 +387,25 @@ pub fn init(state: *State) void {
 pub fn cycle(state: *State, mmu: *MMU.State) void {
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
+        // TODO: When and how does the cpu write the result of the memory request to it's dbus?
+        .addr_idu => {
+            const params: AddrIduParms = uop.params.addr_idu;
+            // TODO: Implement low_offset.
+            const addr_source: *u16 = state.registers.getU16(params.addr);
+            state.address_bus = addr_source.*;
+
+            // +% -1 <=> +% 65535
+            addr_source.* +%= @bitCast(@as(i16, params.idu));
+            applyPins(state, mmu);
+        },
         // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
+        // TODO: Look at all of the uops and see if we can combine them. Examples
+        // - Inc and Dec can be expressed the same: -1 <=> +% 255
+        // - Can ADD and ADC as well as SUB and SBC be combined?
+        // - Can we express add and sub the same: -n <=> +% (256 - n)
+        // - AND, OR, XOR are the same code. The only thing that changes is the actual operation.
+        // - Is RLC with C = 0 the same as RL? (Same for RRC with C = 0 and RR). 
+        // - Can we combine sr and srl?
         .alu_adc => {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
@@ -472,17 +519,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.zero = output.* == 0;
             state.registers.r8.f.flags.n_bcd = true;
             state.registers.r8.f.flags.half_bcd = (((input & 0x0F) -% 1) & 0x10) == 0x10; 
-            applyPins(state, mmu);
-        },
-        // TODO: When and how does the cpu write the result of the memory request to it's dbus?
-        .addr_idu => {
-            const params: AddrIduParms = uop.params.addr_idu;
-            // TODO: Implement low_offset.
-            const addr_source: *u16 = state.registers.getU16(params.addr);
-            state.address_bus = addr_source.*;
-
-            // +% -1 <=> +% 65535
-            addr_source.* +%= @bitCast(@as(i16, params.idu));
             applyPins(state, mmu);
         },
         .alu_inc => {
