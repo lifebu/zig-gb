@@ -127,7 +127,9 @@ const MicroOpData = struct {
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOpData, longest_instruction_cycles);
 const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
 
+// TODO: IN general add more sanity checks and asserts.
 fn AddrIdu(addr: RegisterFileID, idu: i2, low_offset: bool) MicroOpData {
+    // TODO: Maybe add a sanity check here to see if the addr rfid is a valid 16-bit register? Because you could read 16bit between two 16bit registers.
     return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = idu, .low_offset = low_offset } } };
 }
 fn Alu(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, output: RegisterFileID) MicroOpData {
@@ -207,8 +209,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
     for(ld_r16mem_a_rfids, ld_r16mem_a_idu) |rfid, idu| {
         returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(rfid, idu, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
+            AddrIdu(rfid, idu, false), Dbus(.dbus, .z),  ApplyPins(),                  Nop(),
+            AddrIdu(.pcl, 1, false),   Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
         curr_opcode += 0x10;
     }
@@ -218,7 +220,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const inc_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
     for(inc_r16_rfids) |rfid| {
         returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(rfid, 1, false), Nop(), Nop(), Nop(),
+            AddrIdu(rfid, 1, false), Nop(),            Nop(), Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
         }) catch unreachable;
         curr_opcode += 0x10;
@@ -244,9 +246,87 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
+    // LD r8, imm8
+    const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E };
+    // TODO: Missing the [HL] Variant (0x34)
+    // TODO: Those rfids are the same for all of the variants of the same type. Define them once?
+    const ld_r8_imm8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(ld_r8_imm8_opcodes, ld_r8_imm8_rfids) |opcode, rfid| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_prefix),
+        }) catch unreachable;
+    }
+
+    // RLCA
+    returnVal[opcode_bank_default][0x07].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_rlc, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // LD (imm16),SP
+    returnVal[opcode_bank_default][0x08].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),   ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .w),   ApplyPins(), Nop(),
+        AddrIdu(.z, 1, false),   Dbus(.dbus, .spl), ApplyPins(), Nop(),
+        AddrIdu(.z, 0, false),   Dbus(.dbus, .sph), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir),  ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // LD a, r16mem
+    returnVal[opcode_bank_default][0x09].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .w),   ApplyPins(),               Nop(),
+        AddrIdu(.z, 0, false),   Dbus(.dbus, .z),   ApplyPins(),               Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir),  Alu(.alu_set, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // DEC r16
+    curr_opcode = 0x0B;
+    // TODO: Define the variant rfid sets once and use the correct set instead of defining it everywhere.
+    const dec_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
+    for(dec_r16_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(rfid, -1, false), Nop(),           Nop(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 0x10;
+    }
+
+    // ADD HL, R16
+    curr_opcode = 0x09;
+    const add_hl_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
+    for(add_hl_r16_rfids) |rfid| {
+        // TODO: Needs to be tested if this actually works.
+        const r16_msb: RegisterFileID = @enumFromInt((@intFromEnum(rfid) + 1));
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            // TODO: In gekkio it shows + and then +_c, so I think I need add and add+carry? Test this!
+            Nop(), Nop(), Alu(.alu_add, .l, rfid, .l), Nop(),
+            AddrIdu(.pcl, 1, false),   Dbus(.dbus, .ir), Alu(.alu_adc, .h, r16_msb, .h), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 0x10;
+    }
+
+    // RRCA
+    returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_rrc, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // STOP
+    returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
+        Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
+    }) catch unreachable;
+
+    // RLA
+    returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_rl, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // Prefix
     returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
     }) catch unreachable;
+
+
 
     // TODO: We don't have SLA and SRA. So what is the difference, do we need a new uop for this?
     const bit_shift_uops = [_]MicroOp{ .alu_rlc, .alu_rrc, .alu_rl, .alu_rr, .alu_sl, .alu_sr, .alu_swap, .alu_srl }; 
