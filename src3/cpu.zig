@@ -53,6 +53,7 @@ const MicroOp = enum(u6) {
     alu_daa_adjust, 
     alu_dec, 
     alu_inc, 
+    alu_not,
     alu_or, 
     alu_res, 
     alu_rl, 
@@ -312,13 +313,47 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // STOP
-    returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0x10].appendSlice(&[_]MicroOpData{
         Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
     // RLA
-    returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0x17].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_rl, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // JR r8
+    // TODO: Missing JR r8, because I need to implement an adjust function for the IDU.
+    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+
+    // TODO: RRA, RLA, RRCA and so on are all extremly similar, combine their uops?
+    // RRA
+    returnVal[opcode_bank_default][0x1F].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_rr, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // JR cond imm8
+    // TODO: Missing JR cond imm8, because I need to implement an adjust function for the IDU.
+    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+
+    // DAA
+    returnVal[opcode_bank_default][0x27].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_daa_adjust, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // CPL
+    returnVal[opcode_bank_default][0x2F].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_not, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // SCF
+    returnVal[opcode_bank_default][0x37].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_scf, .a, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // CCF
+    returnVal[opcode_bank_default][0x37].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_ccf, .a, .a, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // Prefix
@@ -611,6 +646,17 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.zero = output.* == 0; 
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = (((input & 0x0F) +% 1) & 0x10) == 0x10; 
+            applyPins(state, mmu);
+        },
+        .alu_not => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const result: u8 = ~input;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
+
+            state.registers.r8.f.flags.n_bcd = true;
+            state.registers.r8.f.flags.half_bcd = true;
             applyPins(state, mmu);
         },
         .alu_or => {
