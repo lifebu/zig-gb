@@ -27,6 +27,7 @@ const RegisterFileID = enum(u4) {
     dbus,
     alu_input_1,
     a,
+    // TODO: We need f! Because we can address AF for 16bit stack operation (push and pop).
 };
 
 const longest_instruction_cycles = 24;
@@ -355,6 +356,147 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     returnVal[opcode_bank_default][0x37].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_ccf, .a, .a, .a), Decode(opcode_bank_default),
     }) catch unreachable;
+
+    // LD r8, r8
+    curr_opcode = 0x40;
+    // TODO: Missing the [HL] Variant (0x34)
+    const ld_r8_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(ld_r8_r8_rfids) |target_rfid| {
+        for (ld_r8_r8_rfids) |source_rfid| {
+            returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_set, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
+            }) catch unreachable;
+            curr_opcode += 1;
+        }
+    }
+
+    // TODO: ADD, ADC, SUB, SBC, AND, OR, basically all single mcycle instructions have the same structure.
+    // Only the ALU op changes, so we can combine them?
+    // ADD a, r8
+    curr_opcode = 0x80;
+    // TODO: Missing the [HL] Variant (0x34)
+    const add_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(add_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_add, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // ADC a, r8
+    curr_opcode = 0x88;
+    // TODO: Missing the [HL] Variant (0x34)
+    const adc_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(adc_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_adc, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // SUB a, r8
+    curr_opcode = 0x90;
+    // TODO: Missing the [HL] Variant (0x34)
+    const sub_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(sub_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_sub, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // SBC a, r8
+    curr_opcode = 0x98;
+    // TODO: Missing the [HL] Variant (0x34)
+    const sbc_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(sbc_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_sbc, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // AND a, r8
+    curr_opcode = 0xA0;
+    // TODO: Missing the [HL] Variant (0x34)
+    const and_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(and_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_and, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // XOR a, r8
+    curr_opcode = 0xAF;
+    // TODO: Missing the [HL] Variant (0x34)
+    const xor_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(xor_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_xor, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // OR a, r8
+    curr_opcode = 0xB0;
+    // TODO: Missing the [HL] Variant (0x34)
+    const or_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(or_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_or, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // CP a, r8
+    curr_opcode = 0xBA;
+    // TODO: Missing the [HL] Variant (0x34)
+    const cp_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
+    for(cp_a_r8_rfids) |rfid| {
+        returnVal[opcode_bank_default][curr_opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_cp, rfid, rfid, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+        curr_opcode += 1;
+    }
+
+    // RET cond
+    const ret_cond_opcodes = [_]u8{ 0xC0, 0xC8, 0xD0, 0xD8 };
+    const ret_cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry  };
+    for(ret_cond_cc, ret_cond_opcodes) |cc, opcode| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            Nop(), Nop(), MiscCC(cc), Nop(),
+            AddrIdu(.spl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.spl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
+            Nop(), Nop(), MiscWB(.pcl), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
+    // POP r16stk
+    const pop_rr_opcodes = [_]u8{ 0xC1, 0xD1, 0xE1, 0xF1 };
+    // TODO: We are missing a way to address the AF register pair.
+    const pop_rr_rfids = [_]RegisterFileID{ .c, .e, .l, .a }; 
+    for(pop_rr_opcodes, pop_rr_rfids) |opcode, rfid| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.spl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.spl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), MiscWB(rfid), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
+    // JP cond imm16
+    const jp_cond_opcodes = [_]u8{ 0xC2, 0xD2, 0xCA, 0xDA };
+    const jp_cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry }; 
+    for(jp_cond_opcodes, jp_cond_cc) |opcode, cc| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), MiscCC(cc), Nop(),
+            Nop(), Nop(), MiscWB(.pcl), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
 
     // Prefix
     returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
