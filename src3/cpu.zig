@@ -497,6 +497,69 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
+    // PUSH r16stk
+    const push_rr_opcodes = [_]u8{ 0xC5, 0xD5, 0xE5, 0xF5 };
+    // TODO: We are missing a way to address the AF register pair.
+    const push_rr_rfids = [_]RegisterFileID{ .c, .e, .l, .a }; 
+    for(push_rr_opcodes, push_rr_rfids) |opcode, rfid| {
+        // TODO: Remove this overflow operator once we can address the AF register.
+        const msb_rfid: RegisterFileID = @enumFromInt(@intFromEnum(rfid) +% 1);
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.spl, -1, false), Nop(), Nop(), Nop(),
+            AddrIdu(.spl, -1, false), Dbus(.dbus, msb_rfid), ApplyPins(), Nop(),
+            AddrIdu(.spl, 0, false), Dbus(.dbus, rfid), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
+    // JP imm16
+    returnVal[opcode_bank_default][0xC3].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
+        Nop(), Nop(), MiscWB(.pcl), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+
+    // CALL cond imm16
+    const call_cond_opcodes = [_]u8{ 0xC4, 0xCC, 0xD4, 0xDC };
+    const call_cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
+    for(call_cond_opcodes, call_cond_cc) |opcodes, cc| {
+        returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), MiscCC(cc), Nop(),
+            AddrIdu(.spl, -1, false), Nop(), Nop(), Nop(),
+            AddrIdu(.spl, -1, false), Dbus(.pch, .dbus), ApplyPins(), Nop(),
+            AddrIdu(.spl, -1, false), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
+    // ADD a, imm8
+    returnVal[opcode_bank_default][0xC6].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_add, .z, .a, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // RST target
+    const rst_opcodes = [_]u8{ 0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF };
+    const rst_offsets = [_]u3{ 0, 1, 2, 3, 4, 5, 6, 7 };
+    for(rst_opcodes, rst_offsets) |opcodes, offset| {
+        returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
+            AddrIdu(.spl, -1, false), Nop(), Nop(), Nop(),
+            AddrIdu(.spl, -1, false), Dbus(.pch, .dbus), ApplyPins(), Nop(),
+            AddrIdu(.spl, 0, false), Dbus(.pcl, .dbus), MiscRST(offset), Nop(),
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+
+    // RET
+    returnVal[opcode_bank_default][0xC9].appendSlice(&[_]MicroOpData{
+        AddrIdu(.spl, 1, false), Dbus(.dbus, .z), Nop(), Nop(),
+        AddrIdu(.spl, 1, false), Dbus(.dbus, .w), Nop(), Nop(),
+        Nop(), Nop(), MiscWB(.pcl), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
 
     // Prefix
     returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
