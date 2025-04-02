@@ -156,7 +156,7 @@ fn MiscCC(cc: ConditionCheck) MicroOpData {
     return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .cc = cc } } };
 }
 fn MiscRST(rst_offset: u3) MicroOpData {
-    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .rst_offset = rst_offset } } };
+    return .{ .operation = .set_pc, .params = .{ .misc = MiscParams{ .rst_offset = rst_offset } } };
 }
 fn MiscIME(ime: bool) MicroOpData {
     return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .ime_value = ime } } };
