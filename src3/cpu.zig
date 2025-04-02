@@ -177,6 +177,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     @setEvalBranchQuota(5000);
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
+
+    // TODO: Missing the [HL] RFID. Which for some instructions might mean a different implementation?
+    const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .l, .a };
+    const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
+    // TODO: We are missing a way to address the AF register pair.
+    const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .a };
+    const r16_mem_rfids = [_]RegisterFileID{ .c, .e, .l, .l };  
+    const cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
     
     // TODO: I think I have to switch ALU/MISC with DBUS + Push Pins. Why? Set ,b [HL] requires that the output of the ALU can be used for this cycles memory request.
     // This also means before we decode, we need to apply the pins, because Decode requires that the pins have been applied before decode runs.
@@ -194,8 +202,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // LD r16, imm16
     const ld_r16_imm_opcodes = [_]u8{ 0x01, 0x11, 0x21, 0x31 };
-    const ld_r16_imm_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
-    for (ld_r16_imm_opcodes, ld_r16_imm_rfids) |opcode, rfid| {
+    for (ld_r16_imm_opcodes, r16_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),  ApplyPins(),  Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .w),  ApplyPins(),  Nop(),
@@ -205,9 +212,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // LD r16mem, a
     const ld_r16mem_a_opcodes = [_]u8{ 0x02, 0x12, 0x22, 0x32 };
-    const ld_r16mem_a_rfids = [_]RegisterFileID{ .c, .e, .l, .l }; 
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
-    for(ld_r16mem_a_opcodes, ld_r16mem_a_rfids, ld_r16mem_a_idu) |opcode, rfid, idu| {
+    for(ld_r16mem_a_opcodes, r16_mem_rfids, ld_r16mem_a_idu) |opcode, rfid, idu| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, idu, false), Dbus(.dbus, .z),  ApplyPins(),                  Nop(),
             AddrIdu(.pcl, 1, false),   Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
@@ -216,8 +222,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // Inc r16
     const inc_r16_opcodes = [_]u8{ 0x03, 0x13, 0x23, 0x33 };
-    const inc_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
-    for(inc_r16_opcodes, inc_r16_rfids) |opcode, rfid| {
+    for(inc_r16_opcodes, r16_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, 1, false), Nop(),            Nop(), Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
@@ -227,8 +232,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // INC r8
     const inc_r8_opcodes = [_]u8{ 0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C };
     // TODO: Missing the [HL] Variant (0x34)
-    const inc_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(inc_r8_opcodes, inc_r8_rfids) |opcode, rfid| {
+    for(inc_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_inc, rfid, rfid, rfid), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -237,8 +241,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // DEC r8
     const dec_r8_opcodes = [_]u8{ 0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D };
     // TODO: Missing the [HL] Variant (0x34)
-    const dec_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(dec_r8_opcodes, dec_r8_rfids) |opcode, rfid| {
+    for(dec_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_dec, rfid, rfid, rfid), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -248,8 +251,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E };
     // TODO: Missing the [HL] Variant (0x34)
     // TODO: Those rfids are the same for all of the variants of the same type. Define them once?
-    const ld_r8_imm8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(ld_r8_imm8_opcodes, ld_r8_imm8_rfids) |opcode, rfid| {
+    for(ld_r8_imm8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_prefix),
@@ -280,9 +282,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // DEC r16
     const dec_r16_opcodes = [_]u8{ 0x0B, 0x1B, 0x2B, 0x3B };
-    // TODO: Define the variant rfid sets once and use the correct set instead of defining it everywhere.
-    const dec_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
-    for(dec_r16_opcodes, dec_r16_rfids) |opcode, rfid| {
+    for(dec_r16_opcodes, r16_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, -1, false), Nop(),           Nop(), Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
@@ -291,8 +291,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // ADD HL, R16
     const add_hl_r16_opcodes = [_]u8{ 0x09, 0x19, 0x29, 0x39 };
-    const add_hl_r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl }; 
-    for(add_hl_r16_opcodes, add_hl_r16_rfids) |opcode, rfid| {
+    for(add_hl_r16_opcodes, r16_rfids) |opcode, rfid| {
         // TODO: Needs to be tested if this actually works.
         const r16_msb: RegisterFileID = @enumFromInt((@intFromEnum(rfid) + 1));
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -356,9 +355,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     var ld_r8_r8_opcode: u8 = 0x40;
     // TODO: Missing the [HL] Variant (0x34)
     // TODO: Missing HALT!
-    const ld_r8_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(ld_r8_r8_rfids) |target_rfid| {
-        for (ld_r8_r8_rfids) |source_rfid| {
+    for(r8_rfids) |target_rfid| {
+        for (r8_rfids) |source_rfid| {
             returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_set, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
             }) catch unreachable;
@@ -371,8 +369,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADD a, r8
     const add_a_r8_opcodes = [_]u8{ 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87 };
     // TODO: Missing the [HL] Variant (0x34)
-    const add_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(add_a_r8_opcodes, add_a_r8_rfids) |opcode, rfid| {
+    for(add_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_add, rfid, rfid, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -381,8 +378,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADC a, r8
     const adc_a_r8_opcodes = [_]u8{ 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F };
     // TODO: Missing the [HL] Variant (0x34)
-    const adc_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(adc_a_r8_opcodes, adc_a_r8_rfids) |opcode, rfid| {
+    for(adc_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_adc, rfid, rfid, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -391,8 +387,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // SUB a, r8
     const sub_a_r8_opcodes = [_]u8{ 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97 };
     // TODO: Missing the [HL] Variant (0x34)
-    const sub_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(sub_a_r8_opcodes, sub_a_r8_rfids) |opcode, rfid| {
+    for(sub_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_sub, rfid, rfid, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -411,8 +406,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // AND a, r8
     const and_a_r8_opcodes = [_]u8{ 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7 };
     // TODO: Missing the [HL] Variant (0x34)
-    const and_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(and_a_r8_opcodes, and_a_r8_rfids) |opcode, rfid| {
+    for(and_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_and, rfid, rfid, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -431,8 +425,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // OR a, r8
     const or_a_r8_opcodes = [_]u8{ 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7 };
     // TODO: Missing the [HL] Variant (0x34)
-    const or_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
-    for(or_a_r8_opcodes, or_a_r8_rfids) |opcode, rfid| {
+    for(or_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_or, rfid, rfid, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -450,8 +443,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RET cond
     const ret_cond_opcodes = [_]u8{ 0xC0, 0xC8, 0xD0, 0xD8 };
-    const ret_cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry  };
-    for(ret_cond_cc, ret_cond_opcodes) |cc, opcode| {
+    for(ret_cond_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             Nop(), Nop(), MiscCC(cc), Nop(),
             AddrIdu(.spl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
@@ -463,9 +455,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // POP r16stk
     const pop_rr_opcodes = [_]u8{ 0xC1, 0xD1, 0xE1, 0xF1 };
-    // TODO: We are missing a way to address the AF register pair.
-    const pop_rr_rfids = [_]RegisterFileID{ .c, .e, .l, .a }; 
-    for(pop_rr_opcodes, pop_rr_rfids) |opcode, rfid| {
+    for(pop_rr_opcodes, r16_stack_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.spl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.spl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
@@ -475,8 +465,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // JP cond imm16
     const jp_cond_opcodes = [_]u8{ 0xC2, 0xD2, 0xCA, 0xDA };
-    const jp_cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry }; 
-    for(jp_cond_opcodes, jp_cond_cc) |opcode, cc| {
+    for(jp_cond_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), MiscCC(cc), Nop(),
@@ -488,8 +477,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // PUSH r16stk
     const push_rr_opcodes = [_]u8{ 0xC5, 0xD5, 0xE5, 0xF5 };
     // TODO: We are missing a way to address the AF register pair.
-    const push_rr_rfids = [_]RegisterFileID{ .c, .e, .l, .a }; 
-    for(push_rr_opcodes, push_rr_rfids) |opcode, rfid| {
+    for(push_rr_opcodes, r16_stack_rfids) |opcode, rfid| {
         // TODO: Remove this overflow operator once we can address the AF register.
         const msb_rfid: RegisterFileID = @enumFromInt(@intFromEnum(rfid) +% 1);
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -511,8 +499,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // CALL cond imm16
     const call_cond_opcodes = [_]u8{ 0xC4, 0xCC, 0xD4, 0xDC };
-    const call_cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
-    for(call_cond_opcodes, call_cond_cc) |opcodes, cc| {
+    for(call_cond_opcodes, cond_cc) |opcodes, cc| {
         returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), MiscCC(cc), Nop(),
@@ -561,9 +548,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
     var bit_shift_opcode: u8 = 0x00;
     for(bit_shift_uops) |bit_shift_uop| {
-        // TODO: We are missing the Set bit, [HL] Variant instead of the second h.
-        const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
-        for(rfid_variants) |rfid| {
+        for(r8_rfids) |rfid| {
             returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(bit_shift_uop, rfid, rfid, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
@@ -577,9 +562,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(bit_uops, 0..) |bit_uop, i| {
         var bit_opcode: u8 = bit_opcodes[i];
         for(0..7) |bit_index| {
-            // TODO: We are missing the Set bit, [HL] Variant instead of the second h.
-            const rfid_variants = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .h, .a };
-            for(rfid_variants) |rfid| {
+            for(r8_rfids) |rfid| {
                 returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
                     AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, bit_index, rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
