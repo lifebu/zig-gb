@@ -235,7 +235,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // INC r8
     const inc_r8_opcodes = [_]u8{ 0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C };
-    // TODO: Missing the [HL] Variant (0x34)
     for(inc_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_inc, rfid, rfid, rfid), Decode(opcode_bank_default),
@@ -244,7 +243,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // DEC r8
     const dec_r8_opcodes = [_]u8{ 0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D };
-    // TODO: Missing the [HL] Variant (0x34)
     for(dec_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_dec, rfid, rfid, rfid), Decode(opcode_bank_default),
@@ -253,8 +251,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // LD r8, imm8
     const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E };
-    // TODO: Missing the [HL] Variant (0x34)
-    // TODO: Those rfids are the same for all of the variants of the same type. Define them once?
     for(ld_r8_imm8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
@@ -320,7 +316,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_rl, .a, .a, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // JR r8
+    // JR r8: 0x18 
     // TODO: Missing JR r8, because I need to implement an adjust function for the IDU.
     // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
 
@@ -331,6 +327,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // JR cond imm8
+    // 0x20, 0x30, 0x28, 0x38
     // TODO: Missing JR cond imm8, because I need to implement an adjust function for the IDU.
     // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
 
@@ -357,7 +354,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // LD r8, r8
     // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
     var ld_r8_r8_opcode: u8 = 0x40;
-    // TODO: Missing the [HL] Variant (0x34)
     // TODO: Missing HALT!
     for(r8_rfids) |target_rfid| {
         for (r8_rfids) |source_rfid| {
@@ -372,7 +368,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // Only the ALU op changes, so we can combine them?
     // ADD a, r8
     const add_a_r8_opcodes = [_]u8{ 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87 };
-    // TODO: Missing the [HL] Variant (0x34)
     for(add_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_add, rfid, rfid, .a), Decode(opcode_bank_default),
@@ -381,7 +376,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // ADC a, r8
     const adc_a_r8_opcodes = [_]u8{ 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F };
-    // TODO: Missing the [HL] Variant (0x34)
     for(adc_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_adc, rfid, rfid, .a), Decode(opcode_bank_default),
@@ -390,7 +384,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // SUB a, r8
     const sub_a_r8_opcodes = [_]u8{ 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97 };
-    // TODO: Missing the [HL] Variant (0x34)
     for(sub_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_sub, rfid, rfid, .a), Decode(opcode_bank_default),
@@ -399,7 +392,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // SBC a, r8
     const sbc_a_r8_opcodes = [_]u8{ 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F };
-    // TODO: Missing the [HL] Variant (0x34)
     const sbc_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
     for(sbc_a_r8_opcodes, sbc_a_r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -409,7 +401,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // AND a, r8
     const and_a_r8_opcodes = [_]u8{ 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7 };
-    // TODO: Missing the [HL] Variant (0x34)
     for(and_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_and, rfid, rfid, .a), Decode(opcode_bank_default),
@@ -418,7 +409,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // XOR a, r8
     const xor_a_r8_opcodes = [_]u8{ 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF };
-    // TODO: Missing the [HL] Variant (0x34)
     const xor_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
     for(xor_a_r8_opcodes, xor_a_r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -428,7 +418,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // OR a, r8
     const or_a_r8_opcodes = [_]u8{ 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7 };
-    // TODO: Missing the [HL] Variant (0x34)
     for(or_a_r8_opcodes, r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_or, rfid, rfid, .a), Decode(opcode_bank_default),
@@ -437,7 +426,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // CP a, r8
     const cp_a_r8_opcodes = [_]u8{ 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF };
-    // TODO: Missing the [HL] Variant (0x34)
     const cp_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
     for(cp_a_r8_opcodes, cp_a_r8_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -614,6 +602,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // ADD SP, imm8 (signed)
+    // 0xE8
     // TODO: Missing ADD SP, imm8 (signed), because I need to implement an adjust function for the IDU.
     // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
 
@@ -665,6 +654,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LD HL, SP+imm8(signed)
+    // 0xF8
     // TODO: Missing LD SP, SP+imm8 (signed), because I need to implement an adjust function for the IDU.
     // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
 
@@ -705,7 +695,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     const bit_uops = [_]MicroOp{ .alu_bit, .alu_res, .alu_set };  
-    // TODO: This should not be necessary. It should be enough to start at 0x40 and iterate over all of them. But this has a bug, why?
     const bit_opcodes = [_]u8{ 0x40, 0x80, 0xC0 };
     for(bit_uops, 0..) |bit_uop, i| {
         var bit_opcode: u8 = bit_opcodes[i];
@@ -830,12 +819,11 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
             const params: AddrIduParms = uop.params.addr_idu;
-            // TODO: Implement low_offset.
-            const addr_source: *u16 = state.registers.getU16(params.addr);
-            state.address_bus = addr_source.*;
+            const addr: u16 = if(params.low_offset) 0xFF00 + state.registers.getU8(params.addr).* else state.registers.getU16(params.addr).*;
+            state.address_bus = addr.*;
 
             // +% -1 <=> +% 65535
-            addr_source.* +%= @bitCast(@as(i16, params.idu));
+            addr.* +%= @bitCast(@as(i16, params.idu));
             applyPins(state, mmu);
         },
         // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
@@ -1208,6 +1196,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const opcode_bank = opcode_banks[params.bank_idx];
             const opcode: u8 = state.registers.r8.ir;
             const uops: MicroOpArray = opcode_bank[opcode];
+            if(uops.len == 0) {
+                std.log.err("Empty instruction decoded: {X:0>2}\n", .{ opcode });
+            }
             state.uop_fifo.write(uops.slice());
         },
         .nop => {

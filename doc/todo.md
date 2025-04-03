@@ -1,4 +1,13 @@
 # src3:
+## CPU:
+- Add a way to address the AF register pair.
+- Implement CC Check.
+- Add the Adjust operation to the IDU to implement relative jumps.
+- Missing [HL] Variant for all of the instructions that use the r8_rfids.
+- In some cases we need to have a different register as the IDU output then the input:
+    - LD SP HL, JP (HL) 
+
+## Other:
 - Run emulator itself in thread. Use double-buffer to communicate audio and video data to platform.
     => Errors in the emulator do not crash software (logs with errors).
     => You can re-run emulator at crash (dll hot-reload)!
