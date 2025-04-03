@@ -541,7 +541,98 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
     }) catch unreachable;
 
+    // CALL imm16
+    // TODO: CALL and CALL cc are almost the same. the only difference is the CC Check after changing WZ.
+    returnVal[opcode_bank_default][0xCD].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
+        AddrIdu(.spl, -1, false), Nop(), Nop(), Nop(),
+        AddrIdu(.spl, -1, false), Dbus(.pch, .dbus), ApplyPins(), Nop(),
+        AddrIdu(.spl, -1, false), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
 
+    // ADC a, imm8
+    // TODO: ADC a, imm8 and ADC a, r8 are very similar.
+    returnVal[opcode_bank_default][0xCE].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_adc, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // SUB a, imm8
+    // TODO: SUB a, imm8 and SUB a, r8 are very similar.
+    returnVal[opcode_bank_default][0xD6].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_sub, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // RETI
+    returnVal[opcode_bank_default][0xD9].appendSlice(&[_]MicroOpData{
+        AddrIdu(.spl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.spl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
+        Nop(), Nop(), MiscWB(.pcl), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), MiscIME(true), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // SBC a, imm8
+    // TODO: SBC a, imm8 and SBC a, r8 are very similar.
+    returnVal[opcode_bank_default][0xDE].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_sbc, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // LDH [imm8], a
+    returnVal[opcode_bank_default][0xE0].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.z, 0, true), Dbus(.dbus, .a), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // LD [c], a
+    returnVal[opcode_bank_default][0xE2].appendSlice(&[_]MicroOpData{
+        AddrIdu(.c, 0, true), Dbus(.dbus, .a), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // LD [imm16], a
+    returnVal[opcode_bank_default][0xE2].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
+        AddrIdu(.z, 0, false), Dbus(.dbus, .a), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // AND a, imm8
+    // TODO: AND a, imm8 and AND a, r8 are very similar.
+    returnVal[opcode_bank_default][0xE6].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_and, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // ADD SP, imm8 (signed)
+    // TODO: Missing ADD SP, imm8 (signed), because I need to implement an adjust function for the IDU.
+    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+
+    // JP (HL)
+    returnVal[opcode_bank_default][0xE9].appendSlice(&[_]MicroOpData{
+        // TODO: For this inscturciton we need to set PC to HL + 1 (so direct the result of the IDU to a different register than it's source).
+        AddrIdu(.l, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // XOR a, imm8
+    // TODO: XOR a, imm8 and XOR a, r8 are very similar.
+    returnVal[opcode_bank_default][0xEE].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_xor, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // LDH a, [imm8]
+    // TODO: There are a lot of LDH instructions with 8bit values, can I combine them?
+    returnVal[opcode_bank_default][0xF0].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.z, 0, true), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
+    }) catch unreachable;
 
     // TODO: We don't have SLA and SRA. So what is the difference, do we need a new uop for this?
     const bit_shift_uops = [_]MicroOp{ .alu_rlc, .alu_rrc, .alu_rl, .alu_rr, .alu_sl, .alu_sr, .alu_swap, .alu_srl }; 
