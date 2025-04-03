@@ -1,7 +1,6 @@
 # src3:
 ## CPU:
 - Add a way to address the AF register pair.
-- Implement CC Check.
 - Add the Adjust operation to the IDU to implement relative jumps.
 - Missing [HL] Variant for all of the instructions that use the r8_rfids.
 - In some cases we need to have a different register as the IDU output then the input:

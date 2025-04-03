@@ -153,13 +153,13 @@ fn MiscWB(rfid: RegisterFileID) MicroOpData {
     return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .write_back = rfid } } };
 }
 fn MiscCC(cc: ConditionCheck) MicroOpData {
-    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .cc = cc } } };
+    return .{ .operation = .conditional_check, .params = .{ .misc = MiscParams{ .cc = cc } } };
 }
 fn MiscRST(rst_offset: u3) MicroOpData {
     return .{ .operation = .set_pc, .params = .{ .misc = MiscParams{ .rst_offset = rst_offset } } };
 }
 fn MiscIME(ime: bool) MicroOpData {
-    return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .ime_value = ime } } };
+    return .{ .operation = .change_ime, .params = .{ .misc = MiscParams{ .ime_value = ime } } };
 }
 fn Nop() MicroOpData {
     return .{ .operation = .nop, .params = .none };
@@ -819,11 +819,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
             const params: AddrIduParms = uop.params.addr_idu;
-            const addr: u16 = if(params.low_offset) 0xFF00 + state.registers.getU8(params.addr).* else state.registers.getU16(params.addr).*;
-            state.address_bus = addr.*;
-
-            // +% -1 <=> +% 65535
-            addr.* +%= @bitCast(@as(i16, params.idu));
+            if(params.low_offset) {
+                const addr: u16 = 0xFF00 + @as(u16, state.registers.getU8(params.addr).*);
+                state.address_bus = addr;
+            } else {
+                const addr: *u16 = state.registers.getU16(params.addr);
+                state.address_bus = addr.*;
+                // +% -1 <=> +% 65535
+                addr.* +%= @bitCast(@as(i16, params.idu));
+            }
             applyPins(state, mmu);
         },
         // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
@@ -1178,10 +1182,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 .not_carry => !state.registers.r8.f.flags.carry,
                 .carry => state.registers.r8.f.flags.carry,
             };
-            if(flag) {}
-            // TODO: Need to think about how we need to implement the CC. 
-            // If true we keep the rest of the uops.
-            // If false we load the next instruction?
+
+            if(!flag) { // Load next instruction
+                assert((state.uop_fifo.length() % 4) == 1); // We assume that conditional_check uop is followed by another uop inside of this mcycle (Decode step).
+                state.uop_fifo.clear();
+                state.uop_fifo.write(&[_]MicroOpData{
+                    Nop(),
+                    AddrIdu(.pcl, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+                });
+            }
             applyPins(state, mmu);
         },
         .dbus => {
