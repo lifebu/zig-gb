@@ -25,8 +25,7 @@ const RegisterFileID = enum(u4) {
     sph,
     ir,
     dbus,
-    // TODO: We need f! Because we can address AF for 16bit stack operation (push and pop). Maybe I can remove alu_input_1, is this actually needed?
-    alu_input_1,
+    f,
     a,
 };
 
@@ -187,8 +186,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: Missing the [HL] RFID. Which for some instructions might mean a different implementation?
     const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .l, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
-    // TODO: We are missing a way to address the AF register pair.
-    const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .a };
+    const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .f };
     const r16_mem_rfids = [_]RegisterFileID{ .c, .e, .l, .l };  
     const cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
     
@@ -325,7 +323,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // JR r8 
     returnVal[opcode_bank_default][0x18].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch) , Nop(),
+        Nop(), Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch),
         AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -340,7 +338,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), MiscCC(cc), Nop(),
-            Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch) , Nop(),
+            Nop(), Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch),
             AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -482,10 +480,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // PUSH r16stk
     const push_rr_opcodes = [_]u8{ 0xC5, 0xD5, 0xE5, 0xF5 };
-    // TODO: We are missing a way to address the AF register pair.
     for(push_rr_opcodes, r16_stack_rfids) |opcode, rfid| {
-        // TODO: Remove this overflow operator once we can address the AF register.
-        const msb_rfid: RegisterFileID = @enumFromInt(@intFromEnum(rfid) +% 1);
+        const msb_rfid: RegisterFileID = @enumFromInt(@intFromEnum(rfid) + 1);
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.spl, -1, .spl, false), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl, false), Dbus(.dbus, msb_rfid), ApplyPins(), Nop(),
