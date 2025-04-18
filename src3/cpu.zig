@@ -178,13 +178,10 @@ pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
 // TODO: Would be nicer to create this immediately instead of creating a function, but like this it is easier to implement the instructions in any order.
 fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
-    // TODO: Consider doing this on inizialization and not during compile time?
-    @setEvalBranchQuota(5000);
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
 
-    // TODO: Missing the [HL] RFID. Which for some instructions might mean a different implementation?
-    const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .l, .a };
+    const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .dbus, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
     const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .f };
     const r16_mem_rfids = [_]RegisterFileID{ .c, .e, .l, .l };  
@@ -240,26 +237,52 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // INC r8
     const inc_r8_opcodes = [_]u8{ 0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C };
     for(inc_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_inc, rfid, rfid, rfid), Decode(opcode_bank_default),
-        }) catch unreachable;
+        // TODO: This edge case creates a lot of copied code between all the simple alu op variants.
+        // Plus this condition is generally not a good way to solve this.
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.l, 0, .l, false), Alu(.alu_inc, .z, .z, .z), Dbus(.dbus, .ir), ApplyPins(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_inc, rfid, rfid, rfid), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // DEC r8
     const dec_r8_opcodes = [_]u8{ 0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D };
     for(dec_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_dec, rfid, rfid, rfid), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.l, 0, .l, false), Alu(.alu_dec, .z, .z, .z), Dbus(.dbus, .ir), ApplyPins(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_dec, rfid, rfid, rfid), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // LD r8, imm8
     const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E };
     for(ld_r8_imm8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z),  ApplyPins(), Nop(),
+                AddrIdu(.l, 0, .l, false), Dbus(.z, .dbus), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_prefix),
-        }) catch unreachable;
+            }) catch unreachable;
+        }
     }
 
     // RLCA
@@ -366,12 +389,29 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // LD r8, r8
     // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
     var ld_r8_r8_opcode: u8 = 0x40;
-    // TODO: Missing HALT!
     for(r8_rfids) |target_rfid| {
         for (r8_rfids) |source_rfid| {
-            returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_set, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
-            }) catch unreachable;
+            // TODO: This branch is even worse! The cases are rarely hit, especially HALT!
+            if(source_rfid == .dbus and target_rfid == .dbus) { // HALT
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                    Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
+                }) catch unreachable;
+            } else if (source_rfid == .dbus) {
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_set, .z, .z, target_rfid), Decode(opcode_bank_default),
+                }) catch unreachable;
+            } else if (target_rfid == .dbus) {
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.l, 0, .l, false), Dbus(source_rfid, .dbus), ApplyPins(), Nop(),
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+                }) catch unreachable;
+            }
+            else {
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_set, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
+                }) catch unreachable;
+            }
             ld_r8_r8_opcode += 1;
         }
     }
@@ -381,59 +421,108 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADD a, r8
     const add_a_r8_opcodes = [_]u8{ 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87 };
     for(add_a_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // ADC a, r8
     const adc_a_r8_opcodes = [_]u8{ 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F };
     for(adc_a_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // SUB a, r8
     const sub_a_r8_opcodes = [_]u8{ 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97 };
     for(sub_a_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_sub, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_sub, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_sub, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // SBC a, r8
     const sbc_a_r8_opcodes = [_]u8{ 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F };
     const sbc_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
     for(sbc_a_r8_opcodes, sbc_a_r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_sbc, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_sbc, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_sbc, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // AND a, r8
     const and_a_r8_opcodes = [_]u8{ 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7 };
     for(and_a_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // XOR a, r8
     const xor_a_r8_opcodes = [_]u8{ 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF };
     const xor_a_r8_rfids = [_]RegisterFileID{ .b, .d, .h, .l, .c, .e, .l, .a  }; 
     for(xor_a_r8_opcodes, xor_a_r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // OR a, r8
     const or_a_r8_opcodes = [_]u8{ 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7 };
     for(or_a_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // CP a, r8
@@ -700,9 +789,17 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     var bit_shift_opcode: u8 = 0x00;
     for(bit_shift_uops) |bit_shift_uop| {
         for(r8_rfids) |rfid| {
-            returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(bit_shift_uop, rfid, rfid, rfid), Decode(opcode_bank_default),
-            }) catch unreachable;
+            if(rfid == .dbus) {
+                returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                    AddrIdu(.l, 0, .l, false), Alu(bit_shift_uop, .z, .z, .z), Dbus(.z, .dbus), ApplyPins(),
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+                }) catch unreachable;
+            } else {
+                returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(bit_shift_uop, rfid, rfid, rfid), Decode(opcode_bank_default),
+                }) catch unreachable;
+            }
             bit_shift_opcode += 1;
         }
     }
@@ -713,16 +810,24 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         var bit_opcode: u8 = bit_opcodes[i];
         for(0..7) |bit_index| {
             for(r8_rfids) |rfid| {
-                returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
-                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, bit_index, rfid), Decode(opcode_bank_default),
-                }) catch unreachable;
+                if(rfid == .dbus) {
+                    returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                        AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                        AddrIdu(.l, 0, .l, false), AluValue(bit_uop, .z, @intCast(bit_index), .z), Dbus(.z, .dbus), ApplyPins(),
+                        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+                    }) catch unreachable;
+                } else {
+                    returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, @intCast(bit_index), rfid), Decode(opcode_bank_default),
+                    }) catch unreachable;
+                }
                 bit_opcode += 1;
             }
         }
     }
     return returnVal;
 }
-pub const opcode_banks = genOpcodeBanks();
+pub var opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
 
 // IF and IE flags.
 const InterruptFlags = packed struct(u8) {
@@ -821,6 +926,8 @@ pub const State = struct {
 };
 
 pub fn init(state: *State) void {
+    opcode_banks = genOpcodeBanks();
+
     const opcode_bank = opcode_banks[opcode_bank_default];
     const uops: MicroOpArray = opcode_bank[state.registers.r8.ir];
     state.uop_fifo.write(uops.slice());

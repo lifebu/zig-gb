@@ -128,10 +128,16 @@ pub fn runSingleStepTests() !void {
         defer json.deinit();
 
         var cpu: CPU.State = .{};
+        CPU.init(&cpu);
         var mmu: MMU.State = .{}; 
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
+            if(std.mem.eql(u8, test_case.name, "C7 0000")) {
+                const a: u32 = 10;
+                if(a == 10) {}
+            }
+
             try initializeCpu(&cpu, &mmu.memory, &test_case);
 
             const num_m_cycles = 1 + test_case.cycles.len;

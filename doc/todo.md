@@ -1,22 +1,5 @@
 # src3:
 ## CPU:
-- Missing [HL] Variant for all of the instructions that use the r8_rfids.
-    - currently requires a way to do: mem <- ALU
-    => This means we cannot implement addressing of AF register pair.
-    - INC (HL): Alu(.alu_inc, .z, .z, .z) => Dbus(.z, .mem) => ApplyPins() 
-    - DEC (HL): Alu(.alu_dec, .z, .z, .z) => Dbus(.z, .mem) => ApplyPins()
-    - RLC (HL): AL(.alu_rlc, .z, .z, .z) 
-    - RRC (HL): 
-    - RL (HL): 
-    - RR (HL): 
-    - SLA (HL): 
-    - SRA (HL): 
-    - SWAP (HL): 
-    - SRL (HL): 
-    - RES b (HL): 
-    - Set b (HL):  
-    => Need to run ALU first then dbus then apply pins afterwards.
-    => ALU can also directly set the dbus register (But if it does so it needs to also push the pins).
 - Try to unify the Uop Order:
     - Currently one default case and two exceptions exist:
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 
