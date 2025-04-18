@@ -25,9 +25,9 @@ const RegisterFileID = enum(u4) {
     sph,
     ir,
     dbus,
+    // TODO: We need f! Because we can address AF for 16bit stack operation (push and pop). Maybe I can remove alu_input_1, is this actually needed?
     alu_input_1,
     a,
-    // TODO: We need f! Because we can address AF for 16bit stack operation (push and pop).
 };
 
 const longest_instruction_cycles = 24;
@@ -46,6 +46,7 @@ const MicroOp = enum(u6) {
     // ALU
     alu_set_inputs,
     alu_adc, 
+    alu_adc_adjust,
     alu_add, 
     alu_and, 
     alu_assign, 
@@ -615,11 +616,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // ADD SP, imm8 (signed)
-    // 0xE8
-    // TODO: Missing ADD SP, imm8 (signed), because I need to implement an adjust function for the IDU.
-    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
-    // TODO: Do we actually use an IDU function? It looks like adc with the "adjust" value as input (peudo register/flag?)
-    // Is this the same as the decimal adjust? (that's what gekkio suggests).
+    returnVal[opcode_bank_default][0xE8].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        Nop(), Nop(), Alu(.alu_add, .spl, .z, .z), Nop(),
+        Nop(), Nop(), Alu(.alu_adc_adjust, .sph, .sph, .w), Nop(),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), MiscWB(.spl), Decode(opcode_bank_default),
+    }) catch unreachable;
 
     // JP HL
     returnVal[opcode_bank_default][0xE9].appendSlice(&[_]MicroOpData{
@@ -668,11 +670,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LD HL, SP+imm8(signed)
-    // 0xF8
-    // TODO: Missing LD SP, SP+imm8 (signed), because I need to implement an adjust function for the IDU.
-    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
-    // TODO: Do we actually use an IDU function? It looks like adc with the "adjust" value as input (peudo register/flag?)
-    // Is this the same as the decimal adjust? (that's what gekkio suggests).
+    returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        Nop(), Nop(), Alu(.alu_add, .spl, .z, .l), Nop(),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc_adjust, .sph, .sph, .h), Decode(opcode_bank_default),
+    }) catch unreachable;
 
     // LD SP, HL
     returnVal[opcode_bank_default][0xF9].appendSlice(&[_]MicroOpData{
@@ -867,6 +869,32 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
 
             state.registers.r8.a = result;
+            applyPins(state, mmu);
+        },
+        // TODO: think about a way to simplify adc_adjust, daa_adjust, idu_adjust and adc.
+        // - Gekkio seems to suggest that this underlying operation is the same as DAA.
+        // - DAA does A <- A + adj, signed operation does A <- A +c adj 
+        // - Can we implement this by adding an "adjust" flag? (pseudo-flag). 
+        // - I also need to add this to the possible ALU inputs 
+        // - maybe add new add/addc variants (add_adj and adc_adj) ?
+        .alu_adc_adjust => {
+            const params: AluParams = uop.params.alu;
+            const input: u8 = state.registers.getU8(params.input_1).*;
+            const z_sign: u1 = @intCast(state.registers.r8.z >> 7);
+            const adj: u8 = if(z_sign == 1) 0xFF else 0x00;
+            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
+            const input_carry, const carry_overflow = @addWithOverflow(input, carry);
+            const result, const overflow = @addWithOverflow(adj, input_carry);
+            
+            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.n_bcd = false;
+            const input_hbcd: bool = (((input & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const input_carry_hbcd: bool = (((adj & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
+            state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
+            state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
+
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
             applyPins(state, mmu);
         },
         .alu_add => {

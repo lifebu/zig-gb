@@ -1,13 +1,6 @@
 # src3:
 ## CPU:
 - Add a way to address the AF register pair.
-- Add the Adjust operation to ALU as well.
-    - Used for signed operations.
-    - Gekkio seems to suggest that this underlying operation is the same as DAA.
-    - DAA does A <- A + adj, signed operation does A <- A +c adj 
-    - Can we implement this by adding an "adjust" flag? (pseudo-flag). 
-    - I also need to add this to the possible ALU inputs 
-    - maybe add new add/addc variants (add_adj and adc_adj) ?
 - Missing [HL] Variant for all of the instructions that use the r8_rfids.
 
 ## Other:
