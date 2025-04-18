@@ -40,6 +40,7 @@ const MicroOp = enum(u6) {
     halt,
     nop,
     addr_idu, 
+    idu_adjust,
     dbus,
     stop,
     // ALU
@@ -133,6 +134,9 @@ const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
 fn AddrIdu(addr: RegisterFileID, idu: i2, low_offset: bool) MicroOpData {
     // TODO: Maybe add a sanity check here to see if the addr rfid is a valid 16-bit register? Because you could read 16bit between two 16bit registers.
     return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = idu, .low_offset = low_offset } } };
+}
+fn IduAdjust(addr: RegisterFileID) MicroOpData {
+    return .{ .operation = .idu_adjust, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = 0, .low_offset = false } } };
 }
 fn Alu(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, output: RegisterFileID) MicroOpData {
     return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .rfid = input_2 }, .output = output } } };
@@ -317,8 +321,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // JR r8: 0x18 
-    // TODO: Missing JR r8, because I need to implement an adjust function for the IDU.
-    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+    returnVal[opcode_bank_default][0x18].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+        Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch) , Nop(),
+        // TODO: We need to set a different Ouput for the Addr here (PC <- WZ + 1) (Maybe we can use WZ Writeback for the ALU slot?)
+        AddrIdu(.z, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+    }) catch unreachable;
 
     // TODO: RRA, RLA, RRCA and so on are all extremly similar, combine their uops?
     // RRA
@@ -327,9 +335,15 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // JR cond imm8
-    // 0x20, 0x30, 0x28, 0x38
-    // TODO: Missing JR cond imm8, because I need to implement an adjust function for the IDU.
-    // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+    const jr_cond_imm8_opcodes = [_]u8{ 0x20, 0x30, 0x28, 0x38 };
+    for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, false), Dbus(.dbus, .z), MiscCC(cc), Nop(),
+            Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch) , Nop(),
+            // TODO: We need to set a different Ouput for the Addr here (PC <- WZ + 1) (Maybe we can use WZ Writeback for the ALU slot?)
+            AddrIdu(.z, 1, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // DAA
     returnVal[opcode_bank_default][0x27].appendSlice(&[_]MicroOpData{
@@ -605,6 +619,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 0xE8
     // TODO: Missing ADD SP, imm8 (signed), because I need to implement an adjust function for the IDU.
     // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+    // TODO: Do we actually use an IDU function? It looks like adc with the "adjust" value as input (peudo register/flag?)
+    // Is this the same as the decimal adjust? (that's what gekkio suggests).
 
     // JP (HL)
     returnVal[opcode_bank_default][0xE9].appendSlice(&[_]MicroOpData{
@@ -657,6 +673,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 0xF8
     // TODO: Missing LD SP, SP+imm8 (signed), because I need to implement an adjust function for the IDU.
     // It increments or decrements the based on the 7th carry bit and the sign of the r8 (SIGNED!) value.
+    // TODO: Do we actually use an IDU function? It looks like adc with the "adjust" value as input (peudo register/flag?)
+    // Is this the same as the decimal adjust? (that's what gekkio suggests).
 
     // LD SP, HL
     returnVal[opcode_bank_default][0xF9].appendSlice(&[_]MicroOpData{
@@ -818,6 +836,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     switch(uop.operation) {
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
+            // TODO: Can we implement low_offset mode branchless?
             const params: AddrIduParms = uop.params.addr_idu;
             if(params.low_offset) {
                 const addr: u16 = 0xFF00 + @as(u16, state.registers.getU8(params.addr).*);
@@ -1209,6 +1228,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 std.log.err("Empty instruction decoded: {X:0>2}\n", .{ opcode });
             }
             state.uop_fifo.write(uops.slice());
+        },
+        .idu_adjust => {
+            const params: AddrIduParms = uop.params.addr_idu;
+            const z_sign: u1 = @intCast(state.registers.r8.z >> 7);
+            const amplitude: i2 = @intFromBool(state.registers.r8.f.flags.carry) ^ z_sign;
+            const adjust: i2 = if(z_sign == 1) -amplitude else amplitude;
+            const input: u8 = state.registers.getU8(params.addr).*;
+            // +% -1 <=> +% 255
+            state.registers.r8.w = input +% @as(u8, @bitCast(@as(i8, adjust)));
         },
         .nop => {
         },
