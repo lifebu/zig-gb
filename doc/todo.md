@@ -9,8 +9,6 @@
     - I also need to add this to the possible ALU inputs 
     - maybe add new add/addc variants (add_adj and adc_adj) ?
 - Missing [HL] Variant for all of the instructions that use the r8_rfids.
-- In some cases we need to have a different register as the IDU output then the input:
-    - LD SP HL, JP (HL) 
 
 ## Other:
 - Run emulator itself in thread. Use double-buffer to communicate audio and video data to platform.
