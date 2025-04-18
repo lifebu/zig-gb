@@ -833,18 +833,14 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     switch(uop.operation) {
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
-            // TODO: Can we implement low_offset mode branchless?
             const params: AddrIduParms = uop.params.addr_idu;
-            if(params.low_offset) {
-                const addr: u16 = 0xFF00 + @as(u16, state.registers.getU8(params.addr).*);
-                state.address_bus = addr;
-            } else {
-                const addr: u16 = state.registers.getU16(params.addr).*;
-                state.address_bus = addr;
-                const output: *u16 = state.registers.getU16(params.idu_out);
-                // +% -1 <=> +% 65535
-                output.* +%= @bitCast(@as(i16, params.idu));
-            }
+            const addr: u16 = if(params.low_offset) 0xFF00 + @as(u16, state.registers.getU8(params.addr).*) 
+                else state.registers.getU16(params.addr).*;
+            state.address_bus = addr;
+            const output: *u16 = state.registers.getU16(params.idu_out);
+            // +% -1 <=> +% 65535
+            output.* +%= @bitCast(@as(i16, params.idu));
+
             applyPins(state, mmu);
         },
         // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
