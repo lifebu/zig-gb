@@ -1417,7 +1417,7 @@ fn pushPins(state: *State, mmu: *MMU.State, request: MemoryRequest) void {
         .write => {
             mmu.request.read = null;
             mmu.request.write = state.address_bus;
-            mmu.request.data = state.registers.r8.dbus;
+            mmu.request.data = state.dbus_source.*;
         },
         .none => {
             mmu.request.read = null;
