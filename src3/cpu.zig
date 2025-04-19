@@ -300,12 +300,15 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LD a, r16mem
-    returnVal[opcode_bank_default][0x09].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w),   ApplyPins(),               Nop(),
-        AddrIdu(.z, 0, .z, false),   Dbus(.dbus, .z),   ApplyPins(),               Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir),  Alu(.alu_set, .z, .z, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
+    const ld_a_r16mem_opcodes = [_]u8{ 0x0A, 0x1A, 0x2A, 0x3A };
+    for(ld_a_r16mem_opcodes, r16_mem_rfids) |opcode, rfid| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(rfid, 0, rfid, false), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
+            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w),   ApplyPins(),               Nop(),
+            AddrIdu(.z, 0, .z, false),   Dbus(.dbus, .z),   ApplyPins(),               Nop(),
+            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // DEC r16
     const dec_r16_opcodes = [_]u8{ 0x0B, 0x1B, 0x2B, 0x3B };
@@ -399,7 +402,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             } else if (source_rfid == .dbus) {
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
                     AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_set, .z, .z, target_rfid), Decode(opcode_bank_default),
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, target_rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else if (target_rfid == .dbus) {
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
@@ -409,7 +412,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             }
             else {
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
-                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_set, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
+                    AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_assign, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
             ld_r8_r8_opcode += 1;
@@ -825,7 +828,18 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             }
         }
     }
+
+    //
+    // PSEUDO BANK:
+    //
+
+    // STOP
+    returnVal[opcode_bank_pseudo][0x10].appendSlice(&[_]MicroOpData{
+        Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
+    }) catch unreachable;
+
     return returnVal;
+
 }
 pub var opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
 
