@@ -1388,8 +1388,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // TODO: The IDU now can have different inputs and outputs, so we can also implement this function with the IDU?
         .wz_writeback => {
             const params: MiscParams = uop.params.misc;
-            const input: u16 = state.registers.getU16(params.write_back).*;
-            state.registers.r16.wz = input; 
+            const target: *u16 = state.registers.getU16(params.write_back);
+            target.* = state.registers.r16.wz; 
             applyPins(state, mmu);
         },
         else => { 
