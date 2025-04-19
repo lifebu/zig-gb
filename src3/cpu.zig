@@ -220,8 +220,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
     for(ld_r16mem_a_opcodes, r16_mem_rfids, ld_r16mem_a_idu) |opcode, rfid, idu| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(rfid, idu, rfid, false), Dbus(.dbus, .z),  ApplyPins(),                  Nop(),
-            AddrIdu(.pcl, 1, .pcl, false),   Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
+            AddrIdu(rfid, idu, rfid, false), Dbus(.a, .dbus),  ApplyPins(),                  Nop(),
+            AddrIdu(.pcl, 1, .pcl, false),   Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
 
@@ -235,7 +235,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // INC r8
-    const inc_r8_opcodes = [_]u8{ 0x04, 0x14, 0x24, 0x34, 0x0C, 0x1C, 0x2C, 0x3C };
+    const inc_r8_opcodes = [_]u8{ 0x04, 0x0C, 0x14, 0x1C, 0x24, 0x2C, 0x34, 0x3C };
     for(inc_r8_opcodes, r8_rfids) |opcode, rfid| {
         // TODO: This edge case creates a lot of copied code between all the simple alu op variants.
         // Plus this condition is generally not a good way to solve this.
@@ -253,7 +253,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // DEC r8
-    const dec_r8_opcodes = [_]u8{ 0x05, 0x15, 0x25, 0x35, 0x0D, 0x1D, 0x2D, 0x3D };
+    const dec_r8_opcodes = [_]u8{ 0x05, 0x0D, 0x15, 0x1D, 0x25, 0x2D, 0x35, 0x3D };
     for(dec_r8_opcodes, r8_rfids) |opcode, rfid| {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -269,7 +269,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // LD r8, imm8
-    const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E };
+    const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x0E, 0x16, 0x1E, 0x26, 0x2E, 0x36, 0x3E };
     for(ld_r8_imm8_opcodes, r8_rfids) |opcode, rfid| {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -385,7 +385,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // CCF
-    returnVal[opcode_bank_default][0x37].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0x3F].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_ccf, .a, .a, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -1066,9 +1066,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
             const a: u8 = state.registers.r8.a;
-            _, const overflow = @subWithOverflow(a, input);
+            const result, const overflow = @subWithOverflow(a, input);
 
-            state.registers.r8.f.flags.zero = a == 0;
+            state.registers.r8.f.flags.zero = result == 0;
             state.registers.r8.f.flags.n_bcd = true;
             state.registers.r8.f.flags.half_bcd = (((a & 0x0F) -% (input & 0x0F)) & 0x10) == 0x10;
             state.registers.r8.f.flags.carry = overflow == 1;
