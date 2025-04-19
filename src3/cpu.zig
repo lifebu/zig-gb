@@ -557,7 +557,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // JP cond imm16
-    const jp_cond_opcodes = [_]u8{ 0xC2, 0xD2, 0xCA, 0xDA };
+    const jp_cond_opcodes = [_]u8{ 0xC2, 0xCA, 0xD2, 0xDA };
     for(jp_cond_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
@@ -1331,7 +1331,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         .conditional_check => {
             const params: MiscParams = uop.params.misc;
-            const flag: bool = switch(params.cc) {
+            const cc = params.cc;
+            const flag: bool = switch(cc) {
                 .not_zero => !state.registers.r8.f.flags.zero,
                 .zero => state.registers.r8.f.flags.zero,
                 .not_carry => !state.registers.r8.f.flags.carry,
@@ -1361,7 +1362,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const opcode: u8 = state.registers.r8.ir;
             const uops: MicroOpArray = opcode_bank[opcode];
             if(uops.len == 0) {
-                std.log.err("Empty instruction decoded: {X:0>2}\n", .{ opcode });
+                std.log.err("Empty instruction decoded: {X:0>2} on bank: {d}\n", .{ opcode, params.bank_idx });
             }
             state.uop_fifo.write(uops.slice());
         },
