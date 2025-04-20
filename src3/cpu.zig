@@ -529,9 +529,16 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // CP a, r8
     const cp_a_r8_opcodes = [_]u8{ 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF };
     for(cp_a_r8_opcodes, r8_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, rfid, rfid, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
+        if(rfid == .dbus) {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, .z, .z, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        } else {
+            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, rfid, rfid, .a), Decode(opcode_bank_default),
+            }) catch unreachable;
+        }
     }
 
     // RET cond
@@ -1058,8 +1065,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input: u8 = state.registers.getU8(params.input_1).*;
             const bit_index: u3 = @intCast(params.input_2.value); 
             const result: u8 = input & (@as(u8, 1) << bit_index);
-            const output: *u8 = state.registers.getU8(params.output);
-            output.* = result;
 
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = true;
@@ -1275,7 +1280,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = input == 0;
+            state.registers.r8.f.flags.zero = result == 0;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
