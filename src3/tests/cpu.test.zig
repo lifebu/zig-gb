@@ -133,7 +133,7 @@ pub fn runSingleStepTests() !void {
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
-            if(std.mem.eql(u8, test_case.name, "C7 0000")) {
+            if(std.mem.eql(u8, test_case.name, "38 0001")) {
                 const a: u32 = 10;
                 if(a == 10) {}
             }
@@ -200,6 +200,7 @@ pub fn runSingleStepTests() !void {
                 std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpu.registers.r8.h, cpu.registers.r8.l });
                 // Note: pc - 1, because we prefetch, the SingleStepTests don't implement that.
                 std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpu.registers.r16.sp, cpu.registers.r16.pc - 1 });
+                std.debug.print("WZ: {X:0>4}\n", .{ cpu.registers.r16.wz });
                 for (test_case.final.ram) |ramPair| {
                     std.debug.assert(ramPair.len == 2);
                     const address: u16 = ramPair[0];

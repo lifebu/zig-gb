@@ -962,7 +962,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.address_bus = addr;
             const output: *u16 = state.registers.getU16(params.idu_out);
             // +% -1 <=> +% 65535
-            output.* +%= @bitCast(@as(i16, params.idu));
+            const idu_factor: u16 = @bitCast(@as(i16, params.idu));
+            output.* = addr +% idu_factor;
 
             applyPins(state, mmu);
         },

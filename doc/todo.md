@@ -1,5 +1,13 @@
 # src3:
 ## CPU:
+- When flags are updated is confusing:
+    - ADD r: Changes all flags.
+    - ADD HL, r16: Changes all but the zero flag.
+    - JR e: Changes none of the flags.
+    - But all of them use alu_add
+    - Can we define some rule for this?
+        => Does not look like it.
+    - This seems to be different for each instruction.
 - Try to unify the Uop Order:
     - Currently one default case and two exceptions exist:
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 
