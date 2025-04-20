@@ -427,11 +427,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .z, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .a, .z, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, rfid, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .a, rfid, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -442,11 +442,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .z, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .a, .z, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, rfid, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .a, rfid, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -604,7 +604,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADD a, imm8
     returnVal[opcode_bank_default][0xC6].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .z, .a, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // RST target
@@ -647,7 +647,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: ADC a, imm8 and ADC a, r8 are very similar.
     returnVal[opcode_bank_default][0xCE].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .z, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // SUB a, imm8
@@ -969,20 +969,25 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // - Can we combine sr and srl?
         .alu_adc => {
             const params: AluParams = uop.params.alu;
-            const input: u8 = state.registers.getU8(params.input_1).*;
-            const a: u8 = state.registers.r8.a;
+            const input_1: u8 = state.registers.getU8(params.input_1).*;
+            const input_2: u8 = state.registers.getU8(params.input_2.rfid).*;
             const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
-            const input_carry, const carry_overflow = @addWithOverflow(input, carry);
-            const result, const overflow = @addWithOverflow(a, input_carry);
-            
-            state.registers.r8.f.flags.zero = result == 0;
+            const input_carry, const carry_overflow = @addWithOverflow(input_1, carry);
+            const result, const overflow = @addWithOverflow(input_2, input_carry);
+
+            // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
+            // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
+            if(params.output == .a) {
+                state.registers.r8.f.flags.zero = result == 0;
+            }
             state.registers.r8.f.flags.n_bcd = false;
-            const input_hbcd: bool = (((input & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const input_carry_hbcd: bool = (((a & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
+            const input_hbcd: bool = (((input_1 & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
+            const input_carry_hbcd: bool = (((input_2 & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
             state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
             state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
 
-            state.registers.r8.a = result;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
             applyPins(state, mmu);
         },
         // TODO: think about a way to simplify adc_adjust, daa_adjust, idu_adjust and adc.
@@ -1013,16 +1018,21 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         .alu_add => {
             const params: AluParams = uop.params.alu;
-            const input: u8 = state.registers.getU8(params.input_1).*;
-            const a: u8 = state.registers.r8.a;
-            const result, const overflow = @addWithOverflow(a, input);
+            const input_1: u8 = state.registers.getU8(params.input_1).*;
+            const input_2: u8 = state.registers.getU8(params.input_2.rfid).*;
+            const result, const overflow = @addWithOverflow(input_2, input_1);
 
-            state.registers.r8.f.flags.zero = result == 0;
+            // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
+            // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
+            if(params.output == .a) {
+                state.registers.r8.f.flags.zero = result == 0;
+            }
             state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = ((a & 0x0F) +% (input & 0x0F)) > 0x0F;
+            state.registers.r8.f.flags.half_bcd = ((input_2 & 0x0F) +% (input_1 & 0x0F)) > 0x0F;
             state.registers.r8.f.flags.carry = overflow == 1;
 
-            state.registers.r8.a = result;
+            const output: *u8 = state.registers.getU8(params.output);
+            output.* = result;
             applyPins(state, mmu);
         },
         .alu_and => {
