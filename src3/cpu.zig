@@ -360,6 +360,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // JR cond imm8
+    // TODO: The IduAdjust as described in the gekkio and the result from the single step test do not match.
+    // for 38 0002 the test wants the the adjust is 0, but gekkio is defining it a -1 
+    // The reasons seems to be that the ALU right before the IduAdjust changes the carry flag, in this case we don't want that!
     const jr_cond_imm8_opcodes = [_]u8{ 0x20, 0x30, 0x28, 0x38 };
     for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -815,7 +818,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const bit_opcodes = [_]u8{ 0x40, 0x80, 0xC0 };
     for(bit_uops, 0..) |bit_uop, i| {
         var bit_opcode: u8 = bit_opcodes[i];
-        for(0..7) |bit_index| {
+        for(0..8) |bit_index| {
             for(r8_rfids) |rfid| {
                 if(rfid == .dbus) {
                     returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
@@ -828,7 +831,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
                         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, @intCast(bit_index), rfid), Decode(opcode_bank_default),
                     }) catch unreachable;
                 }
-                bit_opcode += 1;
+                bit_opcode +%= 1;
             }
         }
     }
@@ -1385,7 +1388,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .idu_adjust => {
             const params: AddrIduParms = uop.params.addr_idu;
             const z_sign: u1 = @intCast(state.registers.r8.z >> 7);
-            const amplitude: i2 = @intFromBool(state.registers.r8.f.flags.carry) ^ z_sign;
+            const carry = state.registers.r8.f.flags.carry;
+            const amplitude: i2 = @intFromBool(carry) ^ z_sign;
             const adjust: i2 = if(z_sign == 1) -amplitude else amplitude;
             const input: u8 = state.registers.getU8(params.addr).*;
             // +% -1 <=> +% 255
