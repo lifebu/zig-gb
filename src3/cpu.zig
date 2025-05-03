@@ -583,8 +583,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         const msb_rfid: RegisterFileID = @enumFromInt(@intFromEnum(rfid) + 1);
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.spl, -1, .spl, false), Nop(), Nop(), Nop(),
-            AddrIdu(.spl, -1, .spl, false), Dbus(.dbus, msb_rfid), ApplyPins(), Nop(),
-            AddrIdu(.spl, 0, .spl, false), Dbus(.dbus, rfid), ApplyPins(), Nop(),
+            AddrIdu(.spl, -1, .spl, false), Dbus(msb_rfid, .dbus), ApplyPins(), Nop(),
+            AddrIdu(.spl, 0, .spl, false), Dbus(rfid, .dbus), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -1010,6 +1010,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .alu_adc_adjust => {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
+            // TODO: This is wrong. If you look at LD HL, SP+e you can see that the z_sign is using the original z value that we got from memory.
+            // (Note: Incidentally this works because we don't overwrite it after reading it, lel).
+            // But in the case of ADD SP e, we have already overwritten Z (Z <- SPL + Z). When we use W <- SPH +_c adj next m-cycle, the z_sign value is wrong.
+            // This breaks test E8 0000, where we expect z_sign to be 0 (input is 50x), but it is 1 (after add it is 1F).
             const z_sign: u1 = @intCast(state.registers.r8.z >> 7);
             const adj: u8 = if(z_sign == 1) 0xFF else 0x00;
             const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
