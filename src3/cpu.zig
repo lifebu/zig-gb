@@ -184,7 +184,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .dbus, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
     const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .f };
-    const r16_mem_rfids = [_]RegisterFileID{ .c, .e, .l, .l };  
     const cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
     
     // TODO: I think I have to switch ALU/MISC with DBUS + Push Pins. Why? Set ,b [HL] requires that the output of the ALU can be used for this cycles memory request.
@@ -218,7 +217,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // LD r16mem, a
     const ld_r16mem_a_opcodes = [_]u8{ 0x02, 0x12, 0x22, 0x32 };
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
-    for(ld_r16mem_a_opcodes, r16_mem_rfids, ld_r16mem_a_idu) |opcode, rfid, idu| {
+    const ld_r16mem_a_rfids = [_]RegisterFileID{ .c, .e, .l, .l };
+    for(ld_r16mem_a_opcodes, ld_r16mem_a_rfids, ld_r16mem_a_idu) |opcode, rfid, idu| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, idu, rfid, false), Dbus(.a, .dbus),  ApplyPins(),                  Nop(),
             AddrIdu(.pcl, 1, .pcl, false),   Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
@@ -300,12 +300,21 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LD a, r16mem
-    const ld_a_r16mem_opcodes = [_]u8{ 0x0A, 0x1A, 0x2A, 0x3A };
-    for(ld_a_r16mem_opcodes, r16_mem_rfids) |opcode, rfid| {
+    const ld_a_r16mem_opcodes = [_]u8{ 0x0A, 0x1A };
+    const ld_a_r16mem_rfids = [_]RegisterFileID{ .c, .e };
+    for(ld_a_r16mem_opcodes, ld_a_r16mem_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, 0, rfid, false), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w),   ApplyPins(),               Nop(),
             AddrIdu(.z, 0, .z, false),   Dbus(.dbus, .z),   ApplyPins(),               Nop(),
+            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
+    const ld_a_r16mem_hl_opcodes = [_]u8{ 0x2A, 0x3A };
+    const ld_a_r16mem_hl_idu = [_]i2{ 1, -1 };
+    for(ld_a_r16mem_hl_opcodes, ld_a_r16mem_hl_idu) |opcode, idu| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.l, idu, .l, false), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
     }
