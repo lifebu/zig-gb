@@ -627,7 +627,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // RST target
-    const rst_opcodes = [_]u8{ 0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF };
+    const rst_opcodes = [_]u8{ 0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF };
     const rst_offsets = [_]u3{ 0, 1, 2, 3, 4, 5, 6, 7 };
     for(rst_opcodes, rst_offsets) |opcodes, offset| {
         returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
