@@ -132,13 +132,6 @@ pub fn runSingleStepTests() !void {
 
         // TODO: Some tests will be skipped because of issues where I need to rethink some systems.
         if(
-            // Flags are updated incorrectly (Flag Test is broken).
-            std.mem.eql(u8, dir_entry.name, "18.json") or
-            // Flags are updated incorrectly (Flag Test is broken).
-            std.mem.eql(u8, dir_entry.name, "20.json") or
-            std.mem.eql(u8, dir_entry.name, "28.json") or
-            std.mem.eql(u8, dir_entry.name, "30.json") or
-            std.mem.eql(u8, dir_entry.name, "38.json") or
             // alu_adc_adj is broken only in ADD SP,e case :/
             std.mem.eql(u8, dir_entry.name, "e8.json")) {
             continue;
@@ -154,7 +147,7 @@ pub fn runSingleStepTests() !void {
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
-            if(std.mem.eql(u8, test_case.name, "CB 5E 0000")) {
+            if(std.mem.eql(u8, test_case.name, "28 0003")) {
                 const a: u32 = 10;
                 if(a == 10) {}
             }

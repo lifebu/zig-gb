@@ -357,7 +357,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // JR r8 
     returnVal[opcode_bank_default][0x18].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        Nop(), Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch),
+        IduAdjust(.pcl), Nop(), Nop(), Nop(),
         AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -375,7 +375,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), MiscCC(cc), Nop(),
-            Nop(), Nop(), Alu(.alu_add, .pcl, .z, .z), IduAdjust(.pch),
+            IduAdjust(.pcl), Nop(), Nop(), Nop(),
             AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -1426,13 +1426,17 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         .idu_adjust => {
             const params: AddrIduParms = uop.params.addr_idu;
-            const z_sign: u1 = @intCast(state.registers.r8.z >> 7);
-            const carry = state.registers.r8.f.flags.carry;
+            const input_low: u8 = state.registers.getU8(params.addr).*;
+            const z: u8 = state.registers.r8.z;
+            const result, const overflow = @addWithOverflow(z, input_low);
+            state.registers.r8.z = result;
+
+            const z_sign: u1 = @intCast(z >> 7);
+            const carry: bool = overflow == 1;
             const amplitude: i2 = @intFromBool(carry) ^ z_sign;
             const adjust: i2 = if(z_sign == 1) -amplitude else amplitude;
-            const input: u8 = state.registers.getU8(params.addr).*;
-            // +% -1 <=> +% 255
-            state.registers.r8.w = input +% @as(u8, @bitCast(@as(i8, adjust)));
+            const input_high: u8 = state.registers.getU8(@enumFromInt(@intFromEnum(params.addr) + 1)).*;
+            state.registers.r8.w = input_high +% @as(u8, @bitCast(@as(i8, adjust)));
         },
         .nop => {
         },
