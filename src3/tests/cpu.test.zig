@@ -136,13 +136,6 @@ pub fn runSingleStepTests() !void {
         std.debug.assert(dir_entry.kind == .file);
         std.debug.print("{d}: Testing: {s}\n", .{idx + 1, dir_entry.name});
 
-        // TODO: Some tests will be skipped because of issues where I need to rethink some systems.
-        if(
-            // alu_adc_adj is broken only in ADD SP,e case :/
-            std.mem.eql(u8, dir_entry.name, "e8.json")) {
-            continue;
-        }
-
         const test_file: []u8 = try test_dir.readFileAlloc(alloc, dir_entry.name, 1 * 1024 * 1024);
         defer alloc.free(test_file);
 

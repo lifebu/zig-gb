@@ -45,7 +45,6 @@ const MicroOp = enum(u6) {
     // ALU
     alu_set_inputs,
     alu_adc, 
-    alu_adc_adjust,
     alu_add, 
     alu_and, 
     alu_assign, 
@@ -710,8 +709,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADD SP, imm8 (signed)
     returnVal[opcode_bank_default][0xE8].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        Nop(), Nop(), Alu(.alu_add, .spl, .z, .z), Nop(),
-        Nop(), Nop(), Alu(.alu_adc_adjust, .sph, .sph, .w), Nop(),
+        // Note: Using IduAdjust + WZ-Writebak differs from the definition from gekkio. They use a special adjust add.
+        IduAdjust(.spl), Nop(), Nop(), Nop(),
+        Nop(), Nop(), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), MiscWB(.spl), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -772,8 +772,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // LD HL, SP+imm8(signed)
     returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        Nop(), Nop(), Alu(.alu_add, .spl, .z, .l), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc_adjust, .sph, .sph, .h), Decode(opcode_bank_default),
+        // Note: Using IduAdjust + WZ-Writebak differs from the definition from gekkio. They use a special adjust add.
+        IduAdjust(.spl), Nop(), MiscWB(.l), Nop(),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD SP, HL
@@ -1026,36 +1027,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.n_bcd = false;
             const input_hbcd: bool = (((input_1 & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
             const input_carry_hbcd: bool = (((input_2 & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
-            state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
-            state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
-
-            const output: *u8 = state.registers.getU8(params.output);
-            output.* = result;
-            applyPins(state, mmu);
-        },
-        // TODO: think about a way to simplify adc_adjust, daa_adjust, idu_adjust and adc.
-        // - Gekkio seems to suggest that this underlying operation is the same as DAA.
-        // - DAA does A <- A + adj, signed operation does A <- A +c adj 
-        // - Can we implement this by adding an "adjust" flag? (pseudo-flag). 
-        // - I also need to add this to the possible ALU inputs 
-        // - maybe add new add/addc variants (add_adj and adc_adj) ?
-        .alu_adc_adjust => {
-            const params: AluParams = uop.params.alu;
-            const input: u8 = state.registers.getU8(params.input_1).*;
-            // TODO: This is wrong. If you look at LD HL, SP+e you can see that the z_sign is using the original z value that we got from memory.
-            // (Note: Incidentally this works because we don't overwrite it after reading it, lel).
-            // But in the case of ADD SP e, we have already overwritten Z (Z <- SPL + Z). When we use W <- SPH +_c adj next m-cycle, the z_sign value is wrong.
-            // This breaks test E8 0000, where we expect z_sign to be 0 (input is 50x), but it is 1 (after add it is 1F).
-            const z_sign: u1 = @intCast(state.registers.r8.z >> 7);
-            const adj: u8 = if(z_sign == 1) 0xFF else 0x00;
-            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
-            const input_carry, const carry_overflow = @addWithOverflow(input, carry);
-            const result, const overflow = @addWithOverflow(adj, input_carry);
-            
-            state.registers.r8.f.flags.zero = result == 0;
-            state.registers.r8.f.flags.n_bcd = false;
-            const input_hbcd: bool = (((input & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const input_carry_hbcd: bool = (((adj & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
             state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
             state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
 
@@ -1422,6 +1393,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.uop_fifo.write(uops.slice());
         },
         .idu_adjust => {
+            // TODO: Maybe idu adjust has it's own parameters, because we might need to use a parameter to say if we change the flags or not
             const params: AddrIduParms = uop.params.addr_idu;
             const input_low: u8 = state.registers.getU8(params.addr).*;
             const z: u8 = state.registers.r8.z;
