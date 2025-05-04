@@ -242,7 +242,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.l, 0, .l, false), Alu(.alu_inc, .z, .z, .z), Dbus(.dbus, .ir), ApplyPins(),
+                AddrIdu(.l, 0, .l, false), Alu(.alu_inc, .z, .z, .z), Dbus(.z, .dbus), ApplyPins(),
                 AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
@@ -346,7 +346,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // STOP
     returnVal[opcode_bank_default][0x10].appendSlice(&[_]MicroOpData{
-        Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
+        AddrIdu(.pcl, 1, .pcl, false), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
     // RLA
@@ -408,7 +408,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             // TODO: This branch is even worse! The cases are rarely hit, especially HALT!
             if(source_rfid == .dbus and target_rfid == .dbus) { // HALT
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
-                    Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
+                    AddrIdu(.pcl, 1, .pcl, false), Nop(), Nop(), Decode(opcode_bank_pseudo),
                 }) catch unreachable;
             } else if (source_rfid == .dbus) {
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
@@ -693,7 +693,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // LDH [imm8], a
     returnVal[opcode_bank_default][0xE0].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.z, 0, .z, true), Dbus(.dbus, .a), ApplyPins(), Nop(),
+        AddrIdu(.z, 0, .z, true), Dbus(.a, .dbus), ApplyPins(), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -858,8 +858,15 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // PSEUDO BANK:
     //
 
+    // TODO: Placeholder: Need an actual implementation for STOP.
     // STOP
     returnVal[opcode_bank_pseudo][0x10].appendSlice(&[_]MicroOpData{
+        Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
+    }) catch unreachable;
+
+    // TODO: Placeholder: Need an actual implementation for HALT.
+    // HALT
+    returnVal[opcode_bank_pseudo][0x76].appendSlice(&[_]MicroOpData{
         Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
@@ -978,13 +985,23 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
             const params: AddrIduParms = uop.params.addr_idu;
-            const addr: u16 = if(params.low_offset) 0xFF00 + @as(u16, state.registers.getU8(params.addr).*) 
-                else state.registers.getU16(params.addr).*;
-            state.address_bus = addr;
-            const output: *u16 = state.registers.getU16(params.idu_out);
-            // +% -1 <=> +% 65535
-            const idu_factor: u16 = @bitCast(@as(i16, params.idu));
-            output.* = addr +% idu_factor;
+            if(params.low_offset) {
+                const input: u8 = state.registers.getU8(params.addr).*;
+                const addr: u16 = 0xFF00 + @as(u16, input);
+                state.address_bus = addr;
+                const output: *u8 = state.registers.getU8(params.idu_out);
+                // +% -1 <=> +% 255
+                const idu_factor: u8 = @bitCast(@as(i8, params.idu));
+                output.* = input +% idu_factor;
+
+            } else {
+                const addr: u16 = state.registers.getU16(params.addr).*;
+                state.address_bus = addr;
+                const output: *u16 = state.registers.getU16(params.idu_out);
+                // +% -1 <=> +% 65535
+                const idu_factor: u16 = @bitCast(@as(i16, params.idu));
+                output.* = addr +% idu_factor;
+            }
 
             applyPins(state, mmu);
         },
