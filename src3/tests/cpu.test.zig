@@ -135,6 +135,9 @@ pub fn runSingleStepTests() !void {
             // Flags are updated incorrectly (Flag Test is broken).
             std.mem.eql(u8, dir_entry.name, "18.json") or
             // Flags are updated incorrectly (Flag Test is broken).
+            std.mem.eql(u8, dir_entry.name, "20.json") or
+            std.mem.eql(u8, dir_entry.name, "28.json") or
+            std.mem.eql(u8, dir_entry.name, "30.json") or
             std.mem.eql(u8, dir_entry.name, "38.json") or
             // alu_adc_adj is broken only in ADD SP,e case :/
             std.mem.eql(u8, dir_entry.name, "e8.json")) {

@@ -233,6 +233,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
+    
 
     // INC r8
     const inc_r8_opcodes = [_]u8{ 0x04, 0x0C, 0x14, 0x1C, 0x24, 0x2C, 0x34, 0x3C };
@@ -294,19 +295,18 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     returnVal[opcode_bank_default][0x08].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z),   ApplyPins(), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w),   ApplyPins(), Nop(),
-        AddrIdu(.z, 1, .z, false),   Dbus(.dbus, .spl), ApplyPins(), Nop(),
-        AddrIdu(.z, 0, .z, false),   Dbus(.dbus, .sph), ApplyPins(), Nop(),
+        AddrIdu(.z, 1, .z, false),   Dbus(.spl, .dbus), ApplyPins(), Nop(),
+        AddrIdu(.z, 0, .z, false),   Dbus(.sph, .dbus), ApplyPins(), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir),  ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD a, r16mem
+    // TODO: combine those just like LD r16mem, a
     const ld_a_r16mem_opcodes = [_]u8{ 0x0A, 0x1A };
     const ld_a_r16mem_rfids = [_]RegisterFileID{ .c, .e };
     for(ld_a_r16mem_opcodes, ld_a_r16mem_rfids) |opcode, rfid| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(rfid, 0, rfid, false), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w),   ApplyPins(),               Nop(),
-            AddrIdu(.z, 0, .z, false),   Dbus(.dbus, .z),   ApplyPins(),               Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -615,7 +615,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w), MiscCC(cc), Nop(),
             AddrIdu(.spl, -1, .spl, false), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl, false), Dbus(.pch, .dbus), ApplyPins(), Nop(),
-            AddrIdu(.spl, -1, .spl, false), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
+            AddrIdu(.spl, 0, .spl, false), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -658,7 +658,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .w), ApplyPins(), Nop(),
         AddrIdu(.spl, -1, .spl, false), Nop(), Nop(), Nop(),
         AddrIdu(.spl, -1, .spl, false), Dbus(.pch, .dbus), ApplyPins(), Nop(),
-        AddrIdu(.spl, -1, .spl, false), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
+        AddrIdu(.spl, 0, .spl, false), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
