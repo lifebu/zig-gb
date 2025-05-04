@@ -111,6 +111,12 @@ fn printTestCase(cpuState: *const CPUState) void {
     std.debug.print("\n", .{});
 }
 
+// TODO: Some Ideas on how to improve testing:
+// - It would be nice to generate a test for each instruction. Therefore I can rerun a single test.
+// - Having a test for each instruction means I can parallelize running the tests, making the test run faster.
+// - Allow me to run a certain category of tests (like only the single step tests for cpu) (with test filters?)
+// - Run all the test and once all of them have run show all errors. Don't stop at the first error!
+// => Apparrently I can write my own test runner to solve this!
 pub fn runSingleStepTests() !void {
     const alloc = std.testing.allocator;
 

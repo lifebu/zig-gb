@@ -368,10 +368,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // JR cond imm8
-    // TODO: The IduAdjust as described in the gekkio and the result from the single step test do not match.
-    // for 38 0002 the test wants the the adjust is 0, but gekkio is defining it a -1 
-    // The reasons seems to be that the ALU right before the IduAdjust changes the carry flag, in this case we don't want that!
-    const jr_cond_imm8_opcodes = [_]u8{ 0x20, 0x30, 0x28, 0x38 };
+    const jr_cond_imm8_opcodes = [_]u8{ 0x20, 0x28, 0x30, 0x38 };
     for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), MiscCC(cc), Nop(),
