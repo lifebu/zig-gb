@@ -275,12 +275,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z),  ApplyPins(), Nop(),
                 AddrIdu(.l, 0, .l, false), Dbus(.z, .dbus), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
-            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_prefix),
+            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -830,11 +830,21 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         for(0..8) |bit_index| {
             for(r8_rfids) |rfid| {
                 if(rfid == .dbus) {
-                    returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
-                        AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                        AddrIdu(.l, 0, .l, false), AluValue(bit_uop, .z, @intCast(bit_index), .z), Dbus(.z, .dbus), ApplyPins(),
-                        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-                    }) catch unreachable;
+                    // TODO: Strange that only the bit dbus version is shorter then the rest of the bit uops.
+                    // According to the opcode tables all of them should be shorter.
+                    if(bit_uop == .alu_bit) {
+                        returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                            AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValue(bit_uop, .z, @intCast(bit_index), .z), Decode(opcode_bank_default),
+                        }) catch unreachable;
+                    }
+                    else {
+                        returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                            AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                            AddrIdu(.l, 0, .l, false), AluValue(bit_uop, .z, @intCast(bit_index), .z), Dbus(.z, .dbus), ApplyPins(),
+                            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+                        }) catch unreachable;
+                    }
                 } else {
                     returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
                         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, @intCast(bit_index), rfid), Decode(opcode_bank_default),
