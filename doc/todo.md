@@ -1,5 +1,13 @@
 # src3:
 ## CPU:
+- Flag issues:
+    - rlca sets zero flag to 0. rlc sets zero flag depending on result.
+        => same for rrca/rrc, rla/rl, rra/rr.
+    - ADD SP e, LD HL SP+e:
+        - They use the IduAdjust and both need to change the flags the same way.
+        - But JR cond imm8 and JR imm8 does not change the flags.
+        - Make it configureable if the IduAdjust changes flags?
+
 - When flags are updated is confusing:
     - ADD r: Changes all flags.
     - ADD HL, r16: Changes all but the zero flag.

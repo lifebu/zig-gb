@@ -893,7 +893,7 @@ const InterruptFlags = packed struct(u8) {
     // TODO: Maybe a function where I combine two Flags (IF and IE) and it returns which interrupt is pending?
 };
 
-const FlagRegister = packed union {
+pub const FlagRegister = packed union {
     f: u8,
     flags: packed struct {
         _: u4 = 0,
@@ -1277,7 +1277,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = input == 0;
+            state.registers.r8.f.flags.zero = result == 0;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
@@ -1305,7 +1305,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = input == 0;
+            state.registers.r8.f.flags.zero = result == 0;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
