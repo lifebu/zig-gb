@@ -145,9 +145,6 @@ pub fn runSingleStepTests() !void {
             or std.mem.eql(u8, dir_entry.name, "0f.json")
             or std.mem.eql(u8, dir_entry.name, "17.json")
             or std.mem.eql(u8, dir_entry.name, "1f.json")
-            // Removed because of IduAdjust flag changes.
-            or std.mem.eql(u8, dir_entry.name, "e8.json")
-            or std.mem.eql(u8, dir_entry.name, "f8.json")
         ) {
             continue;
         }

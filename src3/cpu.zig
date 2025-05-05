@@ -84,6 +84,11 @@ const AddrIduParms = packed struct(u12) {
     idu_out: RegisterFileID,
     _: u1 = 0, 
 };
+const IduAdjustParams = packed struct(u12) {
+    input: RegisterFileID,
+    change_flags: bool,
+    _: u7 = 0,
+};
 const DBusParams = packed struct(u12) {
     source: RegisterFileID,
     target: RegisterFileID,
@@ -121,6 +126,7 @@ const MicroOpData = struct {
     params: union(enum) {
         none,
         addr_idu: AddrIduParms,
+        idu_adjust: IduAdjustParams,
         dbus: DBusParams,
         alu: AluParams,
         misc: MiscParams,
@@ -135,8 +141,8 @@ fn AddrIdu(addr: RegisterFileID, idu: i2, idu_out: RegisterFileID, low_offset: b
     // TODO: Maybe add a sanity check here to see if the addr rfid is a valid 16-bit register? Because you could read 16bit between two 16bit registers.
     return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = idu, .idu_out = idu_out, .low_offset = low_offset } } };
 }
-fn IduAdjust(addr: RegisterFileID) MicroOpData {
-    return .{ .operation = .idu_adjust, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = 0, .idu_out = addr, .low_offset = false } } };
+fn IduAdjust(input: RegisterFileID, change_flags: bool) MicroOpData {
+    return .{ .operation = .idu_adjust, .params = .{ .idu_adjust = IduAdjustParams{ .input = input, .change_flags = change_flags } } };
 }
 fn Alu(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, output: RegisterFileID) MicroOpData {
     return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .rfid = input_2 }, .output = output } } };
@@ -356,7 +362,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // JR r8 
     returnVal[opcode_bank_default][0x18].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        IduAdjust(.pcl), Nop(), Nop(), Nop(),
+        IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
         AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -371,7 +377,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), MiscCC(cc), Nop(),
-            IduAdjust(.pcl), Nop(), Nop(), Nop(),
+            IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
             AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -710,7 +716,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     returnVal[opcode_bank_default][0xE8].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
         // Note: Using IduAdjust + WZ-Writebak differs from the definition from gekkio. They use a special adjust add.
-        IduAdjust(.spl), Nop(), Nop(), Nop(),
+        IduAdjust(.spl, true), Nop(), Nop(), Nop(),
         Nop(), Nop(), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), MiscWB(.spl), Decode(opcode_bank_default),
     }) catch unreachable;
@@ -773,7 +779,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
         // Note: Using IduAdjust + WZ-Writebak differs from the definition from gekkio. They use a special adjust add.
-        IduAdjust(.spl), Nop(), MiscWB(.l), Nop(),
+        IduAdjust(.spl, true), Nop(), MiscWB(.l), Nop(),
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
@@ -1393,18 +1399,24 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.uop_fifo.write(uops.slice());
         },
         .idu_adjust => {
-            // TODO: Maybe idu adjust has it's own parameters, because we might need to use a parameter to say if we change the flags or not
-            const params: AddrIduParms = uop.params.addr_idu;
-            const input_low: u8 = state.registers.getU8(params.addr).*;
+            const params: IduAdjustParams = uop.params.idu_adjust;
+            const input_low: u8 = state.registers.getU8(params.input).*;
             const z: u8 = state.registers.r8.z;
             const result, const overflow = @addWithOverflow(z, input_low);
             state.registers.r8.z = result;
+
+            if(params.change_flags) {
+                state.registers.r8.f.flags.carry = overflow == 1;
+                state.registers.r8.f.flags.zero = false;
+                state.registers.r8.f.flags.n_bcd = false;
+                state.registers.r8.f.flags.half_bcd = ((input_low & 0x0F) +% (z & 0x0F)) > 0x0F;
+            }
 
             const z_sign: u1 = @intCast(z >> 7);
             const carry: bool = overflow == 1;
             const amplitude: i2 = @intFromBool(carry) ^ z_sign;
             const adjust: i2 = if(z_sign == 1) -amplitude else amplitude;
-            const input_high: u8 = state.registers.getU8(@enumFromInt(@intFromEnum(params.addr) + 1)).*;
+            const input_high: u8 = state.registers.getU8(@enumFromInt(@intFromEnum(params.input) + 1)).*;
             state.registers.r8.w = input_high +% @as(u8, @bitCast(@as(i8, adjust)));
         },
         .nop => {
