@@ -1,21 +1,5 @@
 # src3:
 ## CPU:
-- Flag issues:
-    - rlca sets zero flag to 0. rlc sets zero flag depending on result.
-        => same for rrca/rrc, rla/rl, rra/rr.
-    - ADD SP e, LD HL SP+e:
-        - They use the IduAdjust and both need to change the flags the same way.
-        - But JR cond imm8 and JR imm8 does not change the flags.
-        - Make it configureable if the IduAdjust changes flags?
-
-- When flags are updated is confusing:
-    - ADD r: Changes all flags.
-    - ADD HL, r16: Changes all but the zero flag.
-    - JR e: Changes none of the flags.
-    - But all of them use alu_add
-    - Can we define some rule for this?
-        => Does not look like it.
-    - This seems to be different for each instruction.
 - Try to unify the Uop Order:
     - Currently one default case and two exceptions exist:
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 

@@ -138,17 +138,6 @@ pub fn runSingleStepTests() !void {
         std.debug.assert(dir_entry.kind == .file);
         std.debug.print("{d}: Testing: {s}\n", .{idx + 1, dir_entry.name});
 
-        // TODO: The following tests are skipped because of flag test issues:
-        if(
-            // Removed because of rlca/rlc (etc) flag differences
-            std.mem.eql(u8, dir_entry.name, "07.json")
-            or std.mem.eql(u8, dir_entry.name, "0f.json")
-            or std.mem.eql(u8, dir_entry.name, "17.json")
-            or std.mem.eql(u8, dir_entry.name, "1f.json")
-        ) {
-            continue;
-        }
-
         const test_file: []u8 = try test_dir.readFileAlloc(alloc, dir_entry.name, 1 * 1024 * 1024);
         defer alloc.free(test_file);
 

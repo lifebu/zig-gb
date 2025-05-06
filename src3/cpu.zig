@@ -292,7 +292,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RLCA
     returnVal[opcode_bank_default][0x07].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rlc, .a, .a, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rlc, .a, .b, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD (imm16),SP
@@ -346,7 +346,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RRCA
     returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rrc, .a, .a, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rrc, .a, .b, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // STOP
@@ -356,7 +356,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RLA
     returnVal[opcode_bank_default][0x17].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rl, .a, .a, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rl, .a, .b, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // JR r8 
@@ -366,10 +366,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.z, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // TODO: RRA, RLA, RRCA and so on are all extremly similar, combine their uops?
     // RRA
     returnVal[opcode_bank_default][0x1F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rr, .a, .a, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rr, .a, .b, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // JR cond imm8
@@ -1193,7 +1192,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = result == 0;
+            // TODO: Workaround to not set the flag values for rla. Need a better flag system.
+            state.registers.r8.f.flags.zero = if(params.input_1 == params.input_2.rfid) result == 0 else false;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
@@ -1207,7 +1207,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit == 0x80;
-            state.registers.r8.f.flags.zero = result == 0;
+            // TODO: Workaround to not set the flag values for rlca. Need a better flag system.
+            state.registers.r8.f.flags.zero = if(params.input_1 == params.input_2.rfid) result == 0 else false;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
@@ -1222,7 +1223,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = result == 0;
+            // TODO: Workaround to not set the flag values for rra. Need a better flag system.
+            state.registers.r8.f.flags.zero = if(params.input_1 == params.input_2.rfid) result == 0 else false;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
@@ -1236,7 +1238,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
 
             state.registers.r8.f.flags.carry = shifted_bit == 1;
-            state.registers.r8.f.flags.zero = result == 0;
+            // TODO: Workaround to not set the flag values for rrca. Need a better flag system.
+            state.registers.r8.f.flags.zero = if(params.input_1 == params.input_2.rfid) result == 0 else false;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
