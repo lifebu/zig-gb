@@ -1,5 +1,12 @@
 # src3:
 ## CPU:
+- Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
+- Interrupts
+- STOP
+- HALT
+- Go over ToDos and do cleanup in cpu.zig!
+- Rework my test system and prepare for a better testing enviroment
+    - Custom testrunner?
 - Try to unify the Uop Order:
     - Currently one default case and two exceptions exist:
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 

@@ -34,16 +34,13 @@ const longest_instruction_cycles = 24;
 const MicroOp = enum(u6) {
     unused,
     // General
-    decode,
-    apply_pins,
-    halt,
-    nop,
     addr_idu, 
-    idu_adjust,
+    apply_pins,
     dbus,
-    stop,
+    decode,
+    idu_adjust,
+    nop,
     // ALU
-    alu_set_inputs,
     alu_adc, 
     alu_add, 
     alu_and, 
@@ -901,6 +898,8 @@ const InterruptFlags = packed struct(u8) {
 pub const FlagRegister = packed union {
     f: u8,
     flags: packed struct {
+        // TODO: Use this unused set of flags for new special flags for my uops?
+        // Like "Always 0" and "Always 1"?
         _: u4 = 0,
         // TODO: u1 or bool?
         carry: bool = false,
@@ -1011,6 +1010,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
         // TODO: Look at all of the uops and see if we can combine them. Examples
         // - Inc and Dec can be expressed the same: -1 <=> +% 255
+        //      - Inc and Dec could also be expressed by add and sub respectively?
         // - Can ADD and ADC as well as SUB and SBC be combined?
         // - Can we express add and sub the same: -n <=> +% (256 - n)
         // - AND, OR, XOR are the same code. The only thing that changes is the actual operation.
@@ -1030,6 +1030,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 state.registers.r8.f.flags.zero = result == 0;
             }
             state.registers.r8.f.flags.n_bcd = false;
+            // TODO: Research how to more easily implement half_bcd. According to gekkio it is carry_per_bit[3]. carry is carry_per_bit[7].
             const input_hbcd: bool = (((input_1 & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
             const input_carry_hbcd: bool = (((input_2 & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
             state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
@@ -1051,7 +1052,11 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 state.registers.r8.f.flags.zero = result == 0;
             }
             state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = ((input_2 & 0x0F) +% (input_1 & 0x0F)) > 0x0F;
+            // TODO: Research how to more easily implement half_bcd. According to gekkio it is carry_per_bit[3]. carry is carry_per_bit[7].
+            // Would be nice if we can assign to the flag directly, but then the flag must be a u1.
+            _, const half_overflow = @addWithOverflow(@as(u4, @truncate(input_2)), @as(u4, @truncate(input_1)));
+            state.registers.r8.f.flags.half_bcd = half_overflow == 1; 
+            // state.registers.r8.f.flags.half_bcd = ((input_2 & 0x0F) +% (input_1 & 0x0F)) > 0x0F;
             state.registers.r8.f.flags.carry = overflow == 1;
 
             const output: *u8 = state.registers.getU8(params.output);
@@ -1106,6 +1111,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             applyPins(state, mmu);
         },
         .alu_daa_adjust => {
+            // TODO: Find a simpler algorithm for this. preferably something that can use u1 instead of bool
             const a: u8 = state.registers.r8.a;
             const half_bcd = state.registers.r8.f.flags.half_bcd;
             const carry = state.registers.r8.f.flags.carry;
@@ -1247,6 +1253,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .alu_sbc => {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
+            // TODO: If I have a Flag-ID that is an index into the bits of the flag register, I can parameterize this carry.
+            // I can also use the 4 bits that are unused on the gameboy as a "always 0" flag 
+            // This that I can change sbc in a way that perfectly mimics the effect of sub, when you use "always 0" flag.
+            // This way I can combine sbc and sub!
             const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
             const input_carry, const carry_overflow = @addWithOverflow(input, carry);
             const a: u8 = state.registers.r8.a;
@@ -1426,6 +1436,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         // TODO: Maybe rename this to reset_pc? It is only used for the rst_offsets.
         // Maybe we can also use this for the interrupt handlers?
+        // Could this maybe be combined with AddrIdu?
         .set_pc => {
             const params: MiscParams = uop.params.misc;
             const new_pc: u16 = rst_addresses[params.rst_offset];
