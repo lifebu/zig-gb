@@ -19,7 +19,6 @@ const CPUState = struct {
     l: u8 = 0,
     ime: u1 = 0,
     ie: u1 = 0,
-    // TODO: Can we define this array of arrays as an array of structs?
     ram: [][]u16, // address (u16), value (u8)
 };
 
@@ -27,9 +26,7 @@ const TestType = struct {
     name: []u8,
     initial: CPUState,
     final: CPUState,
-    // TODO: Need to figure out the actual type?
     // TODO: Check the CPU pins between each M-Cycle.
-    // TODO: To check the pins, I need a simple mmu that gives the cpu the requested data before I test it.
     cycles: [][]std.json.Value,
 };
 
@@ -158,6 +155,7 @@ pub fn runSingleStepTests() !void {
             const num_m_cycles = 1 + test_case.cycles.len;
 
             // TODO: This is a pretty bad solution.
+            // TODO: Would be so nice to disable pre-fetching
             var not_enough_uops: bool = false;
             // TODO: Should we also include the state of the cpu pins when we failed?
             const m_cycle_fail_index: usize = 0;

@@ -11,22 +11,14 @@ const MMU = @import("mmu.zig");
 
 // Note: This assumes little-endian
 const RegisterFileID = enum(u4) {
-    c,
-    b,
-    e,
-    d,
-    l,
-    h,
-    z,
-    w,
-    pcl,
-    pch,
-    spl,
-    sph,
-    ir,
-    dbus,
-    f,
-    a,
+    c, b,
+    e, d,
+    l, h,
+    z, w,
+    pcl, pch,
+    spl, sph,
+    ir, dbus,
+    f, a,
 };
 
 const longest_instruction_cycles = 24;

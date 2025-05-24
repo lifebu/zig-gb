@@ -1,10 +1,12 @@
 # src3:
 ## CPU:
-- Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
 - Interrupts
 - STOP
 - HALT
 - Go over ToDos and do cleanup in cpu.zig!
+- Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
+    - Cycle count.
+    - MCycle pins. 
 - Rework my test system and prepare for a better testing enviroment
     - Custom testrunner?
 - Try to unify the Uop Order:
