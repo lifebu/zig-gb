@@ -3,6 +3,7 @@ const std = @import("std");
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
+// TODO: Maybe rename this into the memory pins of the CPU?
 const MemoryRequest = struct {
     read: ?u16 = null,
     write: ?u16 = null,

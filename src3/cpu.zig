@@ -105,11 +105,10 @@ const ConditionCheck = enum(u2) {
 const MiscParams = packed struct(u12) {
     write_back: RegisterFileID = .a,
     ime_value: bool = false,
-    rst_offset: u3 = 0,
+    rst_idx: u4 = 0,
     cc: ConditionCheck = .not_zero,
-    _: u2 = 0,
+    _: u1 = 0,
 };
-const rst_addresses = [8]u16{ 0x0000, 0x0008, 0x0010, 0x018, 0x020, 0x028, 0x030, 0x038 };
 const MicroOpData = struct {
     operation: MicroOp,
     params: union(enum) {
@@ -154,8 +153,8 @@ fn MiscWB(rfid: RegisterFileID) MicroOpData {
 fn MiscCC(cc: ConditionCheck) MicroOpData {
     return .{ .operation = .conditional_check, .params = .{ .misc = MiscParams{ .cc = cc } } };
 }
-fn MiscRST(rst_offset: u3) MicroOpData {
-    return .{ .operation = .set_pc, .params = .{ .misc = MiscParams{ .rst_offset = rst_offset } } };
+fn MiscRST(rst_idx: u4) MicroOpData {
+    return .{ .operation = .set_pc, .params = .{ .misc = MiscParams{ .rst_idx = rst_idx } } };
 }
 fn MiscIME(ime: bool) MicroOpData {
     return .{ .operation = .change_ime, .params = .{ .misc = MiscParams{ .ime_value = ime } } };
@@ -617,12 +616,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RST target
     const rst_opcodes = [_]u8{ 0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF };
-    const rst_offsets = [_]u3{ 0, 1, 2, 3, 4, 5, 6, 7 };
-    for(rst_opcodes, rst_offsets) |opcodes, offset| {
+    const rst_idx = [_]u4{ 0, 1, 2, 3, 4, 5, 6, 7 };
+    for(rst_opcodes, rst_idx) |opcodes, idx| {
         returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
             AddrIdu(.spl, -1, .spl, false), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl, false), Dbus(.pch, .dbus), ApplyPins(), Nop(),
-            AddrIdu(.spl, 0, .spl, false), Dbus(.pcl, .dbus), MiscRST(offset), Nop(),
+            AddrIdu(.spl, 0, .spl, false), Dbus(.pcl, .dbus), MiscRST(idx), Nop(),
             AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -849,6 +848,19 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     //
     // PSEUDO BANK:
     //
+
+    // INTERRUPT
+    const interrupt_idx = [_]u4{ 8, 9, 10, 11, 12 };
+    const interrupt_opcodes = [_]u8{ 0x00, 0x01, 0x02, 0x03, 0x04 };
+    for(interrupt_opcodes, interrupt_idx) |opcode, idx| {
+        returnVal[opcode_bank_pseudo][opcode].appendSlice(&[_]MicroOpData{
+            Nop(), Nop(), Nop(), Nop(),
+            AddrIdu(.spl, -1, .spl, false), Nop(), Nop(), Nop(),
+            AddrIdu(.spl, -1, .spl, false), Dbus(.pch, .dbus), MiscIME(false), Nop(),
+            AddrIdu(.spl, 0, .spl, false), Dbus(.pcl, .dbus), MiscRST(idx), Nop(),
+            AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // TODO: Placeholder: Need an actual implementation for STOP.
     // STOP
@@ -1398,10 +1410,23 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const opcode_bank = opcode_banks[params.bank_idx];
             const opcode: u8 = state.registers.r8.ir;
             const uops: MicroOpArray = opcode_bank[opcode];
-            if(uops.len == 0) {
-                // std.log.err("Empty instruction decoded: {X:0>2} on bank: {d}\n", .{ opcode, params.bank_idx });
-            }
             state.uop_fifo.write(uops.slice());
+
+            // TODO: Consider using an external system to only check and set an interrupt signal line on the cpu when IE and IF are checked.
+            // Because the CPU should not be able to access IF and IE like this!
+            // And this check is done at worst every m-cycle. but it could also just happen the moment an interrupt is set.
+            const interrupt_signal: u8 = mmu.memory[mem_map.interrupt_enable] & mmu.memory[mem_map.interrupt_flag];
+            if(state.interrupt_master_enable and interrupt_signal != 0) {
+                // https://stackoverflow.com/questions/757059/position-of-least-significant-bit-that-is-set
+                const deBrujinHash: u16 = 0b0001_1101;
+                const deBrujinTable = [_]u3{ 0, 1, 6, 2, 7, 5, 4, 3 }; 
+                const interrupt_lowest: u8 = interrupt_signal & ~(interrupt_signal -% 1);
+                const interrupt_hash: u8 = @truncate(@as(u16, interrupt_lowest) * deBrujinHash);
+                const interrupt_idx: u3 = deBrujinTable[interrupt_hash >> 5];
+                const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
+                state.uop_fifo.write(interrupt_uops.slice());
+                mmu.memory[mem_map.interrupt_flag] &= ~(@as(u8, 1) << interrupt_idx);
+            }
         },
         .idu_adjust => {
             const params: IduAdjustParams = uop.params.idu_adjust;
@@ -1431,7 +1456,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // Could this maybe be combined with AddrIdu?
         .set_pc => {
             const params: MiscParams = uop.params.misc;
-            const new_pc: u16 = rst_addresses[params.rst_offset];
+            const new_pc: u16 = @as(u16, params.rst_idx) * 0x08;
             state.registers.r16.pc = new_pc;
             applyPins(state, mmu);
         },

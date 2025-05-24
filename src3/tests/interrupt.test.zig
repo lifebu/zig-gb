@@ -44,20 +44,32 @@ pub fn runInterruptTests() !void {
         return err;
     };
 
-    // TODO: Probably need to change this test, because the delay is done by prefetching, not by setting IME later.
-    // I should actually test that the interrupt handler only activates one instruction later.
-    // IME is set by EI with 1 instruction delay
+    // IME is set by EI
     mmu.memory[mem_map.wram_low] = 0xFB; // EI
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = false;
     executeCPUFor(&cpu, &mmu, 2);
-    std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
+    std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: EI enables IME after one instruction.\n", .{});
         return err;
     };
-    executeCPUFor(&cpu, &mmu, 1);
-    std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
-        std.debug.print("Failed: EI enables IME after one instruction.\n", .{});
+    
+    // TODO: Implemenent instruction handler is not active after EI directly and is delayed.
+    // executeCPUFor(&cpu, &mmu, 1);
+    // std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
+    //     std.debug.print("Failed: EI enables IME after one instruction.\n", .{});
+    //     return err;
+    // };
+
+    // CPU can write to IF.
+    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
+    mmu.memory[mem_map.wram_low] = 0x77; // LD (HL), A
+    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.hl = mem_map.interrupt_flag;
+    cpu.registers.r8.a = 0xFF;
+    executeCPUFor(&cpu, &mmu, 2);
+    std.testing.expectEqual(0xFF, mmu.memory[mem_map.interrupt_flag]) catch |err| {
+        std.debug.print("Failed: CPU can write to IF.\n", .{});
         return err;
     };
 
@@ -69,18 +81,6 @@ pub fn runInterruptTests() !void {
     executeCPUFor(&cpu, &mmu, 5);
     std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: CPU disables IME during interrupt handling.\n", .{});
-        return err;
-    };
-
-    // CPU can write to IF.
-    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
-    mmu.memory[mem_map.wram_low] = 0x77; // LD (HL), A
-    cpu.registers.r16.pc = mem_map.wram_low;
-    cpu.registers.r16.hl = mem_map.interrupt_flag;
-    cpu.registers.r8.a = 0xFF;
-    executeCPUFor(&cpu, &mmu, 2);
-    std.testing.expectEqual(0xFF, mmu.memory[mem_map.interrupt_flag]) catch |err| {
-        std.debug.print("Failed: CPU can write to IF.\n", .{});
         return err;
     };
 

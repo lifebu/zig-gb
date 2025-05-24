@@ -33,6 +33,7 @@ const TestType = struct {
 // TODO: Need to rethink all of the functions and how they are structured. The code is pretty awfull.
 
 fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType) !void {
+    cpu.interrupt_master_enable = false;
     cpu.registers.r16.pc = test_case.initial.pc;
     cpu.registers.r16.sp = test_case.initial.sp;
     cpu.registers.r8.a = test_case.initial.a;
