@@ -78,7 +78,7 @@ pub fn runInterruptTests() !void {
     mmu.memory[mem_map.interrupt_enable] = 0xFF;
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    executeCPUFor(&cpu, &mmu, 5);
+    executeCPUFor(&cpu, &mmu, 6);
     std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: CPU disables IME during interrupt handling.\n", .{});
         return err;
@@ -119,18 +119,15 @@ pub fn runInterruptTests() !void {
     };
 
     for(interruptTargetTests, 0..) |test_case, i| {
-        if(i == 0) { // Change value to attach debugger.
-            var val: u32 = 0;
-            val += 1;
-        }
-
         mmu.memory[mem_map.interrupt_flag] = test_case.interupt_flag;
         mmu.memory[mem_map.interrupt_enable] = 0xFF;
         cpu.registers.r16.pc = mem_map.wram_low;
         cpu.interrupt_master_enable = true;
-        executeCPUFor(&cpu, &mmu, 6);
+        executeCPUFor(&cpu, &mmu, 7);
         std.testing.expectEqual(test_case.expected_pc, cpu.registers.r16.pc) catch |err| {
             std.debug.print("Failed Target Test {d}: {s}\n", .{ i, test_case.name });
+            std.debug.print("Expected PC: {X:0>4}\n", .{ test_case.expected_pc });
+            std.debug.print("Result   PC: {X:0>4}\n", .{ cpu.registers.r16.pc });
             return err;
         };
     }
@@ -251,16 +248,7 @@ pub fn runInterruptTests() !void {
     // Interrupt priorities: VBlank > LCD > Timer > Serial > Joypad
     mmu.memory[mem_map.interrupt_flag] = 0b0001_1111; // All interrupts are pending.
     mmu.memory[mem_map.interrupt_enable] = 0xFF;
-    // Reenable IME for each interrupt vector.
-    mmu.memory[mem_map.wram_low] = 0xF3; // DI
-    mmu.memory[mem_map.wram_low + 1] = 0xFB; // EI
-    mmu.memory[0x40] = 0xFB; // EI
-    mmu.memory[0x48] = 0xFB; // EI
-    mmu.memory[0x50] = 0xFB; // EI
-    mmu.memory[0x58] = 0xFB; // EI
-    mmu.memory[0x60] = 0xFB; // EI
-    cpu.registers.r16.pc = mem_map.wram_low;
-    executeCPUFor(&cpu, &mmu, 1);
+    cpu.interrupt_master_enable = true;
 
     const InterruptPrioTest = struct {
         name: []const u8,
@@ -290,9 +278,11 @@ pub fn runInterruptTests() !void {
     };
 
     for(interruptPrioTests, 0..) |test_case, i| {
-        executeCPUFor(&cpu, &mmu, 3);
+        executeCPUFor(&cpu, &mmu, 1);
         std.testing.expectEqual(test_case.expected_if, mmu.memory[mem_map.interrupt_flag]) catch |err| {
             std.debug.print("Failed Interrupt Priority Test {d}: {s}\n", .{ i, test_case.name });
+            std.debug.print("Expected IF: {b}\n", .{ test_case.expected_if });
+            std.debug.print("Result   IF: {b}\n", .{ mmu.memory[mem_map.interrupt_flag] });
             return err;
         };
     }

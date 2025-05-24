@@ -21,7 +21,7 @@ const RegisterFileID = enum(u4) {
     f, a,
 };
 
-const longest_instruction_cycles = 24;
+const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
 
 const MicroOp = enum(u6) {
     unused,
@@ -1425,7 +1425,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 const interrupt_idx: u3 = deBrujinTable[interrupt_hash >> 5];
                 const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
                 state.uop_fifo.write(interrupt_uops.slice());
-                mmu.memory[mem_map.interrupt_flag] &= ~(@as(u8, 1) << interrupt_idx);
+
+                const mask: u8 = @as(u8, 1) << interrupt_idx;
+                const result: u8 = mmu.memory[mem_map.interrupt_flag] & ~mask;
+                mmu.memory[mem_map.interrupt_flag] = result;
             }
         },
         .idu_adjust => {
