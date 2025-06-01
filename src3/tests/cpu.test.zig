@@ -70,6 +70,7 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
     try std.testing.expectEqual(expected_flags.flags.half_bcd, cpu.registers.r8.f.flags.half_bcd);
     try std.testing.expectEqual(expected_flags.flags.n_bcd, cpu.registers.r8.f.flags.n_bcd);
     try std.testing.expectEqual(expected_flags.flags.zero, cpu.registers.r8.f.flags.zero);
+    try std.testing.expectEqual(expected_flags.f, cpu.registers.r8.f.f);
     try std.testing.expectEqual(test_case.final.b, cpu.registers.r8.b);
     try std.testing.expectEqual(test_case.final.c, cpu.registers.r8.c);
     try std.testing.expectEqual(test_case.final.d, cpu.registers.r8.d);
@@ -92,7 +93,7 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
 }
 
 fn printTestCase(cpuState: *const CPUState) void {
-    std.debug.print("A: {X:0>2} F: {s} {s} {s} {s} ", .{ cpuState.a, 
+    std.debug.print("A: {X:0>2} F {X:0>2}: {s} {s} {s} {s} ", .{ cpuState.a, cpuState.f,
         if ((cpuState.f & 0x80) == 0x80) "Z" else "_",
         if ((cpuState.f & 0x40) == 0x40) "N" else "_",
         if ((cpuState.f & 0x20) == 0x20) "H" else "_",
@@ -206,7 +207,7 @@ pub fn runSingleStepTests() !void {
                 std.debug.print("\n", .{});
 
                 std.debug.print("Got\n", .{});
-                std.debug.print("A: {X:0>2} F: {s} {s} {s} {s} ", .{ cpu.registers.r8.a, 
+                std.debug.print("A: {X:0>2} F {X:0>2}: {s} {s} {s} {s} ", .{ cpu.registers.r8.a, cpu.registers.r8.f.f,
                     if (cpu.registers.r8.f.flags.zero) "Z" else "_",
                     if (cpu.registers.r8.f.flags.n_bcd) "N" else "_",
                     if (cpu.registers.r8.f.flags.half_bcd) "H" else "_",

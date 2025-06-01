@@ -21,6 +21,14 @@ const RegisterFileID = enum(u4) {
     f, a,
 };
 
+const FlagFileID = enum(u3) {
+    unused_1, unused_2,
+    const_true, const_false,
+    carry, half_bcd,
+    n_bcd, zero,
+};
+
+// TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
 const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
 
 const MicroOp = enum(u6) {
@@ -33,8 +41,7 @@ const MicroOp = enum(u6) {
     idu_adjust,
     nop,
     // ALU
-    alu_adc, 
-    alu_add, 
+    alu_adf,
     alu_and, 
     alu_assign, 
     alu_bit,
@@ -67,34 +74,36 @@ const MicroOp = enum(u6) {
     wz_writeback,
 };
 
-const AddrIduParms = packed struct(u12) {
+// TODO: Try to reduce the size of the Param structs
+const AddrIduParams = packed struct(u15) {
     addr: RegisterFileID, 
     low_offset: bool,
     idu: i2,
     idu_out: RegisterFileID,
-    _: u1 = 0, 
+    _: u4 = 0, 
 };
-const IduAdjustParams = packed struct(u12) {
+const IduAdjustParams = packed struct(u15) {
     input: RegisterFileID,
     change_flags: bool,
-    _: u7 = 0,
+    _: u10 = 0,
 };
-const DBusParams = packed struct(u12) {
+const DBusParams = packed struct(u15) {
     source: RegisterFileID,
     target: RegisterFileID,
-    _: u4 = 0,
+    _: u7 = 0,
 };
-const AluParams = packed struct(u12) {
+const AluParams = packed struct(u15) {
     input_1: RegisterFileID,
     input_2: packed union {
         rfid: RegisterFileID,
         value: u4,
     },
+    ffid: FlagFileID,
     output: RegisterFileID,
 };
-const DecodeParams = packed struct(u12) {
+const DecodeParams = packed struct(u15) {
     bank_idx: u2 = opcode_bank_default,
-    _: u10 = 0,
+    _: u13 = 0,
 };
 // TODO: Is this the best way to implement this?
 const ConditionCheck = enum(u2) {
@@ -103,18 +112,18 @@ const ConditionCheck = enum(u2) {
     not_carry,
     carry,
 };
-const MiscParams = packed struct(u12) {
+const MiscParams = packed struct(u15) {
     write_back: RegisterFileID = .a,
     ime_value: bool = false,
     rst_idx: u4 = 0,
     cc: ConditionCheck = .not_zero,
-    _: u1 = 0,
+    _: u4 = 0,
 };
 const MicroOpData = struct {
     operation: MicroOp,
     params: union(enum) {
         none,
-        addr_idu: AddrIduParms,
+        addr_idu: AddrIduParams,
         idu_adjust: IduAdjustParams,
         dbus: DBusParams,
         alu: AluParams,
@@ -128,16 +137,19 @@ const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
 // TODO: IN general add more sanity checks and asserts.
 fn AddrIdu(addr: RegisterFileID, idu: i2, idu_out: RegisterFileID, low_offset: bool) MicroOpData {
     // TODO: Maybe add a sanity check here to see if the addr rfid is a valid 16-bit register? Because you could read 16bit between two 16bit registers.
-    return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParms{ .addr = addr, .idu = idu, .idu_out = idu_out, .low_offset = low_offset } } };
+    return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParams{ .addr = addr, .idu = idu, .idu_out = idu_out, .low_offset = low_offset } } };
 }
 fn IduAdjust(input: RegisterFileID, change_flags: bool) MicroOpData {
     return .{ .operation = .idu_adjust, .params = .{ .idu_adjust = IduAdjustParams{ .input = input, .change_flags = change_flags } } };
 }
+fn AluFlag(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, ffid: FlagFileID, output: RegisterFileID) MicroOpData {
+    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .rfid = input_2 }, .ffid = ffid, .output = output } } };
+}
 fn Alu(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, output: RegisterFileID) MicroOpData {
-    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .rfid = input_2 }, .output = output } } };
+    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .rfid = input_2 }, .ffid = .const_false, .output = output } } };
 }
 fn AluValue(func: MicroOp, input_1: RegisterFileID, input_2: u4, output: RegisterFileID) MicroOpData {
-    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .value = input_2 }, .output = output } } };
+    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .value = input_2 }, .ffid = .const_false, .output = output } } };
 }
 fn ApplyPins() MicroOpData {
     return .{ .operation = .apply_pins, .params = .none };
@@ -331,8 +343,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         const r16_msb: RegisterFileID = @enumFromInt((@intFromEnum(rfid) + 1));
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             // TODO: In gekkio it shows + and then +_c, so I think I need add and add+carry? Test this!
-            Nop(), Nop(), Alu(.alu_add, .l, rfid, .l), Nop(),
-            AddrIdu(.pcl, 1, .pcl, false),   Dbus(.dbus, .ir), Alu(.alu_adc, .h, r16_msb, .h), Decode(opcode_bank_default),
+            Nop(), Nop(), AluFlag(.alu_adf, .l, rfid, .const_false, .l), Nop(),
+            AddrIdu(.pcl, 1, .pcl, false),   Dbus(.dbus, .ir), AluFlag(.alu_adf, .h, r16_msb, .carry, .h), Decode(opcode_bank_default),
         }) catch unreachable;
     }
 
@@ -431,11 +443,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .a, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, .z, .const_false, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .a, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, rfid, .const_false, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -446,11 +458,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .a, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, .z, .carry, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .a, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, rfid, .carry, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -615,7 +627,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADD a, imm8
     returnVal[opcode_bank_default][0xC6].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_add, .a, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, .z, .const_false, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // RST target
@@ -658,7 +670,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: ADC a, imm8 and ADC a, r8 are very similar.
     returnVal[opcode_bank_default][0xCE].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_adc, .a, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, .z, .carry, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // SUB a, imm8
@@ -900,9 +912,11 @@ const InterruptFlags = packed struct(u8) {
 pub const FlagRegister = packed union {
     f: u8,
     flags: packed struct {
-        // TODO: Use this unused set of flags for new special flags for my uops?
-        // Like "Always 0" and "Always 1"?
-        _: u4 = 0,
+        // Pseudo flags
+        _: u2 = 0,
+        const_true: bool = true,
+        const_false: bool = false,
+        // Cpu flags
         // TODO: u1 or bool?
         carry: bool = false,
         half_bcd: bool = false,
@@ -924,22 +938,14 @@ const RegisterFile = packed union {
     },
     // Note: gb and x86 are little-endian
     r8: packed struct {
-        c: u8 = 0,
-        b: u8 = 0,
-        e: u8 = 0,
-        d: u8 = 0,
-        l: u8 = 0,
-        h: u8 = 0,
-        z: u8 = 0,
-        w: u8 = 0,
-        pcl: u8 = 0,
-        pch: u8 = 0,
-        spl: u8 = 0,
-        sph: u8 = 0,
-        ir: u8 = 0,
-        dbus: u8 = 0,
-        f: FlagRegister = . { .f = 0 },
-        a: u8 = 0,
+        c: u8 = 0, b: u8 = 0,
+        e: u8 = 0, d: u8 = 0,
+        l: u8 = 0, h: u8 = 0,
+        z: u8 = 0, w: u8 = 0,
+        pcl: u8 = 0, pch: u8 = 0,
+        spl: u8 = 0, sph: u8 = 0,
+        ir: u8 = 0, dbus: u8 = 0,
+        f: FlagRegister = .{ .f = 0 }, a: u8 = 0,
     },
 
     const Self = @This();
@@ -955,6 +961,11 @@ const RegisterFile = packed union {
         const base: [*]u16 = @alignCast(@ptrCast(self));
         return @ptrCast(base + index_u16);
     } 
+    pub fn getFlag(self: *Self, ffid: FlagFileID) bool {
+        const bit_index: u3 = @intFromEnum(ffid); 
+        const result: u8 = (self.r8.f.f >> bit_index) & 0x01;
+        return result == 0x01;
+    }
 };
 
 const MemoryRequest = enum {
@@ -991,7 +1002,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     switch(uop.operation) {
         // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
-            const params: AddrIduParms = uop.params.addr_idu;
+            const params: AddrIduParams = uop.params.addr_idu;
             if(params.low_offset) {
                 const input: u8 = state.registers.getU8(params.addr).*;
                 const addr: u16 = 0xFF00 + @as(u16, input);
@@ -1021,13 +1032,13 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // - AND, OR, XOR are the same code. The only thing that changes is the actual operation. 
         // - Is RLC with C = 0 the same as RL? (Same for RRC with C = 0 and RR). 
         // - Can we combine sr and srl?
-        .alu_adc => {
+        .alu_adf => {
             const params: AluParams = uop.params.alu;
             const input_1: u8 = state.registers.getU8(params.input_1).*;
             const input_2: u8 = state.registers.getU8(params.input_2.rfid).*;
-            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
-            const input_carry, const carry_overflow = @addWithOverflow(input_1, carry);
-            const result, const overflow = @addWithOverflow(input_2, input_carry);
+            const flag: u8 = @intFromBool(state.registers.getFlag(params.ffid));
+            const input_flag, const flag_overflow = @addWithOverflow(input_1, flag);
+            const result, const overflow = @addWithOverflow(input_2, input_flag);
 
             // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
             // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
@@ -1036,37 +1047,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             }
             state.registers.r8.f.flags.n_bcd = false;
             // TODO: Research how to more easily implement half_bcd. According to gekkio it is carry_per_bit[3]. carry is carry_per_bit[7].
-            const input_hbcd: bool = (((input_1 & 0x0F) +% (carry & 0x0F)) & 0x10) == 0x10;
-            const input_carry_hbcd: bool = (((input_2 & 0x0F) +% (input_carry & 0x0F)) & 0x10) == 0x10;
+            const input_hbcd: bool = (((input_1 & 0x0F) +% (flag & 0x0F)) & 0x10) == 0x10;
+            const input_carry_hbcd: bool = (((input_2 & 0x0F) +% (input_flag & 0x0F)) & 0x10) == 0x10;
             state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
-            state.registers.r8.f.flags.carry = carry_overflow == 1 or overflow == 1;
+            state.registers.r8.f.flags.carry = flag_overflow == 1 or overflow == 1;
 
             const output: *u8 = state.registers.getU8(params.output);
             output.* = result;
             applyPins(state, mmu);
-        },
-        .alu_add => {
-            const params: AluParams = uop.params.alu;
-            const input_1: u8 = state.registers.getU8(params.input_1).*;
-            const input_2: u8 = state.registers.getU8(params.input_2.rfid).*;
-            const result, const overflow = @addWithOverflow(input_2, input_1);
 
-            // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
-            // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
-            if(params.output == .a) {
-                state.registers.r8.f.flags.zero = result == 0;
-            }
-            state.registers.r8.f.flags.n_bcd = false;
-            // TODO: Research how to more easily implement half_bcd. According to gekkio it is carry_per_bit[3]. carry is carry_per_bit[7].
-            // Would be nice if we can assign to the flag directly, but then the flag must be a u1.
-            _, const half_overflow = @addWithOverflow(@as(u4, @truncate(input_2)), @as(u4, @truncate(input_1)));
-            state.registers.r8.f.flags.half_bcd = half_overflow == 1; 
-            // state.registers.r8.f.flags.half_bcd = ((input_2 & 0x0F) +% (input_1 & 0x0F)) > 0x0F;
-            state.registers.r8.f.flags.carry = overflow == 1;
-
-            const output: *u8 = state.registers.getU8(params.output);
-            output.* = result;
-            applyPins(state, mmu);
         },
         .alu_and => {
             const params: AluParams = uop.params.alu;
@@ -1498,6 +1487,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const params: MiscParams = uop.params.misc;
             const target: *u16 = state.registers.getU16(params.write_back);
             target.* = state.registers.r16.wz; 
+            if(params.write_back == .f) {
+                target.* &= 0xFFF0;
+            }
             applyPins(state, mmu);
         },
         else => { 
@@ -1510,6 +1502,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
 fn applyPins(state: *State, mmu: *MMU.State) void {
     if(mmu.request.read) |_| {
         state.dbus_target.* = mmu.request.data;
+        if(state.dbus_target == &state.registers.r8.f.f) {
+            state.dbus_target.* &= 0xF0;
+        }
         mmu.request.read = null;
     }
 }
