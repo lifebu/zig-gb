@@ -48,7 +48,6 @@ const MicroOp = enum(u6) {
     alu_ccf, 
     alu_cp, 
     alu_daa_adjust, 
-    alu_dec, 
     alu_inc, 
     alu_not,
     alu_or, 
@@ -91,6 +90,7 @@ const DBusParams = packed struct(u15) {
     target: RegisterFileID,
     _: u7 = 0,
 };
+// TODO: Consider splitting the Alu params into what we tend to need, to reduce the size of all Params.
 const AluParams = packed struct(u15) {
     input_1: RegisterFileID,
     input_2: packed union {
@@ -150,6 +150,9 @@ fn Alu(func: MicroOp, input_1: RegisterFileID, input_2: RegisterFileID, output: 
 fn AluValue(func: MicroOp, input_1: RegisterFileID, input_2: u4, output: RegisterFileID) MicroOpData {
     return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .value = input_2 }, .ffid = .const_false, .output = output } } };
 }
+fn AluValueRel(func: MicroOp, input_1: RegisterFileID, input_2: i2, output: RegisterFileID) MicroOpData {
+    return .{ .operation = func, .params = .{ .alu = AluParams{ .input_1 = input_1, .input_2 = .{ .value = @bitCast(@as(i4, input_2)) }, .ffid = .const_false, .output = output } } };
+}
 fn ApplyPins() MicroOpData {
     return .{ .operation = .apply_pins, .params = .none };
 }
@@ -194,10 +197,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .f };
     const cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
     
-    // TODO: I think I have to switch ALU/MISC with DBUS + Push Pins. Why? Set ,b [HL] requires that the output of the ALU can be used for this cycles memory request.
-    // This also means before we decode, we need to apply the pins, because Decode requires that the pins have been applied before decode runs.
-    // But then Again some instructions might need read result immediate as ALU input.
-    // So the order of DBUS and ALU can be switched depending on the need?
+    // TODO: Right now some instruction use a different order than the default.
+    // Could I find a order that fits all the cases cleanly?
+    // Default order:
     // 0: ADDR + IDU 
     // 1: DBUS + Push Pins
     // 2: ALU/MISC + Apply Pins
@@ -250,12 +252,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.l, 0, .l, false), Alu(.alu_inc, .z, .z, .z), Dbus(.z, .dbus), ApplyPins(),
+                AddrIdu(.l, 0, .l, false), AluValueRel(.alu_inc, .z, 1, .z), Dbus(.z, .dbus), ApplyPins(),
                 AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_inc, rfid, rfid, rfid), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValueRel(.alu_inc, rfid, 1, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -266,12 +268,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.l, 0, .l, false), Alu(.alu_dec, .z, .z, .z), Dbus(.z, .dbus), ApplyPins(),
+                AddrIdu(.l, 0, .l, false), AluValueRel(.alu_inc, .z, -1, .z), Dbus(.z, .dbus), ApplyPins(),
                 AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_dec, rfid, rfid, rfid), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluValueRel(.alu_inc, rfid, -1, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -338,7 +340,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // ADD HL, R16
     const add_hl_r16_opcodes = [_]u8{ 0x09, 0x19, 0x29, 0x39 };
     for(add_hl_r16_opcodes, r16_rfids) |opcode, rfid| {
-        // TODO: Needs to be tested if this actually works.
         const r16_msb: RegisterFileID = @enumFromInt((@intFromEnum(rfid) + 1));
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             // TODO: In gekkio it shows + and then +_c, so I think I need add and add+carry? Test this!
@@ -1127,27 +1128,21 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
         },
-        .alu_dec => {
-            const params: AluParams = uop.params.alu;
-            const input: u8 = state.registers.getU8(params.input_1).*;
-            const output: *u8 = state.registers.getU8(params.output);
-            output.* -%= 1;
-
-            state.registers.r8.f.flags.zero = output.* == 0;
-            state.registers.r8.f.flags.n_bcd = true;
-            state.registers.r8.f.flags.half_bcd = (((input & 0x0F) -% 1) & 0x10) == 0x10; 
-            applyPins(state, mmu);
-        },
         .alu_inc => {
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
+
+            // TODO: This works but it is a type unsafe to cast a i2 to u4 and back.
+            const factor: i2 = @bitCast(@as(u2, @truncate(params.input_2.value)));
+            // +% -1 <=> +% 255
+            const factor_inc: u8 = @bitCast(@as(i8, factor));
             const output: *u8 = state.registers.getU8(params.output);
-            output.* = input +% 1;
+            output.* = input +% factor_inc;
 
             // TODO: Maybe we create a more compact way to change the flags? Like a function?
             state.registers.r8.f.flags.zero = output.* == 0; 
-            state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = (((input & 0x0F) +% 1) & 0x10) == 0x10; 
+            state.registers.r8.f.flags.n_bcd = if(factor < 0) true else false;
+            state.registers.r8.f.flags.half_bcd = (((input & 0x0F) +% factor_inc) & 0x10) == 0x10; 
             applyPins(state, mmu);
         },
         .alu_not => {
@@ -1244,6 +1239,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             applyPins(state, mmu);
         },
         .alu_sbf => {
+            // TODO: A lot of uops are getting the input/output from the params struct. 
+            // I could provide a function that takes the params and the registers and returns a data struct for this instruction.
+            // This should reduce the number of lines significantly, but also mean we would querry all possible parameters and not use some of them.
+            // Is the compiler to optimize away unused variables I query?
             const params: AluParams = uop.params.alu;
             const input: u8 = state.registers.getU8(params.input_1).*;
             const flag: u8 = @intFromBool(state.registers.getFlag(params.ffid));
