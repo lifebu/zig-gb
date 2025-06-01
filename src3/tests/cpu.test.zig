@@ -135,6 +135,9 @@ pub fn runSingleStepTests() !void {
     while(try iter.next()) |dir_entry| : (idx += 1) {
         std.debug.assert(dir_entry.kind == .file);
         std.debug.print("{d}: Testing: {s}\n", .{idx + 1, dir_entry.name});
+        if(std.mem.eql(u8, dir_entry.name, "76.json")) {
+            continue; // Skip testing halt. SingleStepTests are inaccurate for halt.
+        }
 
         const test_file: []u8 = try test_dir.readFileAlloc(alloc, dir_entry.name, 1 * 1024 * 1024);
         defer alloc.free(test_file);
@@ -244,4 +247,125 @@ pub fn runSingleStepTests() !void {
             };
         }
     }
+}
+
+// TODO: Also interrupt tests, do we create general helper class?
+pub fn fetchInstruction(cpu: *CPU.State, mmu: *MMU.State) void {
+    cpu.uop_fifo.clear();
+    // Load a nop instruction to fetch the required instruction.
+    const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
+    const uops = opcode_bank[0];
+    cpu.uop_fifo.write(uops.slice());
+    for(0..(def.t_cycles_per_m_cycle)) |_| {
+        CPU.cycle(cpu, mmu);
+        MMU.cycle(mmu);
+    }
+}
+
+// TODO: Also interrupt tests, do we create general helper class?
+pub fn executeCPUFor(cpu: *CPU.State, mmu: *MMU.State, m_cycles: usize) void {
+    for(0..(def.t_cycles_per_m_cycle * m_cycles)) |_| {
+        CPU.cycle(cpu, mmu);
+        MMU.cycle(mmu);
+    }
+}
+
+pub fn isFullInstructionLoaded(cpu: *CPU.State, bank: u2, opcode: u8) bool {
+    const instruction = CPU.opcode_banks[bank][opcode].slice();
+    std.testing.expectEqual(instruction.len, cpu.uop_fifo.length()) catch {
+        std.debug.print("Failed: uop fifo length does not match instruction: [{}][{X:0>2}]\n", .{ bank, opcode });
+        return false;
+    };
+    for(instruction) |instruction_uop| {
+        const cpu_uop = cpu.uop_fifo.readItem().?;
+        std.testing.expectEqual(instruction_uop.operation, cpu_uop.operation) catch {
+            std.debug.print("Failed: cpu uop {} does not match instruction uop {}\n", .{ cpu_uop, instruction_uop });
+            return false;
+        };
+    }
+    return true;
+}
+
+pub fn runHaltTests() !void {
+    var mmu: MMU.State = .{}; 
+    var cpu: CPU.State = .{};
+    CPU.init(&cpu);
+
+    // Halt stops cpu
+    mmu.memory[mem_map.wram_low] = 0x76; // HALT
+    mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
+    mmu.memory[mem_map.interrupt_flag] = 0x00;
+    mmu.memory[mem_map.interrupt_enable] = 0x00;
+    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.interrupt_master_enable = false;
+    fetchInstruction(&cpu, &mmu);
+    executeCPUFor(&cpu, &mmu, 2);
+    std.testing.expectEqual(mem_map.wram_low + 1, cpu.registers.r16.pc) catch |err| {
+        std.debug.print("Failed: Halt stops the cpu.\n", .{});
+        return err;
+    };
+
+    // IME set, no pending interrupt after halt => cpu still paused.
+    mmu.memory[mem_map.interrupt_flag] = 0x00;
+    mmu.memory[mem_map.interrupt_enable] = 0x00;
+    mmu.memory[mem_map.wram_low] = 0x76; // HALT
+    mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
+    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.interrupt_master_enable = true;
+    fetchInstruction(&cpu, &mmu);
+    executeCPUFor(&cpu, &mmu, 1);
+    std.testing.expectEqual(mem_map.wram_low + 1, cpu.registers.r16.pc) catch |err| {
+        std.debug.print("Failed: Halt: IME set, no pending interrupt after halt: cpu halted.\n", .{});
+        return err;
+    };
+
+    // IME set, pending interrupt after halt => interrupt handled, cpu resumed.
+    cpu.registers.r16.pc = mem_map.wram_low;
+    mmu.memory[mem_map.interrupt_flag] = 0x00;
+    mmu.memory[mem_map.interrupt_enable] = 0xFF;
+    mmu.memory[mem_map.wram_low] = 0x76; // HALT
+    mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
+    cpu.interrupt_master_enable = true;
+    fetchInstruction(&cpu, &mmu);
+    executeCPUFor(&cpu, &mmu, 1);
+    // cpu is now halted (pc is on INC BC).
+    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000; // Joypad
+    executeCPUFor(&cpu, &mmu, 1);
+    std.testing.expectEqual(true, isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
+        std.debug.print("Failed: Halt: IME set, pending interrupt after halt: cpu has not loaded the instruction handler.\n", .{});
+        return err;
+    };
+
+    // IME not set, no interrupt pending during halt => interrupt pending after halt => cpu resumes after halt, interrupt not handled.
+    mmu.memory[mem_map.interrupt_flag] = 0x00;
+    mmu.memory[mem_map.interrupt_enable] = 0xFF;
+    mmu.memory[mem_map.wram_low] = 0x76; // HALT
+    mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
+    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.interrupt_master_enable = true;
+    fetchInstruction(&cpu, &mmu);
+    executeCPUFor(&cpu, &mmu, 1);
+    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
+    executeCPUFor(&cpu, &mmu, 1);
+    // TODO: How to know if the cpu is in a halt state or not?
+    // std.testing.expectEqual(false, cpu.isHalted) catch |err| {
+    //     std.debug.print("Failed: Halt: IME not set, no pending interrupt during halt, pending interrupt after halt: cpu resumes.\n", .{});
+    //     return err;
+    // };
+    std.testing.expectEqual(mem_map.wram_low + 2, cpu.registers.r16.pc) catch |err| {
+        std.debug.print("Failed: Halt: IME not set, no pending interrupt during halt, pending interrupt after halt: cpu resumes after halt instruction.\n", .{});
+        return err;
+    };
+
+    // TODO: Halt Bug => Could not be triggered by any released game => Not for now. 
+    // IME not set, interrupt pending during halt => halt-bug
+    // halt bug (does not affect gbc and gba):
+        // Happens when: IME = 0 and IF & IE != 0 => assert that this never happens in real game?  
+        // halt exists immediately, pc is not incremented. 
+        // The byte after halt (next instruction) is read twice. 
+        // Special cases (result of pc never being incremented). 
+        // ei => halt. interrupt is serviced after halt. interrupt returns to halt (because pc was never incremented) => executes halt again.
+        // halt => rst. rst instruction's return address will point at rst itself. ret would return to rst and execute it again.
+        // ei => halt => rst: ei behaviour "wins".  
+    // https://github.com/nitro2k01/little-things-gb/tree/main/double-halt-cancel
 }

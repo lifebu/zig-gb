@@ -124,6 +124,7 @@ pub fn runInterruptTests() !void {
         cpu.registers.r16.pc = mem_map.wram_low;
         cpu.interrupt_master_enable = true;
         executeCPUFor(&cpu, &mmu, 7);
+        // TODO: This is not enough, because the interrupt handler adds itself again to the fifo, which is wrong!
         std.testing.expectEqual(test_case.expected_pc, cpu.registers.r16.pc) catch |err| {
             std.debug.print("Failed Target Test {d}: {s}\n", .{ i, test_case.name });
             std.debug.print("Expected PC: {X:0>4}\n", .{ test_case.expected_pc });

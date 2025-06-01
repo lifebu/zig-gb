@@ -1,9 +1,11 @@
 # src3:
 ## CPU:
-- Interrupts
+- Go over ToDos and do cleanup in cpu.zig!
+- Interrupts:
+    - Add more tests to test interrupts more, there seem to be bugs where the interrupt handler loads itself.
 - STOP
 - HALT
-- Go over ToDos and do cleanup in cpu.zig!
+    - Mostly implemented but the tests are broken.
 - Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
     - Cycle count.
     - MCycle pins. 

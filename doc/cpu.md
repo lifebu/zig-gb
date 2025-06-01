@@ -1,3 +1,46 @@
+# HALT
+- Assert that halt bug does not happen (IME = false, interrupt pending).
+## Factors: Initial/During-Halt, IME is set, Interrupt pending.
+## Initial-Halt (opcode_bank_default):
+- interrupt pending & ime = false: halt-bug.
+    - next pc increment fails (which is part of the initial halt instruction).
+    https://github.com/nitro2k01/little-things-gb/tree/main/double-halt-cancel
+- interrupt pending & ime = true: handle interrupt.
+- no interrupt pending & ime = false: go to pseudo bank.
+- no interrupt pending & ime = true: go to pseudo bank.
+
+## During-Halt (opcode_bank_pseudo):
+- interrupt pending & ime = false: execute next instruction, no interrupt handling.
+- interrupt pending & ime = true: handle interrupt.
+- no interrupt pending & ime = false: keep in pseudo bank.
+- no interrupt pending & ime = true: keep in pseudo bank.
+
+AddrIdu(.pcl, 0, .pcl, false), Dbus(.dbus, .ir), MiscHalt(), Decode(opcode_bank_default)
+MiscHalt():
+    pc is on byte after halt.
+    if no interrupt pending: set ir to 0x76 (HALT), set halt-again-flag => will decode halt again.
+    if interrupt pending & ime = true: set ir to 0x76 (HALT), reset halt-again-flag => will decode halt again and append interrupt. 
+    if interrupt pending & ime = false: 
+                halt-again-flag = false: do nothing => byte is read twice (halt-bug).
+                halt-again-flag = true: increment pcl, reset halt-again-flag => just like normal.
+ 
+
+# CPU size and cache.
+- MicroOps: 12 + 6 = 18 Bit
+- Instruction: 20 + 24 = 44 MicroOps = 792 Bit
+- Instrution Set: 500 * Instruction = 396.000 Bit = 49.500 Byte = ~48kByte
+=> L1 Cache: 32kByte!
+## Change interrupts:
+=> Instruction: max(20, 24) = 24 MicroOps = 432 Bit
+- Instruction Set: 500 * Instruction = 216.000 Bit = 27.0000 Byte = ~26kByte
+## Reduce MicroOp Encoding to 5-Bit.
+- MicroOps: 12 + 5 = 17 Bit
+- Instruction: max(20, 24) = 24 MicroOps = 408 Bit
+- Instrution Set: 500 * Instruction = 204.000 Bit = 25.500 Byte = ~24kByte
+## Using the actual number of microops and not the largest.
+- Current Microops 500 * 24 = 12.000
+- Actual Microops in instruction set: 3.172.
+- Instruction Set: 3.172 * 17 Bit = 53.924 Bit = 6740,5 Byte = ~6,5kByte
 
 # Testing 
 

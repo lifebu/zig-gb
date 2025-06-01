@@ -62,6 +62,7 @@ const MicroOp = enum(u6) {
     // Misc
     change_ime,
     conditional_check,
+    halt,
     set_pc,
     wz_writeback,
 };
@@ -153,6 +154,9 @@ fn MiscWB(rfid: RegisterFileID) MicroOpData {
 fn MiscCC(cc: ConditionCheck) MicroOpData {
     return .{ .operation = .conditional_check, .params = .{ .misc = MiscParams{ .cc = cc } } };
 }
+fn MiscHALT() MicroOpData {
+    return .{ .operation = .halt, .params = .{ .misc = MiscParams{} } };
+}
 fn MiscRST(rst_idx: u4) MicroOpData {
     return .{ .operation = .set_pc, .params = .{ .misc = MiscParams{ .rst_idx = rst_idx } } };
 }
@@ -165,7 +169,7 @@ fn Nop() MicroOpData {
 
 pub const opcode_bank_default = 0;
 pub const opcode_bank_prefix = 1;
-// 0x76 = HALT, 0x10 = STOP, 0x00-0x04: Interrupt Handler
+// 0x10 = STOP, 0x00-0x04: Interrupt Handler
 pub const opcode_bank_pseudo = 2;
 pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
@@ -397,7 +401,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             // TODO: This branch is even worse! The cases are rarely hit, especially HALT!
             if(source_rfid == .dbus and target_rfid == .dbus) { // HALT
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
-                    AddrIdu(.pcl, 1, .pcl, false), Nop(), Nop(), Decode(opcode_bank_pseudo),
+                    AddrIdu(.pcl, 0, .pcl, false), Dbus(.dbus, .ir), MiscHALT(), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else if (source_rfid == .dbus) {
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
@@ -868,12 +872,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
-    // TODO: Placeholder: Need an actual implementation for HALT.
-    // HALT
-    returnVal[opcode_bank_pseudo][0x76].appendSlice(&[_]MicroOpData{
-        Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
-    }) catch unreachable;
-
     return returnVal;
 
 }
@@ -975,6 +973,9 @@ pub const State = struct {
 
     interrupt_enable: InterruptFlags = .{},
     interrupt_master_enable: bool = false,
+
+    // Differentiate the behaviour of halt when it is first encountered vs repeated hits (cpu is halted).
+    halt_again: bool = false,
 };
 
 pub fn init(state: *State) void {
@@ -1017,7 +1018,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         //      - Inc and Dec could also be expressed by add and sub respectively?
         // - Can ADD and ADC as well as SUB and SBC be combined?
         // - Can we express add and sub the same: -n <=> +% (256 - n)
-        // - AND, OR, XOR are the same code. The only thing that changes is the actual operation.
+        // - AND, OR, XOR are the same code. The only thing that changes is the actual operation. 
         // - Is RLC with C = 0 the same as RL? (Same for RRC with C = 0 and RR). 
         // - Can we combine sr and srl?
         .alu_adc => {
@@ -1429,6 +1430,35 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
                 const result: u8 = mmu.memory[mem_map.interrupt_flag] & ~mask;
                 mmu.memory[mem_map.interrupt_flag] = result;
+            }
+        },
+        .halt => {
+            applyPins(state, mmu);
+            // pc is on byte after halt.
+            // if no interrupt pending: set ir to 0x76 (HALT), set halt-again-flag => will decode halt again.
+            // if interrupt pending & ime = true: set ir to 0x76 (HALT), reset halt-again-flag => will decode halt again and append interrupt. 
+            // if interrupt pending & ime = false: 
+            //             halt-again-flag = false: do nothing => byte is read twice (halt-bug).
+            //             halt-again-flag = true: increment pcl, reset halt-again-flag => just like normal.
+
+            // TODO: So many conditionals, a way to implement this better?
+            const pc_curr: u16 = state.registers.r16.pc;
+            if(pc_curr == 0) {}
+            const halt_uop: u8 = 0x76;
+            const interrupt_signal: u8 = mmu.memory[mem_map.interrupt_enable] & mmu.memory[mem_map.interrupt_flag];
+            if(interrupt_signal == 0) { // No interrupt pending
+                state.registers.r8.ir = halt_uop;
+                state.halt_again = true;
+            } else { // Interrupt pending
+                if(state.interrupt_master_enable) {
+                    state.registers.r8.ir = halt_uop;
+                    state.halt_again = false;
+                } else {
+                    if(state.halt_again) {
+                        state.registers.r16.pc += 1;
+                        state.halt_again = false;
+                    }
+                }
             }
         },
         .idu_adjust => {

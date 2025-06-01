@@ -10,6 +10,10 @@ test "CPU_SingleStepTest" {
     try cpu_test.runSingleStepTests();
 }
 
+test "CPU_Halt" {
+    try cpu_test.runHaltTests();
+}
+
 test "InterruptTest" {
     try interrupt_test.runInterruptTests();
 }
