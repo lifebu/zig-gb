@@ -38,6 +38,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     cpu.registers.r16.sp = test_case.initial.sp;
     cpu.registers.r8.a = test_case.initial.a;
     cpu.registers.r8.f.f = test_case.initial.f;
+    cpu.registers.r8.f.flags.const_true = true;
     cpu.registers.r8.b = test_case.initial.b;
     cpu.registers.r8.c = test_case.initial.c;
     cpu.registers.r8.d = test_case.initial.d;
@@ -70,7 +71,8 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
     try std.testing.expectEqual(expected_flags.flags.half_bcd, cpu.registers.r8.f.flags.half_bcd);
     try std.testing.expectEqual(expected_flags.flags.n_bcd, cpu.registers.r8.f.flags.n_bcd);
     try std.testing.expectEqual(expected_flags.flags.zero, cpu.registers.r8.f.flags.zero);
-    try std.testing.expectEqual(expected_flags.f, cpu.registers.r8.f.f);
+    try std.testing.expectEqual(false, cpu.registers.r8.f.flags.const_false);
+    try std.testing.expectEqual(true, cpu.registers.r8.f.flags.const_true);
     try std.testing.expectEqual(test_case.final.b, cpu.registers.r8.b);
     try std.testing.expectEqual(test_case.final.c, cpu.registers.r8.c);
     try std.testing.expectEqual(test_case.final.d, cpu.registers.r8.d);

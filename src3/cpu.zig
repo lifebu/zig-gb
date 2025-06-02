@@ -22,7 +22,7 @@ const RegisterFileID = enum(u4) {
 };
 
 const FlagFileID = enum(u3) {
-    unused_1, unused_2,
+    unused, temp,
     const_true, const_false,
     carry, half_bcd,
     n_bcd, zero,
@@ -60,6 +60,7 @@ const MicroOp = enum(u6) {
     alu_scf, 
     alu_set,
     alu_sl, 
+    alu_slf, 
     alu_sr, 
     alu_srl, 
     alu_swap, 
@@ -922,8 +923,14 @@ const InterruptFlags = packed struct(u8) {
 pub const FlagRegister = packed union {
     f: u8,
     flags: packed struct {
+        // TODO: Pseudo flags are only for the internal usage of the emulator and not part of the gameboy itself.
+        // The gameboy always sees them as 0. But this adds some house keeping to make sure we don't ovewrite them with PUSH AF and POP AF.
+        // Could we implement the ffids better so that this bookkeeping is not necessary?
+        // For example there is another byte in the RegisterFile after the Flags for the pseudo flags.
+        // FFID than has 4 unused at the start, the 4 actual flags and then the flags of the next byte you can address.
         // Pseudo flags
-        _: u2 = 0,
+        _: u1 = 0,
+        temp: bool = false,
         const_true: bool = true,
         const_false: bool = false,
         // Cpu flags
@@ -955,7 +962,7 @@ const RegisterFile = packed union {
         pcl: u8 = 0, pch: u8 = 0,
         spl: u8 = 0, sph: u8 = 0,
         ir: u8 = 0, dbus: u8 = 0,
-        f: FlagRegister = .{ .f = 0 }, a: u8 = 0,
+        f: FlagRegister = .{ .flags = .{} }, a: u8 = 0,
     },
 
     const Self = @This();
@@ -987,9 +994,9 @@ const MemoryRequest = enum {
 pub const State = struct {
     uop_fifo: MicroOpFifo = .{}, 
 
-    registers: RegisterFile = .{ .r16 = .{} },
+    registers: RegisterFile = .{ .r8 = .{} },
     address_bus: u16 = 0,
-    dbus_source: *u8 = undefined,
+    dbus_source: u8 = 0,
     dbus_target: *u8 = undefined,
 
     interrupt_enable: InterruptFlags = .{},
@@ -1046,6 +1053,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             const input_flag, const flag_overflow = @addWithOverflow(input_1, flag);
             const result, const overflow = @addWithOverflow(input_2, input_flag);
+            output.* = result;
 
             // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
             // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
@@ -1058,10 +1066,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_carry_hbcd: bool = (((input_2 & 0x0F) +% (input_flag & 0x0F)) & 0x10) == 0x10;
             state.registers.r8.f.flags.half_bcd = input_hbcd or input_carry_hbcd;
             state.registers.r8.f.flags.carry = flag_overflow == 1 or overflow == 1;
-
-            output.* = result;
             applyPins(state, mmu);
-
         },
         .alu_and => {
             const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
@@ -1129,6 +1134,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             applyPins(state, mmu);
         },
         .alu_inc => {
+            // TODO: I can probably implement alu_inc with alu_adf? If I also allow an additional u4 value that will be added.
+            // TODO: Maybe use a full u8 instead of the u4? Might be more usefull?
             const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             // TODO: This works but it is a type unsafe to cast a i2 to u4 and back.
             const factor: i2 = @bitCast(@as(u2, @truncate(input_2)));
@@ -1253,6 +1260,21 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
             applyPins(state, mmu);
         },
+        .alu_slf => {
+            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            var result, const shifted_bit = @shlWithOverflow(input_1, 1);
+            state.registers.r8.f.flags.temp = shifted_bit == 1;
+            const flag: u8 = @intFromBool(state.registers.getFlag(uop.params.alu.ffid));
+            result |= flag;
+            output.* = result;
+
+            state.registers.r8.f.flags.carry = shifted_bit == 1;
+            // TODO: Workaround to not set the flag values for rlca. Need a better flag system.
+            state.registers.r8.f.flags.zero = if(uop.params.alu.ffid == .temp) result == 0 else false;
+            state.registers.r8.f.flags.n_bcd = false;
+            state.registers.r8.f.flags.half_bcd = false;
+            applyPins(state, mmu);
+        },
         .alu_sl => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             const shifted_bit: bool = (input_1 & 0x80) == 0x80;
@@ -1339,7 +1361,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         .dbus => {
             const params: DBusParams = uop.params.dbus;
-            state.dbus_source = state.registers.getU8(params.source);
+            const source = state.registers.getU8(params.source);
+            // Make sure to never overwrite the pseudo flags.
+            const mask: u8 = if(params.source == .f) 0xF0 else 0xFF;
+            state.dbus_source = source.* & mask;
             state.dbus_target = state.registers.getU8(params.target);
             const request: MemoryRequest = if(params.source == .dbus) .read else if(params.target == .dbus) .write else .none;
             pushPins(state, mmu, request);
@@ -1435,10 +1460,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .wz_writeback => {
             const params: MiscParams = uop.params.misc;
             const target: *u16 = state.registers.getU16(params.write_back);
-            target.* = state.registers.r16.wz; 
-            if(params.write_back == .f) {
-                target.* &= 0xFFF0;
-            }
+            // Make sure to never overwrite the pseudo flags.
+            const mask: u16 = if(params.write_back == .f) 0xFFF0 else 0xFFFF;
+            target.* = (state.registers.r16.wz & mask) | (target.* & ~mask); 
             applyPins(state, mmu);
         },
         else => { 
@@ -1451,9 +1475,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
 fn applyPins(state: *State, mmu: *MMU.State) void {
     if(mmu.request.read) |_| {
         state.dbus_target.* = mmu.request.data;
-        if(state.dbus_target == &state.registers.r8.f.f) {
-            state.dbus_target.* &= 0xF0;
-        }
         mmu.request.read = null;
     }
 }
@@ -1467,7 +1488,7 @@ fn pushPins(state: *State, mmu: *MMU.State, request: MemoryRequest) void {
         .write => {
             mmu.request.read = null;
             mmu.request.write = state.address_bus;
-            mmu.request.data = state.dbus_source.*;
+            mmu.request.data = state.dbus_source;
         },
         .none => {
             mmu.request.read = null;
