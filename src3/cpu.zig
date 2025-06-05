@@ -22,10 +22,7 @@ const RegisterFileID = enum(u4) {
 };
 
 const FlagFileID = enum(u3) {
-    // TODO: Rename the pseudo flags temp_1 and temp_2 to something more meaningfull.
-    // Right now only alu_slf and alu_srf use them. So they can be renamed to:
-    // temp_1 = temp_msb, temp_2 = temp_lsb
-    unused, temp,
+    temp_lsb, temp_msb,
     const_true, const_false,
     carry, half_bcd,
     n_bcd, zero,
@@ -55,16 +52,13 @@ const MicroOp = enum(u6) {
     alu_not,
     alu_or, 
     alu_res, 
-    alu_rr, 
-    alu_rrc, 
     alu_sbf,
     alu_scf, 
     alu_set,
     // TODO: Once most of the other things are done, consider renaming all of the ffid alu ops to something without flag.
     // The shortnames make them a little bit harder to understand (especially sbf, adf)
     alu_slf, 
-    alu_sr, 
-    alu_srl, 
+    alu_srf,
     alu_swap, 
     alu_xor, 
     // Misc
@@ -310,7 +304,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RLCA
     returnVal[opcode_bank_default][0x07].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_slf, .a, .b, .temp, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_slf, .a, .b, .temp_msb, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD (imm16),SP
@@ -363,7 +357,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RRCA
     returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rrc, .a, .b, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_srf, .a, .b, .temp_lsb, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // STOP
@@ -385,7 +379,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // RRA
     returnVal[opcode_bank_default][0x1F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_rr, .a, .b, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_srf, .a, .b, .carry, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // JR cond imm8
@@ -821,9 +815,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // PREFIX BANK:
     //
 
-    // TODO: We don't have SLA and SRA. So what is the difference, do we need a new uop for this?
-    const bit_shift_flags = [_]FlagFileID{ .temp, .temp, .carry, .carry, .const_false, .const_false, .temp, .temp };
-    const bit_shift_uops = [_]MicroOp{ .alu_slf, .alu_rrc, .alu_slf, .alu_rr, .alu_slf, .alu_sr, .alu_swap, .alu_srl }; 
+    const bit_shift_flags = [_]FlagFileID{ .temp_msb, .temp_lsb, .carry,   .carry,   .const_false, .temp_msb,    .temp_msb, .const_false };
+    const bit_shift_uops = [_]MicroOp{     .alu_slf,  .alu_srf,  .alu_slf, .alu_srf, .alu_slf,     .alu_srf,     .alu_swap, .alu_srf }; 
     // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
     var bit_shift_opcode: u8 = 0x00;
     for(bit_shift_uops, bit_shift_flags) |bit_shift_uop, flag| {
@@ -932,8 +925,8 @@ pub const FlagRegister = packed union {
         // For example there is another byte in the RegisterFile after the Flags for the pseudo flags.
         // FFID than has 4 unused at the start, the 4 actual flags and then the flags of the next byte you can address.
         // Pseudo flags
-        _: u1 = 0,
-        temp: bool = false,
+        temp_lsb: bool = false,
+        temp_msb: bool = false,
         const_true: bool = true,
         const_false: bool = false,
         // Cpu flags
@@ -1176,33 +1169,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = result;
             applyPins(state, mmu);
         }, 
-        .alu_rr => {
-            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const shifted_bit: bool = (input_1 & 0x01) == 0x01;
-            const carry: u8 = @intFromBool(state.registers.r8.f.flags.carry);
-            const result: u8 = (input_1 >> 1) | (carry << 7);
-            output.* = result;
-
-            state.registers.r8.f.flags.carry = shifted_bit;
-            // TODO: Workaround to not set the flag values for rra. Need a better flag system.
-            state.registers.r8.f.flags.zero = if(input_1 == input_2) result == 0 else false;
-            state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = false;
-            applyPins(state, mmu);
-        },
-        .alu_rrc => {
-            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const shifted_bit: u8 = (input_1 & 0x01);
-            const result: u8 = (input_1 >> 1) | (shifted_bit << 7);
-            output.* = result;
-
-            state.registers.r8.f.flags.carry = shifted_bit == 1;
-            // TODO: Workaround to not set the flag values for rrca. Need a better flag system.
-            state.registers.r8.f.flags.zero = if(input_1 == input_2) result == 0 else false;
-            state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = false;
-            applyPins(state, mmu);
-        },
         .alu_sbf => {
             // TODO: A lot of uops are getting the input/output from the params struct. 
             // I could provide a function that takes the params and the registers and returns a data struct for this instruction.
@@ -1239,7 +1205,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .alu_slf => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             var result, const shifted_bit = @shlWithOverflow(input_1, 1);
-            state.registers.r8.f.flags.temp = shifted_bit == 1;
+            state.registers.r8.f.flags.temp_msb = shifted_bit == 1;
             const flag: u8 = @intFromBool(state.registers.getFlag(uop.params.alu.ffid));
             result |= flag;
             output.* = result;
@@ -1251,30 +1217,23 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
         },
-        .alu_sr => {
+        .alu_srf => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const shifted_bit: bool = (input_1 & 0x01) == 0x01;
-            const result: u8 = (input_1 >> 1) | (input_1 & 0x80);
+            const lsb: u1 = @intCast(input_1 & 0x01); 
+            const msb: u1 = @intCast(input_1 >> 7);
+            state.registers.r8.f.flags.temp_lsb = lsb == 0x01;
+            state.registers.r8.f.flags.temp_msb = msb == 0x01;
+            const flag: u8 = @intFromBool(state.registers.getFlag(uop.params.alu.ffid));
+            const result: u8 = (input_1 >> 1) | (flag << 7);
             output.* = result;
 
-            state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = result == 0;
+            state.registers.r8.f.flags.carry = lsb == 0x01;
+            // TODO: Workaround to not set the flag values for rra. Need a better flag system.
+            state.registers.r8.f.flags.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) result == 0 else false;
             state.registers.r8.f.flags.n_bcd = false;
             state.registers.r8.f.flags.half_bcd = false;
             applyPins(state, mmu);
         },
-        .alu_srl => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const shifted_bit: bool = (input_1 & 0x01) == 0x01;
-            const result: u8 = (input_1 >> 1);
-            output.* = result;
-
-            state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.zero = result == 0;
-            state.registers.r8.f.flags.n_bcd = false;
-            state.registers.r8.f.flags.half_bcd = false;
-            applyPins(state, mmu);
-        }, 
         .alu_swap => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             const result = (input_1 << 4) | (input_1 >> 4);
