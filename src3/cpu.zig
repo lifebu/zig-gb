@@ -1137,7 +1137,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = input_1 +% factor_inc;
 
             // TODO: Maybe we create a more compact way to change the flags? Like a function?
-            state.registers.r8.f.flags.half_bcd = @truncate(((input_1 & 0x0F) +% factor_inc) >> 4); 
+            state.registers.r8.f.flags.half_bcd = @truncate(((input_1 & 0xF) +% factor_inc) >> 4); 
             state.registers.r8.f.flags.n_bcd = if(factor < 0) 1 else 0;
             state.registers.r8.f.flags.zero = @intFromBool(output.* == 0); 
             applyPins(state, mmu);
@@ -1173,9 +1173,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result, const overflow = @subWithOverflow(a, input_flag);
 
             state.registers.r8.f.flags.carry = flag_overflow | overflow;
-            const input_carry_hbcd: u1 = @truncate(((a & 0xF) -% (input_flag & 0xF)) >> 4);
-            const input_hbcd: u1 = @truncate(((input_1 & 0xF) +% (flag & 0xF)) >> 4);
-            state.registers.r8.f.flags.half_bcd = input_hbcd | input_carry_hbcd;
+            state.registers.r8.f.flags.half_bcd = @truncate(((a & 0xF) -% (input_1 & 0xF) -% flag) >> 4);
             state.registers.r8.f.flags.n_bcd = 1;
             state.registers.r8.f.flags.zero = @intFromBool(result == 0);
 
