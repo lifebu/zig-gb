@@ -38,7 +38,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     cpu.registers.r16.sp = test_case.initial.sp;
     cpu.registers.r8.a = test_case.initial.a;
     cpu.registers.r8.f.f = test_case.initial.f;
-    cpu.registers.r8.f.flags.const_true = true;
+    cpu.registers.r8.f.flags.const_one = 1;
     cpu.registers.r8.b = test_case.initial.b;
     cpu.registers.r8.c = test_case.initial.c;
     cpu.registers.r8.d = test_case.initial.d;
@@ -71,8 +71,8 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
     try std.testing.expectEqual(expected_flags.flags.half_bcd, cpu.registers.r8.f.flags.half_bcd);
     try std.testing.expectEqual(expected_flags.flags.n_bcd, cpu.registers.r8.f.flags.n_bcd);
     try std.testing.expectEqual(expected_flags.flags.zero, cpu.registers.r8.f.flags.zero);
-    try std.testing.expectEqual(false, cpu.registers.r8.f.flags.const_false);
-    try std.testing.expectEqual(true, cpu.registers.r8.f.flags.const_true);
+    try std.testing.expectEqual(0, cpu.registers.r8.f.flags.const_zero);
+    try std.testing.expectEqual(1, cpu.registers.r8.f.flags.const_one);
     try std.testing.expectEqual(test_case.final.b, cpu.registers.r8.b);
     try std.testing.expectEqual(test_case.final.c, cpu.registers.r8.c);
     try std.testing.expectEqual(test_case.final.d, cpu.registers.r8.d);
@@ -210,10 +210,10 @@ pub fn runSingleStepTests() !void {
 
                 std.debug.print("Got\n", .{});
                 std.debug.print("A: {X:0>2} F {X:0>2}: {s} {s} {s} {s} ", .{ cpu.registers.r8.a, cpu.registers.r8.f.f,
-                    if (cpu.registers.r8.f.flags.zero) "Z" else "_",
-                    if (cpu.registers.r8.f.flags.n_bcd) "N" else "_",
-                    if (cpu.registers.r8.f.flags.half_bcd) "H" else "_",
-                    if (cpu.registers.r8.f.flags.carry) "C" else "_",
+                    if (cpu.registers.r8.f.flags.zero == 1) "Z" else "_",
+                    if (cpu.registers.r8.f.flags.n_bcd == 1) "N" else "_",
+                    if (cpu.registers.r8.f.flags.half_bcd == 1) "H" else "_",
+                    if (cpu.registers.r8.f.flags.carry == 1) "C" else "_",
                 });
                 std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpu.registers.r8.b, cpu.registers.r8.c });
                 std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpu.registers.r8.d, cpu.registers.r8.e });

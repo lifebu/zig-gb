@@ -1,6 +1,13 @@
 # src3:
 ## CPU:
 - Go over ToDos and do cleanup in cpu.zig!
+    - Expand FFID so that the pseudo flags are outside of the normal register set (after a).
+    - Create helper function to update flags.
+        - With a struct as the parameter?
+        - Also set temporary flags?
+        - Not sure If I really like how the code looks then.
+            - In some cases the code does not look better to be honest.
+            - Maybe get a shortcut to the registers and flags at the start of each cycle?
 - Interrupts:
     - Add more tests to test interrupts more, there seem to be bugs where the interrupt handler loads itself.
 - STOP
