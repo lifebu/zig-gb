@@ -1103,27 +1103,17 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             applyPins(state, mmu);
         },
         .alu_daa_adjust => {
-            // TODO: Find a simpler algorithm for this. preferably something that can use u1 instead of bool
-            const a: u8 = state.registers.r8.a;
-            const half_bcd: u1 = state.registers.r8.f.flags.half_bcd;
-            const carry: u1 = state.registers.r8.f.flags.carry;
-            const subtract: u1 = state.registers.r8.f.flags.n_bcd;
-
-            var offset: u8 = 0;
-            var should_carry: bool = false;
-            if((subtract == 0 and ((a & 0xF) > 0x09)) or half_bcd == 1) {
-                offset |= 0x06;
-            }
-            if((subtract == 0 and (a > 0x99)) or carry == 1) {
-                offset |= 0x60;
-                should_carry = true;
-            }
-            const result = if (subtract == 1) a -% offset else a +% offset;
+            const f = state.registers.r8.f.flags;
+            const a = state.registers.r8.a;
+            const low: u1 = ~f.n_bcd & @intFromBool((a & 0xF) > 0x09) | f.half_bcd;
+            const high: u1 = ~f.n_bcd & @intFromBool(a > 0x99) | f.carry;
+            const offset: u8 = 0x06 * @as(u8, low) + 0x60 * @as(u8, high);
+            const result = if (f.n_bcd == 1) a -% offset else a +% offset;
             state.registers.r8.a = result;
 
-            state.registers.r8.f.flags.carry = @intFromBool(should_carry);
-            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
+            state.registers.r8.f.flags.carry = high;
             state.registers.r8.f.flags.half_bcd = 0;
+            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
             applyPins(state, mmu);
         },
         .alu_inc => {
