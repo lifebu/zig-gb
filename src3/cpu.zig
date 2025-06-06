@@ -480,11 +480,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .z, .z, .const_zero, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, .z, .const_zero, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, rfid, rfid, .const_zero, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, rfid, .const_zero, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -495,11 +495,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .z, .z, .carry, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, .z, .carry, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, rfid, rfid, .carry, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, rfid, .carry, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -684,7 +684,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: SUB a, imm8 and SUB a, r8 are very similar.
     returnVal[opcode_bank_default][0xD6].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .z, .z, .const_zero, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, .z, .const_zero, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // RETI
@@ -699,7 +699,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: SBC a, imm8 and SBC a, r8 are very similar.
     returnVal[opcode_bank_default][0xDE].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .z, .z, .carry, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, .z, .carry, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LDH [imm8], a
@@ -1157,17 +1157,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             applyPins(state, mmu);
         }, 
         .alu_sbf => {
-            const input_1, _, _, const flag, _ = AluParams.Unpack(&state.registers, uop.params.alu);
-            const input_flag, const flag_overflow = @addWithOverflow(input_1, flag);
-            const a: u8 = state.registers.r8.a;
-            const result, const overflow = @subWithOverflow(a, input_flag);
+            const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_flag, const flag_overflow = @addWithOverflow(input_2, flag);
+            const result, const overflow = @subWithOverflow(input_1, input_flag);
+            output.* = result;
 
             state.registers.r8.f.flags.carry = flag_overflow | overflow;
-            state.registers.r8.f.flags.half_bcd = @truncate(((a & 0xF) -% (input_1 & 0xF) -% flag) >> 4);
+            state.registers.r8.f.flags.half_bcd = @truncate(((input_1 & 0xF) -% (input_2 & 0xF) -% flag) >> 4);
             state.registers.r8.f.flags.n_bcd = 1;
             state.registers.r8.f.flags.zero = @intFromBool(result == 0);
-
-            state.registers.r8.a = result;
             applyPins(state, mmu);
         },
         .alu_scf => {
@@ -1284,12 +1282,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             // And this check is done at worst every m-cycle. but it could also just happen the moment an interrupt is set.
             const interrupt_signal: u8 = mmu.memory[mem_map.interrupt_enable] & mmu.memory[mem_map.interrupt_flag];
             if(state.interrupt_master_enable and interrupt_signal != 0) {
-                // https://stackoverflow.com/questions/757059/position-of-least-significant-bit-that-is-set
-                const deBrujinHash: u16 = 0b0001_1101;
-                const deBrujinTable = [_]u3{ 0, 1, 6, 2, 7, 5, 4, 3 }; 
-                const interrupt_lowest: u8 = interrupt_signal & ~(interrupt_signal -% 1);
-                const interrupt_hash: u8 = @truncate(@as(u16, interrupt_lowest) * deBrujinHash);
-                const interrupt_idx: u3 = deBrujinTable[interrupt_hash >> 5];
+                const interrupt_idx: u3 = getLowestSetBit(interrupt_signal);
                 const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
                 state.uop_fifo.write(interrupt_uops.slice());
 
@@ -1373,6 +1366,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             unreachable;
         },
     }
+}
+
+fn getLowestSetBit(value: u8) u3 {
+    // https://stackoverflow.com/questions/757059/position-of-least-significant-bit-that-is-set
+    const deBrujinHash: u16 = 0b0001_1101;
+    const deBrujinTable = [_]u3{ 0, 1, 6, 2, 7, 5, 4, 3 }; 
+    const lowest: u8 = value & ~(value -% 1);
+    const hash: u8 = @truncate(@as(u16, lowest) * deBrujinHash);
+    return deBrujinTable[hash >> 5];
 }
 
 fn applyPins(state: *State, mmu: *MMU.State) void {
