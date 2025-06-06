@@ -102,7 +102,7 @@ const AluParams = packed struct(u15) {
             registers.getU8(params.input_1).*,
             registers.getU8(params.input_2.rfid).*,
             params.input_2.value,
-            @intFromBool(registers.getFlag(params.ffid)),
+            registers.getFlag(params.ffid),
             registers.getU8(params.output),
         };
     }
@@ -973,10 +973,10 @@ const RegisterFile = packed union {
         const base: [*]u16 = @alignCast(@ptrCast(self));
         return @ptrCast(base + index_u16);
     } 
-    pub fn getFlag(self: *Self, ffid: FlagFileID) bool {
+    pub fn getFlag(self: *Self, ffid: FlagFileID) u1 {
         const bit_index: u3 = @intFromEnum(ffid); 
-        const result: u8 = (self.r8.f.f >> bit_index) & 0x01;
-        return result == 0x01;
+        const result: u1 = @truncate(self.r8.f.f >> bit_index);
+        return result;
     }
 };
 
@@ -1184,7 +1184,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             var result, const shifted_bit = @shlWithOverflow(input_1, 1);
             state.registers.r8.f.flags.temp_msb = shifted_bit;
-            const flag: u8 = @intFromBool(state.registers.getFlag(uop.params.alu.ffid));
+            const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
             result |= flag;
             output.* = result;
 
@@ -1197,11 +1197,11 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         },
         .alu_srf => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const lsb: u1 = @intCast(input_1 & 0x01); 
+            const lsb: u1 = @truncate(input_1); 
             const msb: u1 = @intCast(input_1 >> 7);
             state.registers.r8.f.flags.temp_lsb = lsb;
             state.registers.r8.f.flags.temp_msb = msb;
-            const flag: u8 = @intFromBool(state.registers.getFlag(uop.params.alu.ffid));
+            const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
             const result: u8 = (input_1 >> 1) | (flag << 7);
             output.* = result;
 

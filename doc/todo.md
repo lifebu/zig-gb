@@ -1,6 +1,8 @@
 # src3:
 ## CPU:
 - Go over ToDos and do cleanup in cpu.zig!
+    - rework idu_adjust
+    - rework addr_idu
     - Expand FFID so that the pseudo flags are outside of the normal register set (after a).
     - Create helper function to update flags.
         - With a struct as the parameter?
