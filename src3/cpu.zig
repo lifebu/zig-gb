@@ -918,28 +918,20 @@ const InterruptFlags = packed struct(u8) {
     // TODO: Maybe a function where I combine two Flags (IF and IE) and it returns which interrupt is pending?
 };
 
-// TODO: Remove f and p and not have a packed union?
-pub const FlagRegister = packed union {
-    f: u8,
-    flags: packed struct {
-        _: u4 = 0,
-        carry: u1 = 0,
-        half_bcd: u1 = 0,
-        n_bcd: u1 = 0,
-        zero: u1 = 0,
-    },
+pub const FlagRegister = packed struct(u8) {
+    _: u4 = 0,
+    carry: u1 = 0,
+    half_bcd: u1 = 0,
+    n_bcd: u1 = 0,
+    zero: u1 = 0,
 };
-const PseudoFlagRegister = packed union {
-    p: u8,
-    pseudo: packed struct {
-        temp_lsb: u1 = 0,
-        temp_msb: u1 = 0,
-        const_one: u1 = 1,
-        const_zero: u1 = 0,
-        _: u4 = 0,
-    },
+const PseudoFlagRegister = packed struct(u8) {
+    temp_lsb: u1 = 0,
+    temp_msb: u1 = 0,
+    const_one: u1 = 1,
+    const_zero: u1 = 0,
+    _: u4 = 0,
 };
-
 const RegisterFile = packed union {
     r16: packed struct {
         bc: u16 = 0,
@@ -961,8 +953,9 @@ const RegisterFile = packed union {
         pcl: u8 = 0, pch: u8 = 0,
         spl: u8 = 0, sph: u8 = 0,
         ir: u8 = 0, dbus: u8 = 0,
-        f: FlagRegister = .{ .flags = .{} }, a: u8 = 0,
-        p: PseudoFlagRegister = .{ .pseudo = .{} }, u: u8 = 0,
+        f: FlagRegister = .{}, a: u8 = 0,
+        // p = Pseudo, u = unused
+        p: PseudoFlagRegister = .{}, u: u8 = 0,
     },
 
     const Self = @This();
@@ -979,8 +972,8 @@ const RegisterFile = packed union {
         return @ptrCast(base + index_u16);
     } 
     pub fn getFlag(self: *Self, ffid: FlagFileID) u1 {
-        // Note: This only works for the specific memory layout above.
-        // Flag followed by A followed by Pseudoflag.
+        // Note: This only works for the specific memory layout above (bytes and bits).
+        // Flag followed by A followed by Pseudoflag. And the specific order of the bits.
         const ffid_idx: u5 = @intFromEnum(ffid);
         const base_index: u5 = ffid_idx + 4; 
         const offset: u5 = base_index + (8 * (base_index / 8));
@@ -1059,13 +1052,13 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result, const overflow = @addWithOverflow(input_2, input_flag);
             output.* = result;
 
-            state.registers.r8.f.flags.carry = flag_overflow | overflow;
-            state.registers.r8.f.flags.half_bcd = @truncate(((input_1 & 0xF) + (input_2 & 0xF) + flag) >> 4);
-            state.registers.r8.f.flags.n_bcd = 0;
+            state.registers.r8.f.carry = flag_overflow | overflow;
+            state.registers.r8.f.half_bcd = @truncate(((input_1 & 0xF) + (input_2 & 0xF) + flag) >> 4);
+            state.registers.r8.f.n_bcd = 0;
             // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
             // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
             if(uop.params.alu.output == .a) {
-                state.registers.r8.f.flags.zero = @intFromBool(result == 0);
+                state.registers.r8.f.zero = @intFromBool(result == 0);
             }
             applyPins(state, mmu);
         },
@@ -1073,11 +1066,11 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
             state.registers.r8.a &= input_1;
 
-            state.registers.r8.f.flags.carry = 0;
-            state.registers.r8.f.flags.half_bcd = 1;
-            state.registers.r8.f.flags.n_bcd = 0;
+            state.registers.r8.f.carry = 0;
+            state.registers.r8.f.half_bcd = 1;
+            state.registers.r8.f.n_bcd = 0;
             // TODO: Can you do this better then converting from bool?
-            state.registers.r8.f.flags.zero = @intFromBool(state.registers.r8.a == 0);
+            state.registers.r8.f.zero = @intFromBool(state.registers.r8.a == 0);
             applyPins(state, mmu);
         },
         .alu_assign => {
@@ -1089,15 +1082,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_1, _, const input_2, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
             const result: u8 = input_1 & (@as(u8, 1) << @as(u3, @intCast(input_2)));
 
-            state.registers.r8.f.flags.half_bcd = 1;
-            state.registers.r8.f.flags.n_bcd = 0;
-            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
+            state.registers.r8.f.half_bcd = 1;
+            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f.zero = @intFromBool(result == 0);
             applyPins(state, mmu);
         },
         .alu_ccf => {
-            state.registers.r8.f.flags.carry = ~state.registers.r8.f.flags.carry;
-            state.registers.r8.f.flags.half_bcd = 0;
-            state.registers.r8.f.flags.n_bcd = 0;
+            state.registers.r8.f.carry = ~state.registers.r8.f.carry;
+            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f.n_bcd = 0;
             applyPins(state, mmu);
         },
         .alu_cp => {
@@ -1105,14 +1098,14 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const a: u8 = state.registers.r8.a;
             const result, const overflow = @subWithOverflow(a, input_1);
 
-            state.registers.r8.f.flags.carry = overflow;
-            state.registers.r8.f.flags.half_bcd = @truncate(((a & 0xF) -% (input_1 & 0xF)) >> 4);
-            state.registers.r8.f.flags.n_bcd = 1;
-            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
+            state.registers.r8.f.carry = overflow;
+            state.registers.r8.f.half_bcd = @truncate(((a & 0xF) -% (input_1 & 0xF)) >> 4);
+            state.registers.r8.f.n_bcd = 1;
+            state.registers.r8.f.zero = @intFromBool(result == 0);
             applyPins(state, mmu);
         },
         .alu_daa_adjust => {
-            const f = state.registers.r8.f.flags;
+            const f = state.registers.r8.f;
             const a = state.registers.r8.a;
             const low: u1 = ~f.n_bcd & @intFromBool((a & 0xF) > 0x09) | f.half_bcd;
             const high: u1 = ~f.n_bcd & @intFromBool(a > 0x99) | f.carry;
@@ -1120,9 +1113,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result = if (f.n_bcd == 1) a -% offset else a +% offset;
             state.registers.r8.a = result;
 
-            state.registers.r8.f.flags.carry = high;
-            state.registers.r8.f.flags.half_bcd = 0;
-            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
+            state.registers.r8.f.carry = high;
+            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f.zero = @intFromBool(result == 0);
             applyPins(state, mmu);
         },
         .alu_inc => {
@@ -1136,27 +1129,27 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             output.* = input_1 +% factor_inc;
 
             // TODO: Maybe we create a more compact way to change the flags? Like a function?
-            state.registers.r8.f.flags.half_bcd = @truncate(((input_1 & 0xF) +% factor_inc) >> 4); 
-            state.registers.r8.f.flags.n_bcd = if(factor < 0) 1 else 0;
-            state.registers.r8.f.flags.zero = @intFromBool(output.* == 0); 
+            state.registers.r8.f.half_bcd = @truncate(((input_1 & 0xF) +% factor_inc) >> 4); 
+            state.registers.r8.f.n_bcd = if(factor < 0) 1 else 0;
+            state.registers.r8.f.zero = @intFromBool(output.* == 0); 
             applyPins(state, mmu);
         },
         .alu_not => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             output.* = ~input_1;
 
-            state.registers.r8.f.flags.half_bcd = 1;
-            state.registers.r8.f.flags.n_bcd = 1;
+            state.registers.r8.f.half_bcd = 1;
+            state.registers.r8.f.n_bcd = 1;
             applyPins(state, mmu);
         },
         .alu_or => {
             const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
             state.registers.r8.a |= input_1;
 
-            state.registers.r8.f.flags.carry = 0;
-            state.registers.r8.f.flags.half_bcd = 0;
-            state.registers.r8.f.flags.n_bcd = 0;
-            state.registers.r8.f.flags.zero = @intFromBool(state.registers.r8.a == 0);
+            state.registers.r8.f.carry = 0;
+            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f.zero = @intFromBool(state.registers.r8.a == 0);
             applyPins(state, mmu);
         }, 
         .alu_res => {
@@ -1171,16 +1164,16 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result, const overflow = @subWithOverflow(input_1, input_flag);
             output.* = result;
 
-            state.registers.r8.f.flags.carry = flag_overflow | overflow;
-            state.registers.r8.f.flags.half_bcd = @truncate(((input_1 & 0xF) -% (input_2 & 0xF) -% flag) >> 4);
-            state.registers.r8.f.flags.n_bcd = 1;
-            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
+            state.registers.r8.f.carry = flag_overflow | overflow;
+            state.registers.r8.f.half_bcd = @truncate(((input_1 & 0xF) -% (input_2 & 0xF) -% flag) >> 4);
+            state.registers.r8.f.n_bcd = 1;
+            state.registers.r8.f.zero = @intFromBool(result == 0);
             applyPins(state, mmu);
         },
         .alu_scf => {
-            state.registers.r8.f.flags.carry = 1;
-            state.registers.r8.f.flags.half_bcd = 0;
-            state.registers.r8.f.flags.n_bcd = 0;
+            state.registers.r8.f.carry = 1;
+            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f.n_bcd = 0;
             applyPins(state, mmu);
         },
         .alu_set => {
@@ -1192,33 +1185,33 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .alu_slf => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             var result, const shifted_bit = @shlWithOverflow(input_1, 1);
-            state.registers.r8.p.pseudo.temp_msb = shifted_bit;
+            state.registers.r8.p.temp_msb = shifted_bit;
             const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
             result |= flag;
             output.* = result;
 
-            state.registers.r8.f.flags.carry = shifted_bit;
-            state.registers.r8.f.flags.half_bcd = 0;
-            state.registers.r8.f.flags.n_bcd = 0;
+            state.registers.r8.f.carry = shifted_bit;
+            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f.n_bcd = 0;
             // TODO: Workaround to not set the flag values for rlca. Need a better flag system.
-            state.registers.r8.f.flags.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
+            state.registers.r8.f.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
             applyPins(state, mmu);
         },
         .alu_srf => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             const lsb: u1 = @truncate(input_1); 
             const msb: u1 = @intCast(input_1 >> 7);
-            state.registers.r8.p.pseudo.temp_lsb = lsb;
-            state.registers.r8.p.pseudo.temp_msb = msb;
+            state.registers.r8.p.temp_lsb = lsb;
+            state.registers.r8.p.temp_msb = msb;
             const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
             const result: u8 = (input_1 >> 1) | (flag << 7);
             output.* = result;
 
-            state.registers.r8.f.flags.carry = lsb;
+            state.registers.r8.f.carry = lsb;
             // TODO: Workaround to not set the flag values for rra. Need a better flag system.
-            state.registers.r8.f.flags.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
-            state.registers.r8.f.flags.n_bcd = 0;
-            state.registers.r8.f.flags.half_bcd = 0;
+            state.registers.r8.f.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
+            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f.half_bcd = 0;
             applyPins(state, mmu);
         },
         .alu_swap => {
@@ -1226,20 +1219,20 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result = (input_1 << 4) | (input_1 >> 4);
             output.* = result;
 
-            state.registers.r8.f.flags.carry = 0;
-            state.registers.r8.f.flags.zero = @intFromBool(result == 0);
-            state.registers.r8.f.flags.n_bcd = 0;
-            state.registers.r8.f.flags.half_bcd = 0;
+            state.registers.r8.f.carry = 0;
+            state.registers.r8.f.zero = @intFromBool(result == 0);
+            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f.half_bcd = 0;
             applyPins(state, mmu);
         },
         .alu_xor => {
             const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
             state.registers.r8.a ^= input_1;
 
-            state.registers.r8.f.flags.carry = 0;
-            state.registers.r8.f.flags.half_bcd = 0;
-            state.registers.r8.f.flags.n_bcd = 0;
-            state.registers.r8.f.flags.zero = @intFromBool(state.registers.r8.a == 0);
+            state.registers.r8.f.carry = 0;
+            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f.zero = @intFromBool(state.registers.r8.a == 0);
             applyPins(state, mmu);
         },
         .apply_pins => {
@@ -1253,10 +1246,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const params: MiscParams = uop.params.misc;
             const cc = params.cc;
             const flag: u1 = switch(cc) {
-                .not_zero => ~state.registers.r8.f.flags.zero,
-                .zero => state.registers.r8.f.flags.zero,
-                .not_carry => ~state.registers.r8.f.flags.carry,
-                .carry => state.registers.r8.f.flags.carry,
+                .not_zero => ~state.registers.r8.f.zero,
+                .zero => state.registers.r8.f.zero,
+                .not_carry => ~state.registers.r8.f.carry,
+                .carry => state.registers.r8.f.carry,
             };
 
             if(flag == 0) { // Load next instruction
@@ -1335,10 +1328,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.registers.r8.z = result;
 
             if(params.change_flags) {
-                state.registers.r8.f.flags.carry = overflow;
-                state.registers.r8.f.flags.half_bcd = @truncate(((input_low & 0xF) + (z & 0xF)) >> 4);
-                state.registers.r8.f.flags.n_bcd = 0;
-                state.registers.r8.f.flags.zero = 0;
+                state.registers.r8.f.carry = overflow;
+                state.registers.r8.f.half_bcd = @truncate(((input_low & 0xF) + (z & 0xF)) >> 4);
+                state.registers.r8.f.n_bcd = 0;
+                state.registers.r8.f.zero = 0;
             }
 
             const z_sign: u1 = @intCast(z >> 7);
