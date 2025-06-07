@@ -512,11 +512,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, .z, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, .a, .z, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, rfid, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, .a, rfid, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -527,11 +527,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, .z, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, .a, .z, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, rfid, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, .a, rfid, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -542,11 +542,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, .z, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, .a, .z, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, rfid, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, .a, rfid, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -557,11 +557,11 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         if(rfid == .dbus) {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                 AddrIdu(.l, 0, .l, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, .z, .z, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, .a, .z, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, rfid, rfid, .a), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, .a, rfid, .a), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -721,7 +721,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: AND a, imm8 and AND a, r8 are very similar.
     returnVal[opcode_bank_default][0xE6].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, .z, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_and, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // ADD SP, imm8 (signed)
@@ -750,7 +750,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: XOR a, imm8 and XOR a, r8 are very similar.
     returnVal[opcode_bank_default][0xEE].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, .z, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_xor, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LDH a, [imm8]
@@ -784,7 +784,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: OR a, imm8 and OR a, r8 are very similar.
     returnVal[opcode_bank_default][0xF6].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, .z, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_or, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD HL, SP+imm8(signed)
@@ -810,7 +810,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: CP a, imm8 and CP a, r8 are very similar.
     returnVal[opcode_bank_default][0xFE].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, .z, .z, .a), Decode(opcode_bank_default),
+        AddrIdu(.pcl, 1, .pcl, false), Dbus(.dbus, .ir), Alu(.alu_cp, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     //
@@ -1012,9 +1012,9 @@ pub fn init(state: *State) void {
 }
 
 pub fn cycle(state: *State, mmu: *MMU.State) void {
+    const flags = state.registers.r8.f;
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
-        // TODO: When and how does the cpu write the result of the memory request to it's dbus?
         .addr_idu => {
             const params: AddrIduParams = uop.params.addr_idu;
             if(params.low_offset) {
@@ -1037,40 +1037,23 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
 
             applyPins(state, mmu);
         },
-        // TODO: Look at all the alu implementation and see where we can use some common changes and combine them to make the code clearer and more concise.
-        // TODO: Look at all of the uops and see if we can combine them. Examples
-        // - Inc and Dec can be expressed the same: -1 <=> +% 255
-        //      - Inc and Dec could also be expressed by add and sub respectively?
-        // - Can ADD and ADC as well as SUB and SBC be combined?
-        // - Can we express add and sub the same: -n <=> +% (256 - n)
-        // - AND, OR, XOR are the same code. The only thing that changes is the actual operation. 
-        // - Is RLC with C = 0 the same as RL? (Same for RRC with C = 0 and RR). 
-        // - Can we combine sr and srl?
         .alu_adf => {
             const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             const input_flag, const flag_overflow = @addWithOverflow(input_1, flag);
             const result, const overflow = @addWithOverflow(input_2, input_flag);
             output.* = result;
 
-            state.registers.r8.f.carry = flag_overflow | overflow;
-            state.registers.r8.f.half_bcd = @truncate(((input_1 & 0xF) + (input_2 & 0xF) + flag) >> 4);
-            state.registers.r8.f.n_bcd = 0;
-            // TODO: This feels extemly hacky and I don't know if this works in practice all the time.
-            // ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do?
-            if(uop.params.alu.output == .a) {
-                state.registers.r8.f.zero = @intFromBool(result == 0);
-            }
+            const half_bcd: u1 = @truncate(((input_1 & 0xF) + (input_2 & 0xF) + flag) >> 4);
+            // TODO: Super hacky. ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do.
+            const zero: u1 = if(uop.params.alu.output == .a) @intFromBool(result == 0) else flags.zero;
+            state.registers.r8.f = .{ .carry = flag_overflow | overflow, .half_bcd = half_bcd, .n_bcd = 0, .zero = zero};
             applyPins(state, mmu);
         },
         .alu_and => {
-            const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
-            state.registers.r8.a &= input_1;
-
-            state.registers.r8.f.carry = 0;
-            state.registers.r8.f.half_bcd = 1;
-            state.registers.r8.f.n_bcd = 0;
-            // TODO: Can you do this better then converting from bool?
-            state.registers.r8.f.zero = @intFromBool(state.registers.r8.a == 0);
+            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            output.* = input_1 & input_2;
+            
+            state.registers.r8.f = .{ .carry = 0, .half_bcd = 1, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
             applyPins(state, mmu);
         },
         .alu_assign => {
@@ -1082,45 +1065,33 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_1, _, const input_2, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
             const result: u8 = input_1 & (@as(u8, 1) << @as(u3, @intCast(input_2)));
 
-            state.registers.r8.f.half_bcd = 1;
-            state.registers.r8.f.n_bcd = 0;
-            state.registers.r8.f.zero = @intFromBool(result == 0);
+            state.registers.r8.f = .{ .carry = flags.carry, .half_bcd = 1, .n_bcd = 0, .zero = @intFromBool(result == 0) };
             applyPins(state, mmu);
         },
         .alu_ccf => {
-            state.registers.r8.f.carry = ~state.registers.r8.f.carry;
-            state.registers.r8.f.half_bcd = 0;
-            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f = .{ .carry = ~flags.carry, .half_bcd = 0, .n_bcd = 0, .zero = flags.zero };
             applyPins(state, mmu);
         },
         .alu_cp => {
-            const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
-            const a: u8 = state.registers.r8.a;
-            const result, const overflow = @subWithOverflow(a, input_1);
+            const input_1, const input_2, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
+            const result, const overflow = @subWithOverflow(input_1, input_2);
 
-            state.registers.r8.f.carry = overflow;
-            state.registers.r8.f.half_bcd = @truncate(((a & 0xF) -% (input_1 & 0xF)) >> 4);
-            state.registers.r8.f.n_bcd = 1;
-            state.registers.r8.f.zero = @intFromBool(result == 0);
+            const half_bcd: u1 = @truncate(((input_1 & 0xF) -% (input_2 & 0xF)) >> 4);
+            state.registers.r8.f = .{ .carry = overflow, .half_bcd = half_bcd, .n_bcd = 1, .zero = @intFromBool(result == 0) };
             applyPins(state, mmu);
         },
         .alu_daa_adjust => {
-            const f = state.registers.r8.f;
-            const a = state.registers.r8.a;
-            const low: u1 = ~f.n_bcd & @intFromBool((a & 0xF) > 0x09) | f.half_bcd;
-            const high: u1 = ~f.n_bcd & @intFromBool(a > 0x99) | f.carry;
+            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const low: u1 = ~flags.n_bcd & @intFromBool((input_1 & 0xF) > 0x09) | flags.half_bcd;
+            const high: u1 = ~flags.n_bcd & @intFromBool(input_1 > 0x99) | flags.carry;
             const offset: u8 = 0x06 * @as(u8, low) + 0x60 * @as(u8, high);
-            const result = if (f.n_bcd == 1) a -% offset else a +% offset;
-            state.registers.r8.a = result;
+            const result = if (flags.n_bcd == 1) input_1 -% offset else input_1 +% offset;
+            output.* = result;
 
-            state.registers.r8.f.carry = high;
-            state.registers.r8.f.half_bcd = 0;
-            state.registers.r8.f.zero = @intFromBool(result == 0);
+            state.registers.r8.f = .{ .carry = high, .half_bcd = 0, .n_bcd = flags.n_bcd, .zero = @intFromBool(result == 0) };
             applyPins(state, mmu);
         },
         .alu_inc => {
-            // TODO: I can probably implement alu_inc with alu_adf? If I also allow an additional u4 value that will be added.
-            // TODO: Maybe use a full u8 instead of the u4? Might be more usefull?
             const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             // TODO: This works but it is a type unsafe to cast a i2 to u4 and back.
             const factor: i2 = @bitCast(@as(u2, @truncate(input_2)));
@@ -1128,33 +1099,29 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const factor_inc: u8 = @bitCast(@as(i8, factor));
             output.* = input_1 +% factor_inc;
 
-            // TODO: Maybe we create a more compact way to change the flags? Like a function?
-            state.registers.r8.f.half_bcd = @truncate(((input_1 & 0xF) +% factor_inc) >> 4); 
-            state.registers.r8.f.n_bcd = if(factor < 0) 1 else 0;
-            state.registers.r8.f.zero = @intFromBool(output.* == 0); 
+            const half_bcd: u1 = @truncate(((input_1 & 0xF) +% factor_inc) >> 4);
+            const n_bcd: u1 = if(factor < 0) 1 else 0;
+            state.registers.r8.f = .{ .carry = flags.carry, .half_bcd = half_bcd, .n_bcd = n_bcd, .zero = @intFromBool(output.* == 0) };
             applyPins(state, mmu);
         },
         .alu_not => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             output.* = ~input_1;
 
-            state.registers.r8.f.half_bcd = 1;
-            state.registers.r8.f.n_bcd = 1;
+            state.registers.r8.f = .{ .carry = flags.carry, .half_bcd = 1, .n_bcd = 1, .zero = flags.zero };
             applyPins(state, mmu);
         },
         .alu_or => {
-            const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
-            state.registers.r8.a |= input_1;
+            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            output.* = input_1 | input_2;
 
-            state.registers.r8.f.carry = 0;
-            state.registers.r8.f.half_bcd = 0;
-            state.registers.r8.f.n_bcd = 0;
-            state.registers.r8.f.zero = @intFromBool(state.registers.r8.a == 0);
+            state.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
             applyPins(state, mmu);
         }, 
         .alu_res => {
             const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const result: u8 = input_1 & ~(@as(u8, 1) << @as(u3, @intCast(input_2)));
+            const mask: u8 = @as(u8, 1) << @as(u3, @intCast(input_2));
+            const result: u8 = input_1 & ~mask;
             output.* = result;
             applyPins(state, mmu);
         }, 
@@ -1164,21 +1131,18 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result, const overflow = @subWithOverflow(input_1, input_flag);
             output.* = result;
 
-            state.registers.r8.f.carry = flag_overflow | overflow;
-            state.registers.r8.f.half_bcd = @truncate(((input_1 & 0xF) -% (input_2 & 0xF) -% flag) >> 4);
-            state.registers.r8.f.n_bcd = 1;
-            state.registers.r8.f.zero = @intFromBool(result == 0);
+            const half_bcd: u1 = @truncate(((input_1 & 0xF) -% (input_2 & 0xF) -% flag) >> 4);
+            state.registers.r8.f = .{ .carry = flag_overflow | overflow, .half_bcd = half_bcd, .n_bcd = 1, .zero = @intFromBool(result == 0) };
             applyPins(state, mmu);
         },
         .alu_scf => {
-            state.registers.r8.f.carry = 1;
-            state.registers.r8.f.half_bcd = 0;
-            state.registers.r8.f.n_bcd = 0;
+            state.registers.r8.f = .{ .carry = 1, .half_bcd = 0, .n_bcd = 0, .zero = flags.zero };
             applyPins(state, mmu);
         },
         .alu_set => {
             const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
-            const result: u8 = input_1 | (@as(u8, 1) << @as(u3, @intCast(input_2)));
+            const mask: u8 = @as(u8, 1) << @as(u3, @intCast(input_2));
+            const result: u8 = input_1 | mask;
             output.* = result;
             applyPins(state, mmu);
         },
@@ -1190,11 +1154,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             result |= flag;
             output.* = result;
 
-            state.registers.r8.f.carry = shifted_bit;
-            state.registers.r8.f.half_bcd = 0;
-            state.registers.r8.f.n_bcd = 0;
             // TODO: Workaround to not set the flag values for rlca. Need a better flag system.
-            state.registers.r8.f.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
+            const zero: u1 = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
+            state.registers.r8.f = .{ .carry = shifted_bit, .half_bcd = 0, .n_bcd = 0, .zero = zero };
             applyPins(state, mmu);
         },
         .alu_srf => {
@@ -1207,11 +1169,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result: u8 = (input_1 >> 1) | (flag << 7);
             output.* = result;
 
-            state.registers.r8.f.carry = lsb;
             // TODO: Workaround to not set the flag values for rra. Need a better flag system.
-            state.registers.r8.f.zero = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
-            state.registers.r8.f.n_bcd = 0;
-            state.registers.r8.f.half_bcd = 0;
+            const zero: u1 = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
+            state.registers.r8.f = .{ .carry = lsb, .half_bcd = 0, .n_bcd = 0, .zero = zero };
             applyPins(state, mmu);
         },
         .alu_swap => {
@@ -1219,20 +1179,14 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result = (input_1 << 4) | (input_1 >> 4);
             output.* = result;
 
-            state.registers.r8.f.carry = 0;
-            state.registers.r8.f.zero = @intFromBool(result == 0);
-            state.registers.r8.f.n_bcd = 0;
-            state.registers.r8.f.half_bcd = 0;
+            state.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(result == 0) };
             applyPins(state, mmu);
         },
         .alu_xor => {
-            const input_1, _, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
-            state.registers.r8.a ^= input_1;
+            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            output.* = input_1 ^ input_2;
 
-            state.registers.r8.f.carry = 0;
-            state.registers.r8.f.half_bcd = 0;
-            state.registers.r8.f.n_bcd = 0;
-            state.registers.r8.f.zero = @intFromBool(state.registers.r8.a == 0);
+            state.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
             applyPins(state, mmu);
         },
         .apply_pins => {
@@ -1327,11 +1281,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const result, const overflow = @addWithOverflow(z, input_low);
             state.registers.r8.z = result;
 
+            // TODO: Can we do this better? Relative jumps to not change the flags, but other instructions do.
             if(params.change_flags) {
-                state.registers.r8.f.carry = overflow;
-                state.registers.r8.f.half_bcd = @truncate(((input_low & 0xF) + (z & 0xF)) >> 4);
-                state.registers.r8.f.n_bcd = 0;
-                state.registers.r8.f.zero = 0;
+                const half_bcd: u1 = @truncate(((input_low & 0xF) + (z & 0xF)) >> 4);
+                state.registers.r8.f = .{ .carry = overflow, .half_bcd = half_bcd, .n_bcd = 0, .zero = 0 };
             }
 
             const z_sign: u1 = @intCast(z >> 7);
