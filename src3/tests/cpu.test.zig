@@ -38,7 +38,6 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     cpu.registers.r16.sp = test_case.initial.sp;
     cpu.registers.r8.a = test_case.initial.a;
     cpu.registers.r8.f.f = test_case.initial.f;
-    cpu.registers.r8.f.flags.const_one = 1;
     cpu.registers.r8.b = test_case.initial.b;
     cpu.registers.r8.c = test_case.initial.c;
     cpu.registers.r8.d = test_case.initial.d;
@@ -71,8 +70,8 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
     try std.testing.expectEqual(expected_flags.flags.half_bcd, cpu.registers.r8.f.flags.half_bcd);
     try std.testing.expectEqual(expected_flags.flags.n_bcd, cpu.registers.r8.f.flags.n_bcd);
     try std.testing.expectEqual(expected_flags.flags.zero, cpu.registers.r8.f.flags.zero);
-    try std.testing.expectEqual(0, cpu.registers.r8.f.flags.const_zero);
-    try std.testing.expectEqual(1, cpu.registers.r8.f.flags.const_one);
+    try std.testing.expectEqual(0, cpu.registers.r8.p.pseudo.const_zero);
+    try std.testing.expectEqual(1, cpu.registers.r8.p.pseudo.const_one);
     try std.testing.expectEqual(test_case.final.b, cpu.registers.r8.b);
     try std.testing.expectEqual(test_case.final.c, cpu.registers.r8.c);
     try std.testing.expectEqual(test_case.final.d, cpu.registers.r8.d);
@@ -152,7 +151,7 @@ pub fn runSingleStepTests() !void {
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
-            if(std.mem.eql(u8, test_case.name, "28 0003")) {
+            if(std.mem.eql(u8, test_case.name, "CB 0F 0000")) {
                 const a: u32 = 10;
                 if(a == 10) {}
             }

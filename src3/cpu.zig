@@ -22,10 +22,12 @@ const RegisterFileID = enum(u4) {
 };
 
 const FlagFileID = enum(u3) {
-    temp_lsb, temp_msb,
-    const_one, const_zero,
+    // Flags
     carry, half_bcd,
     n_bcd, zero,
+    // Pseudo
+    temp_lsb, temp_msb,
+    const_one, const_zero,
 };
 
 // TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
@@ -916,24 +918,25 @@ const InterruptFlags = packed struct(u8) {
     // TODO: Maybe a function where I combine two Flags (IF and IE) and it returns which interrupt is pending?
 };
 
+// TODO: Remove f and p and not have a packed union?
 pub const FlagRegister = packed union {
     f: u8,
     flags: packed struct {
-        // TODO: Pseudo flags are only for the internal usage of the emulator and not part of the gameboy itself.
-        // The gameboy always sees them as 0. But this adds some house keeping to make sure we don't ovewrite them with PUSH AF and POP AF.
-        // Could we implement the ffids better so that this bookkeeping is not necessary?
-        // For example there is another byte in the RegisterFile after the Flags for the pseudo flags.
-        // FFID than has 4 unused at the start, the 4 actual flags and then the flags of the next byte you can address.
-        // Pseudo flags
-        temp_lsb: u1 = 0,
-        temp_msb: u1 = 0,
-        const_one: u1 = 1,
-        const_zero: u1 = 0,
-        // Cpu flags
+        _: u4 = 0,
         carry: u1 = 0,
         half_bcd: u1 = 0,
         n_bcd: u1 = 0,
         zero: u1 = 0,
+    },
+};
+const PseudoFlagRegister = packed union {
+    p: u8,
+    pseudo: packed struct {
+        temp_lsb: u1 = 0,
+        temp_msb: u1 = 0,
+        const_one: u1 = 1,
+        const_zero: u1 = 0,
+        _: u4 = 0,
     },
 };
 
@@ -947,6 +950,7 @@ const RegisterFile = packed union {
         sp: u16 = 0,
         ir_dbus: u16 = 0,
         af: u16 = 0,
+        pu: u16 = 0,
     },
     // Note: gb and x86 are little-endian
     r8: packed struct {
@@ -958,6 +962,7 @@ const RegisterFile = packed union {
         spl: u8 = 0, sph: u8 = 0,
         ir: u8 = 0, dbus: u8 = 0,
         f: FlagRegister = .{ .flags = .{} }, a: u8 = 0,
+        p: PseudoFlagRegister = .{ .pseudo = .{} }, u: u8 = 0,
     },
 
     const Self = @This();
@@ -974,9 +979,13 @@ const RegisterFile = packed union {
         return @ptrCast(base + index_u16);
     } 
     pub fn getFlag(self: *Self, ffid: FlagFileID) u1 {
-        const bit_index: u3 = @intFromEnum(ffid); 
-        const result: u1 = @truncate(self.r8.f.f >> bit_index);
-        return result;
+        // Note: This only works for the specific memory layout above.
+        // Flag followed by A followed by Pseudoflag.
+        const ffid_idx: u5 = @intFromEnum(ffid);
+        const base_index: u5 = ffid_idx + 4; 
+        const offset: u5 = base_index + (8 * (base_index / 8));
+        const base: *align(1) u32 = @alignCast(@ptrCast(&self.r8.f));
+        return @truncate(base.* >> offset);
     }
 };
 
@@ -1183,7 +1192,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .alu_slf => {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             var result, const shifted_bit = @shlWithOverflow(input_1, 1);
-            state.registers.r8.f.flags.temp_msb = shifted_bit;
+            state.registers.r8.p.pseudo.temp_msb = shifted_bit;
             const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
             result |= flag;
             output.* = result;
@@ -1199,8 +1208,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
             const lsb: u1 = @truncate(input_1); 
             const msb: u1 = @intCast(input_1 >> 7);
-            state.registers.r8.f.flags.temp_lsb = lsb;
-            state.registers.r8.f.flags.temp_msb = msb;
+            state.registers.r8.p.pseudo.temp_lsb = lsb;
+            state.registers.r8.p.pseudo.temp_msb = msb;
             const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
             const result: u8 = (input_1 >> 1) | (flag << 7);
             output.* = result;
@@ -1263,9 +1272,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .dbus => {
             const params: DBusParams = uop.params.dbus;
             const source = state.registers.getU8(params.source);
-            // Make sure to never overwrite the pseudo flags.
-            const mask: u8 = if(params.source == .f) 0xF0 else 0xFF;
-            state.dbus_source = source.* & mask;
+            state.dbus_source = source.*;
             state.dbus_target = state.registers.getU8(params.target);
             const request: MemoryRequest = if(params.source == .dbus) .read else if(params.target == .dbus) .write else .none;
             pushPins(state, mmu, request);
@@ -1356,9 +1363,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .wz_writeback => {
             const params: MiscParams = uop.params.misc;
             const target: *u16 = state.registers.getU16(params.write_back);
-            // Make sure to never overwrite the pseudo flags.
-            const mask: u16 = if(params.write_back == .f) 0xFFF0 else 0xFFFF;
-            target.* = (state.registers.r16.wz & mask) | (target.* & ~mask); 
+            target.* = state.registers.r16.wz;
             applyPins(state, mmu);
         },
         else => { 
