@@ -113,19 +113,20 @@ const DecodeParams = packed struct(u15) {
     bank_idx: u2 = opcode_bank_default,
     _: u13 = 0,
 };
-// TODO: Is this the best way to implement this?
-const ConditionCheck = enum(u2) {
+// TODO: Replace ConditionCheck with FlagFileID?
+const ConditionCheck = enum(u3) {
     not_zero,
     zero,
     not_carry,
     carry,
+    const_one,
 };
 const MiscParams = packed struct(u15) {
     write_back: RegisterFileID = .a,
     ime_value: bool = false,
     rst_idx: u4 = 0,
     cc: ConditionCheck = .not_zero,
-    _: u4 = 0,
+    _: u3 = 0,
 };
 const MicroOpData = struct {
     operation: MicroOp,
@@ -205,7 +206,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .dbus, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
     const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .f };
+    // TODO: Can we combine them? Can we use cond_cc_jump for the oother cond_cc?
     const cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
+    const cond_cc_jump = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry, .const_one };
     
     // TODO: Right now some instruction use a different order than the default.
     // Could I find a order that fits all the cases cleanly?
@@ -350,16 +353,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
-    // JR r8 
-    returnVal[opcode_bank_default][0x18].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
-        AddrIdu(.z, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // JR cond imm8
-    const jr_cond_imm8_opcodes = [_]u8{ 0x20, 0x28, 0x30, 0x38 };
-    for(jr_cond_imm8_opcodes, cond_cc) |opcode, cc| {
+    // JR imm8, JR cond imm8
+    const jr_opcodes = [_]u8{ 0x20, 0x28, 0x30, 0x38, 0x18 };
+    for(jr_opcodes, cond_cc_jump) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), MiscCC(cc), Nop(),
             IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
@@ -483,9 +479,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
-    // JP cond imm16
-    const jp_cond_opcodes = [_]u8{ 0xC2, 0xCA, 0xD2, 0xDA };
-    for(jp_cond_opcodes, cond_cc) |opcode, cc| {
+    // JP cond imm16, JP imm16
+    const jp_opcodes = [_]u8{ 0xC2, 0xCA, 0xD2, 0xDA, 0xC3 };
+    for(jp_opcodes, cond_cc_jump) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), MiscCC(cc), Nop(),
@@ -505,15 +501,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
-
-    // JP imm16
-    returnVal[opcode_bank_default][0xC3].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), ApplyPins(), Nop(),
-        Nop(), Nop(), MiscWB(.pcl), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-    }) catch unreachable;
-
 
     // CALL cond imm16
     const call_cond_opcodes = [_]u8{ 0xC4, 0xCC, 0xD4, 0xDC };
@@ -650,10 +637,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // DI (Disable Interrupts)
-    returnVal[opcode_bank_default][0xF3].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(false), Decode(opcode_bank_default),
-    }) catch unreachable;
+    // DI (Disable Interrupts), EI (Disable Interrupts)
+    const ime_opcodes = [_]u8{ 0xF3, 0xFB };
+    const ime_value = [_]bool{ false, true };
+    for(ime_opcodes, ime_value) |opcode, ime| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(ime), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // LD HL, SP+imm8(signed)
     returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
@@ -667,11 +658,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     returnVal[opcode_bank_default][0xF9].appendSlice(&[_]MicroOpData{
         AddrIdu(.l, 0, .spl), Dbus(.dbus, .z), ApplyPins(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // EI (Enable Interrupts)
-    returnVal[opcode_bank_default][0xFB].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(true), Decode(opcode_bank_default),
     }) catch unreachable;
 
     //
@@ -1065,6 +1051,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 .zero => state.registers.r8.f.zero,
                 .not_carry => ~state.registers.r8.f.carry,
                 .carry => state.registers.r8.f.carry,
+                .const_one => state.registers.r8.p.const_one,
             };
 
             if(flag == 0) { // Load next instruction
