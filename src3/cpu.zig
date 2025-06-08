@@ -139,7 +139,7 @@ const MicroOpData = struct {
     },
 };
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOpData, longest_instruction_cycles);
-const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
+pub const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
 
 fn AddrIdu(addr: RegisterFileID, idu: i2, idu_out: RegisterFileID) MicroOpData {
     return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParams{ .addr = addr, .idu = idu, .idu_out = idu_out } } };
@@ -211,6 +211,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // 1: DBUS + Push Pins
     // 2: ALU/MISC + Apply Pins
     // 3: DECODE
+    // TODO: Maybe AddrIdu -> ALU/Misc -> Dbus -> Decode should be the default?
 
     //
     // DEFAULT BANK:
@@ -266,6 +267,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             if(rfid == .dbus) {
                 returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
+                    // TODO: Why does this not follow the default microop order?
                     AddrIdu(.l, 0, .l), AluValueRel(.alu_inc, .z, delta, .z), Dbus(.z, .dbus), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                 }) catch unreachable;
@@ -599,14 +601,16 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // DI (Disable Interrupts), EI (Disable Interrupts)
-    const ime_opcodes = [_]u8{ 0xF3, 0xFB };
-    const ime_value = [_]bool{ false, true };
-    for(ime_opcodes, ime_value) |opcode, ime| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(ime), Decode(opcode_bank_default),
-        }) catch unreachable;
-    }
+    // DI (Disable Interrupts)
+    returnVal[opcode_bank_default][0xF3].appendSlice(&[_]MicroOpData{
+        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(false), Decode(opcode_bank_default),
+    }) catch unreachable;
+
+    // EI (Enable Interrupts)
+    returnVal[opcode_bank_default][0xFB].appendSlice(&[_]MicroOpData{
+        // Note: switching MiscIME with Decode allowes the effect of the EI instruction to be delayed by one instruction.
+        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Decode(opcode_bank_default), MiscIME(true),
+    }) catch unreachable;
 
     // LD HL, SP+imm8(signed)
     returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
@@ -634,6 +638,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             if(rfid == .dbus) {
                 returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
+                    // TODO: Why does this not follow the default microop order?
                     AddrIdu(.l, 0, .l), AluFlag(bit_shift_uop, .z, .z, flag, .z), Dbus(.z, .dbus), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                 }) catch unreachable;
@@ -664,6 +669,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
                     else {
                         returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
                             AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
+                            // TODO: Why does this not follow the default microop order?
                             AddrIdu(.l, 0, .l), AluValue(bit_uop, .z, @intCast(bit_index), .z), Dbus(.z, .dbus), Nop(),
                             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                         }) catch unreachable;
@@ -1006,12 +1012,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             }
         },
         .decode => {
-            const params: DecodeParams = uop.params.decode;
-            const opcode_bank = opcode_banks[params.bank_idx];
-            const opcode: u8 = state.registers.r8.ir;
-            const uops: MicroOpArray = opcode_bank[opcode];
-            state.uop_fifo.write(uops.slice());
-
             // TODO: If an interrupt is pending during an instruction, do we handle interrupt immediately or after the next instruction like this?
 
             // TODO: Consider using an external system to only check and set an interrupt signal line on the cpu when IE and IF are checked.
@@ -1029,6 +1029,12 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
                 const result: u8 = mmu.memory[mem_map.interrupt_flag] & ~mask;
                 mmu.memory[mem_map.interrupt_flag] = result;
+            } else {
+                const params: DecodeParams = uop.params.decode;
+                const opcode_bank = opcode_banks[params.bank_idx];
+                const opcode: u8 = state.registers.r8.ir;
+                const uops: MicroOpArray = opcode_bank[opcode];
+                state.uop_fifo.write(uops.slice());
             }
         },
         .halt => {

@@ -28,12 +28,18 @@ pub fn isFullInstructionLoaded(cpu: *CPU.State, bank: u2, opcode: u8) bool {
         std.debug.print("Failed: uop fifo length does not match instruction: [{}][{X:0>2}]\n", .{ bank, opcode });
         return false;
     };
+
+    // TODO: I don't like this buffer to save the read item. Do we add a function to peakContents that returns a slice to the entire array?
+    var uop_match: bool = true;
+    var uop_buffer = CPU.MicroOpArray{};
     for(instruction) |instruction_uop| {
         const cpu_uop = cpu.uop_fifo.readItem().?;
         std.testing.expectEqual(instruction_uop.operation, cpu_uop.operation) catch {
             std.debug.print("Failed: cpu uop {} does not match instruction uop {}\n", .{ cpu_uop, instruction_uop });
-            return false;
+            uop_match = false;
         };
+        uop_buffer.appendAssumeCapacity(cpu_uop);
     }
-    return true;
+    cpu.uop_fifo.write(uop_buffer.slice());
+    return uop_match;
 }
