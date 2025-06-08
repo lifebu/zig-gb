@@ -1,24 +1,24 @@
 # src3:
 ## CPU:
 - Go over ToDos and do cleanup in cpu.zig!
+    - compress genOpcodeBanks
     - rework idu_adjust
     - rework addr_idu
-    - Create helper function to update flags.
-        - With a struct as the parameter?
-        - Also set temporary flags?
-        - Not sure If I really like how the code looks then.
-            - In some cases the code does not look better to be honest.
-            - Maybe get a shortcut to the registers and flags at the start of each cycle?
 - Interrupts:
     - Add more tests to test interrupts more, there seem to be bugs where the interrupt handler loads itself.
-- STOP
 - HALT
     - Mostly implemented but the tests are broken.
+- Initialize to state after dmb boot rom.
+- CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
+- MBC
+- STOP
 - Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
     - Cycle count.
     - MCycle pins. 
 - Rework my test system and prepare for a better testing enviroment
     - Custom testrunner?
+- APU
+- Running actually boot roms.
 - Try to unify the Uop Order:
     - Currently one default case and two exceptions exist:
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 

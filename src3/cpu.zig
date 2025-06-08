@@ -33,7 +33,7 @@ const FlagFileID = enum(u3) {
 // TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
 const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
 
-const MicroOp = enum(u6) {
+const MicroOp = enum(u5) {
     unused,
     // General
     addr_idu, 
@@ -245,46 +245,38 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
-    // Inc r16
-    const inc_r16_opcodes = [_]u8{ 0x03, 0x13, 0x23, 0x33 };
-    for(inc_r16_opcodes, r16_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(rfid, 1, rfid), Nop(),            Nop(), Nop(),
-            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
-        }) catch unreachable;
-    }
-
-    // INC r8
-    const inc_r8_opcodes = [_]u8{ 0x04, 0x0C, 0x14, 0x1C, 0x24, 0x2C, 0x34, 0x3C };
-    for(inc_r8_opcodes, r8_rfids) |opcode, rfid| {
-        // TODO: This edge case creates a lot of copied code between all the simple alu op variants.
-        // Plus this condition is generally not a good way to solve this.
-        if(rfid == .dbus) {
+    // INC r16, DEC r16
+    const inc_dec_r16_delta = [2]i2{ 1, -1 };
+    const inc_dec_r16_opcodes = [2][r16_rfids.len]u8{
+        [_]u8{ 0x03, 0x13, 0x23, 0x33 }, [_]u8{ 0x0B, 0x1B, 0x2B, 0x3B },
+    };
+    for(inc_dec_r16_opcodes, inc_dec_r16_delta) |opcodes, delta| {
+        for(opcodes, r16_rfids) |opcode, rfid| {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.l, 0, .l), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.l, 0, .l), AluValueRel(.alu_inc, .z, 1, .z), Dbus(.z, .dbus), ApplyPins(),
-                AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-            }) catch unreachable;
-        } else {
-            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluValueRel(.alu_inc, rfid, 1, rfid), Decode(opcode_bank_default),
+                AddrIdu(rfid, delta, rfid), Nop(),            Nop(), Nop(),
+                AddrIdu(.pcl, 1, .pcl),     Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
 
-    // DEC r8
-    const dec_r8_opcodes = [_]u8{ 0x05, 0x0D, 0x15, 0x1D, 0x25, 0x2D, 0x35, 0x3D };
-    for(dec_r8_opcodes, r8_rfids) |opcode, rfid| {
-        if(rfid == .dbus) {
-            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.l, 0, .l), Dbus(.dbus, .z), ApplyPins(), Nop(),
-                AddrIdu(.l, 0, .l), AluValueRel(.alu_inc, .z, -1, .z), Dbus(.z, .dbus), ApplyPins(),
-                AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-            }) catch unreachable;
-        } else {
-            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-                AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluValueRel(.alu_inc, rfid, -1, rfid), Decode(opcode_bank_default),
-            }) catch unreachable;
+    // INC r8, DEC r8
+    const inc_dec_r8_delta = [2]i2{ 1, -1 };
+    const inc_dec_r8_opcodes = [2][r8_rfids.len]u8{ 
+        [_]u8{ 0x04, 0x0C, 0x14, 0x1C, 0x24, 0x2C, 0x34, 0x3C }, [_]u8{ 0x05, 0x0D, 0x15, 0x1D, 0x25, 0x2D, 0x35, 0x3D } 
+    };
+    for(inc_dec_r8_opcodes, inc_dec_r8_delta) |opcodes, delta| {
+        for(opcodes, r8_rfids) |opcode, rfid| {
+            if(rfid == .dbus) {
+                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.l, 0, .l), Dbus(.dbus, .z), ApplyPins(), Nop(),
+                    AddrIdu(.l, 0, .l), AluValueRel(.alu_inc, .z, delta, .z), Dbus(.z, .dbus), ApplyPins(),
+                    AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
+                }) catch unreachable;
+            } else {
+                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                    AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluValueRel(.alu_inc, rfid, delta, rfid), Decode(opcode_bank_default),
+                }) catch unreachable;
+            }
         }
     }
 
@@ -335,15 +327,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.l, idu, .l), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
-    }
-
-    // DEC r16
-    const dec_r16_opcodes = [_]u8{ 0x0B, 0x1B, 0x2B, 0x3B };
-    for(dec_r16_opcodes, r16_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(rfid, -1, rfid), Nop(),           Nop(), Nop(),
-            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
         }) catch unreachable;
     }
 
