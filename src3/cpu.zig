@@ -297,10 +297,15 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }
     }
 
-    // RLCA
-    returnVal[opcode_bank_default][0x07].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_slf, .a, .b, .temp_msb, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
+    // RLCA, RRCA, RLA, RRA
+    const rotate_opcodes = [_]u8{ 0x07, 0x0F, 0x17, 0x1F };
+    const rotate_uops = [_]MicroOp{ .alu_slf, .alu_srf, .alu_slf, .alu_srf };
+    const rotate_flags = [_]FlagFileID{ .temp_msb, .temp_lsb, .carry, .carry };
+    for(rotate_opcodes, rotate_uops, rotate_flags) |opcode, uop, flag| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(uop, .a, .b, flag, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // LD (imm16),SP
     returnVal[opcode_bank_default][0x08].appendSlice(&[_]MicroOpData{
@@ -340,19 +345,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
-    // RRCA
-    returnVal[opcode_bank_default][0x0F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_srf, .a, .b, .temp_lsb, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
     // STOP
     returnVal[opcode_bank_default][0x10].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Nop(), Nop(), Decode(opcode_bank_pseudo),
-    }) catch unreachable;
-
-    // RLA
-    returnVal[opcode_bank_default][0x17].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_slf, .a, .b, .carry, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // JR r8 
@@ -360,11 +355,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
         IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
         AddrIdu(.z, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // RRA
-    returnVal[opcode_bank_default][0x1F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_srf, .a, .b, .carry, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // JR cond imm8
@@ -377,6 +367,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
+    // TODO: Combine DAA, CPL, SCF and CCF?
     // DAA
     returnVal[opcode_bank_default][0x27].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_daa_adjust, .a, .a, .a), Decode(opcode_bank_default),
