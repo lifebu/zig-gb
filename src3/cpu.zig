@@ -198,7 +198,6 @@ pub const opcode_bank_prefix = 1;
 pub const opcode_bank_pseudo = 2;
 pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
-// TODO: Would be nicer to create this immediately instead of creating a function, but like this it is easier to implement the instructions in any order.
 fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
@@ -294,8 +293,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
             }) catch unreachable;
         } else {
             returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
-            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_default),
+                AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z),  ApplyPins(),                    Nop(),
+                AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
         }
     }
@@ -320,20 +319,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LD a, r16mem
-    // TODO: combine those just like LD r16mem, a
-    const ld_a_r16mem_opcodes = [_]u8{ 0x0A, 0x1A };
-    const ld_a_r16mem_rfids = [_]RegisterFileID{ .c, .e };
-    for(ld_a_r16mem_opcodes, ld_a_r16mem_rfids) |opcode, rfid| {
+    const ld_a_r16mem_opcodes = [_]u8{ 0x0A, 0x1A, 0x2A, 0x3A };
+    const ld_a_r16mem_rfids = [_]RegisterFileID{ .c, .e, .l, .l };
+    const ld_a_r16mem_idu = [_]i2{ 0, 0, 1, -1 };
+    for(ld_a_r16mem_opcodes, ld_a_r16mem_rfids, ld_a_r16mem_idu) |opcode, rfid, idu| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(rfid, 0, rfid), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
-            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
-        }) catch unreachable;
-    }
-    const ld_a_r16mem_hl_opcodes = [_]u8{ 0x2A, 0x3A };
-    const ld_a_r16mem_hl_idu = [_]i2{ 1, -1 };
-    for(ld_a_r16mem_hl_opcodes, ld_a_r16mem_hl_idu) |opcode, idu| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
-            AddrIdu(.l, idu, .l), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
+            AddrIdu(rfid, idu, rfid), Dbus(.dbus, .z),   ApplyPins(),               Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -373,11 +364,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // LD r8, r8
-    // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
     var ld_r8_r8_opcode: u8 = 0x40;
     for(r8_rfids) |target_rfid| {
         for (r8_rfids) |source_rfid| {
-            // TODO: This branch is even worse! The cases are rarely hit, especially HALT!
             if(source_rfid == .dbus and target_rfid == .dbus) { // HALT
                 returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
                     AddrIdu(.pcl, 0, .pcl), Dbus(.dbus, .ir), MiscHALT(), Decode(opcode_bank_default),
@@ -595,7 +584,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LDH a, [imm8]
-    // TODO: There are a lot of LDH instructions with 8bit values, can I combine them?
     returnVal[opcode_bank_default][0xF0].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
         AddrIduLow(.z, 0, .z), Dbus(.dbus, .z), ApplyPins(), Nop(),

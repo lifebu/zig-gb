@@ -2,8 +2,9 @@
 ## CPU:
 - Go over ToDos and do cleanup in cpu.zig!
     - compress genOpcodeBanks
-    - rework idu_adjust
-    - rework addr_idu
+        - Combine RETI, RET and RET cond
+    - replace ConditionalCheck with FlagFileID?
+    - rename uops
 - Interrupts:
     - Add more tests to test interrupts more, there seem to be bugs where the interrupt handler loads itself.
 - HALT
