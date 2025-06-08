@@ -419,13 +419,13 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // ADD a r8, ADC a r8, SUB a r8, SBC a r8
-    const arithmetic_opcodes = [4][r8_rfids.len]u8{
+    const arithmetic_r8_opcodes = [4][r8_rfids.len]u8{
         [_]u8{ 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87 }, [_]u8{ 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F },
         [_]u8{ 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97 }, [_]u8{ 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F },
     };
-    const arithmetic_uops = [4]MicroOp{ .alu_adf, .alu_adf, .alu_sbf, .alu_sbf };
-    const arithmetic_flags = [4]FlagFileID{ .const_zero, .carry, .const_zero, .carry };
-    for(arithmetic_opcodes, arithmetic_uops, arithmetic_flags) |opcodes, uop, flag| {
+    const arithmetic_r8_uops = [4]MicroOp{ .alu_adf, .alu_adf, .alu_sbf, .alu_sbf };
+    const arithmetic_r8_flags = [4]FlagFileID{ .const_zero, .carry, .const_zero, .carry };
+    for(arithmetic_r8_opcodes, arithmetic_r8_uops, arithmetic_r8_flags) |opcodes, uop, flag| {
         for(opcodes, r8_rfids) |opcode, rfid| {
             if(rfid == .dbus) {
                 returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -441,12 +441,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // AND a r8, XOR a r8, OR a r8, CP a r8
-    const logic_opcodes = [4][r8_rfids.len]u8{
+    const logic_r8_opcodes = [4][r8_rfids.len]u8{
         [_]u8{ 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7 }, [_]u8{ 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF },
         [_]u8{ 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7 }, [_]u8{ 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF },
     };
-    const logic_uops = [4]MicroOp{ .alu_and, .alu_xor, .alu_or, .alu_cp };
-    for(logic_opcodes, logic_uops) |opcodes, uop| {
+    const logic_r8_uops = [4]MicroOp{ .alu_and, .alu_xor, .alu_or, .alu_cp };
+    for(logic_r8_opcodes, logic_r8_uops) |opcodes, uop| {
         for(opcodes, r8_rfids) |opcode, rfid| {
             if(rfid == .dbus) {
                 returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -528,11 +528,16 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
-    // ADD a, imm8
-    returnVal[opcode_bank_default][0xC6].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, .z, .const_zero, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
+    // ADD a imm8, ADC a imm8, SUB a imm8, SBC a imm8
+    const arithmetic_imm8_opcodes = [_]u8{ 0xC6, 0xCE, 0xD6, 0xDE };
+    const arithmetic_imm8_uops = [_]MicroOp{ .alu_adf, .alu_adf, .alu_sbf, .alu_sbf };
+    const arithmetic_imm8_flags = [_]FlagFileID{ .const_zero, .carry, .const_zero, .carry };
+    for(arithmetic_imm8_opcodes, arithmetic_imm8_uops, arithmetic_imm8_flags) |opcode, uop, flag| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(uop, .a, .z, flag, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // RST target
     const rst_opcodes = [_]u8{ 0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF };
@@ -570,33 +575,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // ADC a, imm8
-    // TODO: ADC a, imm8 and ADC a, r8 are very similar.
-    returnVal[opcode_bank_default][0xCE].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_adf, .a, .z, .carry, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // SUB a, imm8
-    // TODO: SUB a, imm8 and SUB a, r8 are very similar.
-    returnVal[opcode_bank_default][0xD6].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, .z, .const_zero, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
     // RETI
     returnVal[opcode_bank_default][0xD9].appendSlice(&[_]MicroOpData{
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .z), ApplyPins(), Nop(),
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .w), ApplyPins(), Nop(),
         Nop(), Nop(), MiscWB(.pcl), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(true), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // SBC a, imm8
-    // TODO: SBC a, imm8 and SBC a, r8 are very similar.
-    returnVal[opcode_bank_default][0xDE].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(.alu_sbf, .a, .z, .carry, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LDH [imm8], a
@@ -612,12 +596,15 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // AND a, imm8
-    // TODO: AND a, imm8 and AND a, r8 are very similar.
-    returnVal[opcode_bank_default][0xE6].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_and, .a, .z, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
+    // AND a imm8, XOR a imm8, OR a imm8, CP a imm8
+    const logic_imm8_opcodes = [_]u8{ 0xE6, 0xEE, 0xF6, 0xFE };
+    const logic_imm8_uops = [_]MicroOp{ .alu_and, .alu_xor, .alu_or, .alu_cp };
+    for(logic_imm8_opcodes, logic_imm8_uops) |opcode, uop| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(uop, .a, .z, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // ADD SP, imm8 (signed)
     returnVal[opcode_bank_default][0xE8].appendSlice(&[_]MicroOpData{
@@ -639,13 +626,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), ApplyPins(), Nop(),
         AddrIdu(.z, 0, .z), Dbus(.a, .dbus), ApplyPins(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // XOR a, imm8
-    // TODO: XOR a, imm8 and XOR a, r8 are very similar.
-    returnVal[opcode_bank_default][0xEE].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_xor, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LDH a, [imm8]
@@ -675,13 +655,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(false), Decode(opcode_bank_default),
     }) catch unreachable;
 
-    // OR a, imm8
-    // TODO: OR a, imm8 and OR a, r8 are very similar.
-    returnVal[opcode_bank_default][0xF6].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_or, .a, .z, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
     // LD HL, SP+imm8(signed)
     returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
@@ -699,13 +672,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // EI (Enable Interrupts)
     returnVal[opcode_bank_default][0xFB].appendSlice(&[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(true), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // CP a, imm8
-    // TODO: CP a, imm8 and CP a, r8 are very similar.
-    returnVal[opcode_bank_default][0xFE].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_cp, .a, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     //
