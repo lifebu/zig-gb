@@ -6,6 +6,8 @@ const CPU = @import("../cpu.zig");
 const mem_map = @import("../mem_map.zig");
 const MMU = @import("../mmu.zig");
 
+const cpu_helper = @import("cpu_helper.zig");
+
 const CPUState = struct {
     pc: u16 = 0,
     sp: u16 = 0,
@@ -251,43 +253,6 @@ pub fn runSingleStepTests() !void {
     }
 }
 
-// TODO: Also interrupt tests, do we create general helper class?
-pub fn fetchInstruction(cpu: *CPU.State, mmu: *MMU.State) void {
-    cpu.uop_fifo.clear();
-    // Load a nop instruction to fetch the required instruction.
-    const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
-    const uops = opcode_bank[0];
-    cpu.uop_fifo.write(uops.slice());
-    for(0..(def.t_cycles_per_m_cycle)) |_| {
-        CPU.cycle(cpu, mmu);
-        MMU.cycle(mmu);
-    }
-}
-
-// TODO: Also interrupt tests, do we create general helper class?
-pub fn executeCPUFor(cpu: *CPU.State, mmu: *MMU.State, m_cycles: usize) void {
-    for(0..(def.t_cycles_per_m_cycle * m_cycles)) |_| {
-        CPU.cycle(cpu, mmu);
-        MMU.cycle(mmu);
-    }
-}
-
-pub fn isFullInstructionLoaded(cpu: *CPU.State, bank: u2, opcode: u8) bool {
-    const instruction = CPU.opcode_banks[bank][opcode].slice();
-    std.testing.expectEqual(instruction.len, cpu.uop_fifo.length()) catch {
-        std.debug.print("Failed: uop fifo length does not match instruction: [{}][{X:0>2}]\n", .{ bank, opcode });
-        return false;
-    };
-    for(instruction) |instruction_uop| {
-        const cpu_uop = cpu.uop_fifo.readItem().?;
-        std.testing.expectEqual(instruction_uop.operation, cpu_uop.operation) catch {
-            std.debug.print("Failed: cpu uop {} does not match instruction uop {}\n", .{ cpu_uop, instruction_uop });
-            return false;
-        };
-    }
-    return true;
-}
-
 pub fn runHaltTests() !void {
     var mmu: MMU.State = .{}; 
     var cpu: CPU.State = .{};
@@ -300,8 +265,8 @@ pub fn runHaltTests() !void {
     mmu.memory[mem_map.interrupt_enable] = 0x00;
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = false;
-    fetchInstruction(&cpu, &mmu);
-    executeCPUFor(&cpu, &mmu, 2);
+    cpu_helper.fetchInstruction(&cpu, &mmu);
+    cpu_helper.executeCPUFor(&cpu, &mmu, 2 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(mem_map.wram_low + 1, cpu.registers.r16.pc) catch |err| {
         std.debug.print("Failed: Halt stops the cpu.\n", .{});
         return err;
@@ -314,8 +279,8 @@ pub fn runHaltTests() !void {
     mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    fetchInstruction(&cpu, &mmu);
-    executeCPUFor(&cpu, &mmu, 1);
+    cpu_helper.fetchInstruction(&cpu, &mmu);
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(mem_map.wram_low + 1, cpu.registers.r16.pc) catch |err| {
         std.debug.print("Failed: Halt: IME set, no pending interrupt after halt: cpu halted.\n", .{});
         return err;
@@ -328,12 +293,12 @@ pub fn runHaltTests() !void {
     mmu.memory[mem_map.wram_low] = 0x76; // HALT
     mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
     cpu.interrupt_master_enable = true;
-    fetchInstruction(&cpu, &mmu);
-    executeCPUFor(&cpu, &mmu, 1);
+    cpu_helper.fetchInstruction(&cpu, &mmu);
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
     // cpu is now halted (pc is on INC BC).
     mmu.memory[mem_map.interrupt_flag] = 0b0001_0000; // Joypad
-    executeCPUFor(&cpu, &mmu, 1);
-    std.testing.expectEqual(true, isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
+    std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
         std.debug.print("Failed: Halt: IME set, pending interrupt after halt: cpu has not loaded the instruction handler.\n", .{});
         return err;
     };
@@ -345,10 +310,10 @@ pub fn runHaltTests() !void {
     mmu.memory[mem_map.wram_low + 1] = 0x03; // INC BC
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    fetchInstruction(&cpu, &mmu);
-    executeCPUFor(&cpu, &mmu, 1);
+    cpu_helper.fetchInstruction(&cpu, &mmu);
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
     mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
-    executeCPUFor(&cpu, &mmu, 1);
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
     // TODO: How to know if the cpu is in a halt state or not?
     // std.testing.expectEqual(false, cpu.isHalted) catch |err| {
     //     std.debug.print("Failed: Halt: IME not set, no pending interrupt during halt, pending interrupt after halt: cpu resumes.\n", .{});
@@ -369,5 +334,7 @@ pub fn runHaltTests() !void {
         // ei => halt. interrupt is serviced after halt. interrupt returns to halt (because pc was never incremented) => executes halt again.
         // halt => rst. rst instruction's return address will point at rst itself. ret would return to rst and execute it again.
         // ei => halt => rst: ei behaviour "wins".  
+
     // https://github.com/nitro2k01/little-things-gb/tree/main/double-halt-cancel
+    // => Would be nice to run some example combinations of instructions to nail down all the quirks of the halt bug.
 }

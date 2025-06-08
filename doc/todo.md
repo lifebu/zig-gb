@@ -1,10 +1,5 @@
 # src3:
 ## CPU:
-- Go over ToDos and do cleanup in cpu.zig!
-    - compress genOpcodeBanks
-        - Combine RETI, RET and RET cond
-    - replace ConditionalCheck with FlagFileID?
-    - rename uops
 - Interrupts:
     - Add more tests to test interrupts more, there seem to be bugs where the interrupt handler loads itself.
 - HALT
@@ -25,6 +20,10 @@
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 
         - JR r8, JR cond r8: Nop => Nop => Alu => IduAdjust 
         - INC (HL), etc: AddrIdu => ALU => Dbus (PushPins) => ApplyPins
+- Go over ToDos and do cleanup in cpu.zig!
+    - compress genOpcodeBanks
+        - Combine RETI, RET and RET cond
+    - replace ConditionalCheck with FlagFileID?
 
 ## Other:
 - Run emulator itself in thread. Use double-buffer to communicate audio and video data to platform.

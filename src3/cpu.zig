@@ -58,8 +58,6 @@ const MicroOp = enum(u5) {
     alu_sbf,
     alu_scf, 
     alu_set,
-    // TODO: Once most of the other things are done, consider renaming all of the ffid alu ops to something without flag.
-    // The shortnames make them a little bit harder to understand (especially sbf, adf)
     alu_slf, 
     alu_srf,
     alu_swap, 
@@ -1044,6 +1042,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             const opcode: u8 = state.registers.r8.ir;
             const uops: MicroOpArray = opcode_bank[opcode];
             state.uop_fifo.write(uops.slice());
+
+            // TODO: If an interrupt is pending during an instruction, do we handle interrupt immediately or after the next instruction like this?
 
             // TODO: Consider using an external system to only check and set an interrupt signal line on the cpu when IE and IF are checked.
             // Because the CPU should not be able to access IF and IE like this!
