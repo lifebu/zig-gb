@@ -208,7 +208,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const r16_stack_rfids = [_]RegisterFileID{ .c, .e, .l, .f };
     // TODO: Can we combine them? Can we use cond_cc_jump for the oother cond_cc?
     const cond_cc = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry };
-    const cond_cc_jump = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry, .const_one };
+    const cond_cc_one = [_]ConditionCheck{ .not_zero, .zero, .not_carry, .carry, .const_one };
     
     // TODO: Right now some instruction use a different order than the default.
     // Could I find a order that fits all the cases cleanly?
@@ -355,7 +355,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // JR imm8, JR cond imm8
     const jr_opcodes = [_]u8{ 0x20, 0x28, 0x30, 0x38, 0x18 };
-    for(jr_opcodes, cond_cc_jump) |opcode, cc| {
+    for(jr_opcodes, cond_cc_one) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), MiscCC(cc), Nop(),
             IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
@@ -363,26 +363,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
-    // TODO: Combine DAA, CPL, SCF and CCF?
-    // DAA
-    returnVal[opcode_bank_default][0x27].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_daa_adjust, .a, .a, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // CPL
-    returnVal[opcode_bank_default][0x2F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_not, .a, .a, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // SCF
-    returnVal[opcode_bank_default][0x37].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_scf, .a, .a, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
-
-    // CCF
-    returnVal[opcode_bank_default][0x3F].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_ccf, .a, .a, .a), Decode(opcode_bank_default),
-    }) catch unreachable;
+    // DAA, CPL, SCF, CCF
+    const misc_opcodes = [_]u8{ 0x27, 0x2F, 0x37, 0x3F };
+    const misc_uops = [_]MicroOp{ .alu_daa_adjust, .alu_not, .alu_scf, .alu_ccf };
+    for(misc_opcodes, misc_uops) |opcode, uop| {
+        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(uop, .a, .a, .a), Decode(opcode_bank_default),
+        }) catch unreachable;
+    }
 
     // LD r8, r8
     // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
@@ -458,6 +446,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // RET cond
+    // TODO: RET and RET cond are mostly the same, but RET cond has one Mcycle more, can we still combine them?
     const ret_cond_opcodes = [_]u8{ 0xC0, 0xC8, 0xD0, 0xD8 };
     for(ret_cond_opcodes, cond_cc) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
@@ -481,7 +470,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // JP cond imm16, JP imm16
     const jp_opcodes = [_]u8{ 0xC2, 0xCA, 0xD2, 0xDA, 0xC3 };
-    for(jp_opcodes, cond_cc_jump) |opcode, cc| {
+    for(jp_opcodes, cond_cc_one) |opcode, cc| {
         returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), MiscCC(cc), Nop(),
@@ -502,9 +491,9 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         }) catch unreachable;
     }
 
-    // CALL cond imm16
-    const call_cond_opcodes = [_]u8{ 0xC4, 0xCC, 0xD4, 0xDC };
-    for(call_cond_opcodes, cond_cc) |opcodes, cc| {
+    // CALL cond imm16, CALL imm16
+    const call_opcodes = [_]u8{ 0xC4, 0xCC, 0xD4, 0xDC, 0xCD };
+    for(call_opcodes, cond_cc_one) |opcodes, cc| {
         returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), MiscCC(cc), Nop(),
@@ -551,18 +540,8 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_prefix),
     }) catch unreachable;
 
-    // CALL imm16
-    // TODO: CALL and CALL cc are almost the same. the only difference is the CC Check after changing WZ.
-    returnVal[opcode_bank_default][0xCD].appendSlice(&[_]MicroOpData{
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), ApplyPins(), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), ApplyPins(), Nop(),
-        AddrIdu(.spl, -1, .spl), Nop(), Nop(), Nop(),
-        AddrIdu(.spl, -1, .spl), Dbus(.pch, .dbus), ApplyPins(), Nop(),
-        AddrIdu(.spl, 0, .spl), Dbus(.pcl, .dbus), MiscWB(.pcl), Nop(),
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), ApplyPins(), Decode(opcode_bank_default),
-    }) catch unreachable;
-
     // RETI
+    // TODO: RET and RETI differ only in the MiscIME() call. If we can set the IME to itself
     returnVal[opcode_bank_default][0xD9].appendSlice(&[_]MicroOpData{
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .z), ApplyPins(), Nop(),
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .w), ApplyPins(), Nop(),
@@ -666,7 +645,6 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     const bit_shift_flags = [_]FlagFileID{ .temp_msb, .temp_lsb, .carry,   .carry,   .const_zero, .temp_msb,    .temp_msb, .const_zero };
     const bit_shift_uops = [_]MicroOp{     .alu_slf,  .alu_srf,  .alu_slf, .alu_srf, .alu_slf,     .alu_srf,     .alu_swap, .alu_srf }; 
-    // TODO: Would be nicer to have a searchable list like the other operations, so that If I have a bug with 0x45, I know which opcode it must be.
     var bit_shift_opcode: u8 = 0x00;
     for(bit_shift_uops, bit_shift_flags) |bit_shift_uop, flag| {
         for(r8_rfids) |rfid| {
