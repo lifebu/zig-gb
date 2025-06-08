@@ -7,7 +7,7 @@ const mem_map = @import("mem_map.zig");
 const MemoryRequest = struct {
     read: ?u16 = null,
     write: ?u16 = null,
-    data: u8 = 0,
+    data: *u8 = undefined,
 
     const Self = @This();
     pub fn print(self: *Self) []u8 {
@@ -55,9 +55,11 @@ pub fn loadDump(state: *State, path: []const u8) void {
 
 pub fn cycle(state: *State) void {
     if(state.request.read) |address| {
-        state.request.data = state.memory[address];
+        state.request.data.* = state.memory[address];
+        state.request.read = null;
     }
     if(state.request.write) |address| {
-        state.memory[address] = state.request.data;
+        state.memory[address] = state.request.data.*;
+        state.request.write = null;
     }
 }

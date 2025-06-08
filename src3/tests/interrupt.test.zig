@@ -60,7 +60,7 @@ pub fn runInterruptTests() !void {
         return err;
     };
 
-    // Effect of IME is delayed.
+    // Effect of EI is delayed.
     mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
     mmu.memory[mem_map.interrupt_enable] = 0xFF;
     mmu.memory[mem_map.wram_low] = 0xFB; // EI
