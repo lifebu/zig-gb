@@ -1104,6 +1104,27 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     }
 }
 
+pub fn loadDump(state: *State, file_type: MMU.FileType) void {
+    // TODO: I would need a more stabile and better thought out initialization system when you load files.
+    switch(file_type) {
+        .gameboy => {
+            // state after DMG Boot rom has run.
+            // https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
+            state.registers.r16.af = 0x01B0;
+            state.registers.r16.bc = 0x0013;
+            state.registers.r16.de = 0x00D8;
+            state.registers.r16.hl = 0x014D;
+            state.registers.r16.pc = 0x0100;
+            state.registers.r16.sp = 0xFFFE;
+        },
+        .dump => {
+            init(state);
+        },
+        .unknown => {
+        }
+    }
+}
+
 fn getLowestSetBit(value: u8) u3 {
     // https://stackoverflow.com/questions/757059/position-of-least-significant-bit-that-is-set
     const deBrujinHash: u16 = 0b0001_1101;

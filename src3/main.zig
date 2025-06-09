@@ -30,12 +30,14 @@ export fn init() void {
 
     // TODO: Better way to do this? Not in main function!
     if(state.cli.dumpFile) |dumpFile| {
-        MMU.loadDump(&state.mmu, dumpFile);
+        imgui_cb(dumpFile);
     }
 }
 
-fn imgui_cb(dump_path: []u8) void {
-    MMU.loadDump(&state.mmu, dump_path);
+fn imgui_cb(dump_path: []const u8) void {
+    const file_type: MMU.FileType = MMU.getFileType(dump_path);
+    MMU.loadDump(&state.mmu, dump_path, file_type);
+    CPU.loadDump(&state.cpu, file_type);
 }
 
 export fn frame() void {
@@ -45,8 +47,7 @@ export fn frame() void {
     for(0..cycles_per_frame) |_| {
         // TODO: Maybe the CPU should return it's pins, so that it is very clear that we communicate between cpu and other system. 
         // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
-        // TODO: Disable cpu for now, because it is incomplete and will lead to crashes.
-        // CPU.cycle(&state.cpu, &state.mmu);
+        CPU.cycle(&state.cpu, &state.mmu);
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);

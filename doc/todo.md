@@ -7,7 +7,6 @@
     - Timer
     - Stat 
     - VBlank
-- Initialize to state after dmb boot rom.
 - CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - MBC
 - STOP
@@ -16,6 +15,8 @@
     - MCycle pins. 
 - Rework my test system and prepare for a better testing enviroment
     - Custom testrunner?
+- Think about how the code for loading and initializing the emulator should work.
+    - Loading from command line and using the imgui ui.
 - APU
 - Running actually boot roms.
 - Try to unify the Uop Order:
