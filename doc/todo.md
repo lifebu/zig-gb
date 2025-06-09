@@ -6,7 +6,6 @@
     - Serial
     - Timer
     - Stat 
-    - VBlank
 - CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - MBC
 - STOP

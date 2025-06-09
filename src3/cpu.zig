@@ -1029,6 +1029,12 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
                 const result: u8 = mmu.memory[mem_map.interrupt_flag] & ~mask;
                 mmu.memory[mem_map.interrupt_flag] = result;
+
+                // TODO: Because we are preparing to load the next instruction but not decoding it we are skipping one byte.
+                // Removing the pc again is more of a hack and it should not happen. 
+                // I should rethink when exactly an interrupt would happen when it is triggered during an instruction.
+                // And how that interacts with the EI instruction.
+                state.registers.r16.pc -= 1;
             } else {
                 const params: DecodeParams = uop.params.decode;
                 const opcode_bank = opcode_banks[params.bank_idx];

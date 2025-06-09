@@ -119,6 +119,30 @@ pub fn runInterruptTests() !void {
         return err;
     };
 
+    // The pc of the next instruction is saved to the stack by the ISR.
+    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
+    mmu.memory[mem_map.interrupt_enable] = 0xFF;
+    mmu.memory[mem_map.wram_low] = 0x04; // INC B
+    mmu.memory[mem_map.wram_low + 1] = 0x04; // INC B
+    mmu.memory[mem_map.wram_low + 2] = 0x04; // INC B
+    mmu.memory[mem_map.wram_low + 3] = 0x04; // INC B
+    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.sp = mem_map.hram_high;
+    cpu.interrupt_master_enable = true;
+    cpu_helper.fetchInstruction(&cpu, &mmu);
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle); // execute: wram_low
+    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
+    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle); // execute: wram_low + 1 
+    cpu_helper.executeCPUFor(&cpu, &mmu, 5 * def.t_cycles_per_m_cycle); // execute: ISR
+    const pch: u16 = mmu.memory[mem_map.hram_high - 1]; 
+    const pcl: u16 = mmu.memory[mem_map.hram_high - 2]; 
+    const written_pc: u16 = pch << 8 | pcl;
+    const expected_pc: u16 = mem_map.wram_low + 2;
+    std.testing.expectEqual(expected_pc, written_pc) catch |err| {
+        std.debug.print("Failed: The pc of the next instruction is saved to the stack by the ISR..\n", .{});
+        return err;
+    };
+
     // Interrupt targets
     const InterruptTargetTest = struct {
         name: []const u8,

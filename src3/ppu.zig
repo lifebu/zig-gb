@@ -229,6 +229,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
             state.oam_scan_idx = 0;
         },
         .advance_vblank => {
+            memory[mem_map.interrupt_flag] |= mem_map.interrupt_vblank;
             lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
         },
