@@ -1,32 +1,35 @@
 const std = @import("std");
 
-const def = @import("defines.zig");
-const CPU = @import("cpu.zig");
-const CLI = @import("cli.zig");
-const Platform = @import("platform.zig");
 const APU = @import("apu.zig");
-const MMU = @import("mmu.zig");
+const CLI = @import("cli.zig");
+const CPU = @import("cpu.zig");
+const def = @import("defines.zig");
+const DMA = @import("dma.zig");
 const mem_map = @import("mem_map.zig");
+const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
+const Platform = @import("platform.zig");
 
 const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
+    var apu: APU.State = .{};
     var cli: CLI.State = .{};
     var cpu: CPU.State = .{};
-    var platform: Platform.State = .{};
-    var apu: APU.State = .{};
+    var dma: DMA.State = .{};
     var mmu: MMU.State = .{};
+    var platform: Platform.State = .{};
     var ppu: PPU.State = .{};
 };
 
 export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
-    CLI.init(&state.cli, state.allocator.allocator());
-    Platform.init(&state.platform, imgui_cb);
     APU.init(&state.apu);
+    CLI.init(&state.cli, state.allocator.allocator());
     CPU.init(&state.cpu);
+    DMA.init(&state.dma);
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
+    Platform.init(&state.platform, imgui_cb);
 
     // TODO: Better way to do this? Not in main function!
     if(state.cli.dumpFile) |dumpFile| {
@@ -48,6 +51,7 @@ export fn frame() void {
         // TODO: Maybe the CPU should return it's pins, so that it is very clear that we communicate between cpu and other system. 
         // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
         CPU.cycle(&state.cpu, &state.mmu);
+        DMA.cycle(&state.dma, &state.mmu);
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);
