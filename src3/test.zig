@@ -1,19 +1,20 @@
 const std = @import("std");
 
-const cpu_test = @import("tests/cpu.test.zig");
+const singlestep_test = @import("tests/singlestep.test.zig");
+const halt_test = @import("tests/halt.test.zig");
 const interrupt_test = @import("tests/interrupt.test.zig");
 
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 // TODO: Move tests into it's own module so that we don't have it loitering in the src folder!
 // TODO: Maybe split up the tests?
 test "CPU_SingleStepTest" {
-    try cpu_test.runSingleStepTests();
+    try singlestep_test.runSingleStepTests();
 }
 
 test "CPU_Halt" {
-    try cpu_test.runHaltTests();
+    try halt_test.runHaltTests();
 }
 
-test "InterruptTest" {
+test "CPU_InterruptTest" {
     try interrupt_test.runInterruptTests();
 }

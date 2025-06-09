@@ -1,9 +1,12 @@
 # src3:
 ## CPU:
-- Interrupts:
-    - Add more tests to test interrupts more, there seem to be bugs where the interrupt handler loads itself.
-- HALT
-    - Mostly implemented but the tests are broken.
+- MMIO: DMA, Input, Divider, Timer
+- Interrupt Sources
+    - Joypad
+    - Serial
+    - Timer
+    - Stat 
+    - VBlank
 - Initialize to state after dmb boot rom.
 - CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - MBC
