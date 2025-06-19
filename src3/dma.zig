@@ -23,6 +23,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.start_addr = @as(u16, mmu.request.data.*) << 8;
             state.offset = 0;
             state.counter = 0;
+
+            mmu.memory[address] = mmu.request.data.*;
+            mmu.request.write = null;
             // TODO: While it is running I need to implement the bus conflict behavior for the cpu, 
             // the cpu will not be able to write and when it reads it will read the current byte of the dma transfer.
         }
