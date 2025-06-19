@@ -1,3 +1,17 @@
+// input
+// TODO: Is this optimal? Can we make it easier to calculate the dpad and button bytes?
+pub const InputState = packed struct {
+    right_pressed: bool = false,
+    left_pressed: bool = false,
+    up_pressed: bool = false,
+    down_pressed: bool = false,
+
+    a_pressed: bool = false,
+    b_pressed: bool = false,
+    select_pressed: bool = false,
+    start_pressed: bool = false,
+};
+
 // graphics
 pub const resolution_width = 160;
 pub const resolution_height = 144;

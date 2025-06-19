@@ -5,6 +5,7 @@ const CLI = @import("cli.zig");
 const CPU = @import("cpu.zig");
 const def = @import("defines.zig");
 const DMA = @import("dma.zig");
+const INPUT = @import("input.zig");
 const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
@@ -16,6 +17,7 @@ const state = struct {
     var cli: CLI.State = .{};
     var cpu: CPU.State = .{};
     var dma: DMA.State = .{};
+    var input: INPUT.State = .{};
     var mmu: MMU.State = .{};
     var platform: Platform.State = .{};
     var ppu: PPU.State = .{};
@@ -27,6 +29,7 @@ export fn init() void {
     CLI.init(&state.cli, state.allocator.allocator());
     CPU.init(&state.cpu);
     DMA.init(&state.dma);
+    INPUT.init(&state.input);
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
     Platform.init(&state.platform, imgui_cb);
@@ -44,6 +47,7 @@ fn imgui_cb(dump_path: []const u8) void {
 }
 
 export fn frame() void {
+    INPUT.updateInputState(&state.input, &state.mmu, &state.platform.input_state);
     // Note: GB runs at 59.73Hz. This software runs at 60Hz.
     // TODO: It would be better to just let the system run to the end of the next vblank.
     const cycles_per_frame = 70224; 
@@ -52,6 +56,7 @@ export fn frame() void {
         // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
         CPU.cycle(&state.cpu, &state.mmu);
         DMA.cycle(&state.dma, &state.mmu);
+        INPUT.cycle(&state.input, &state.mmu);
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);

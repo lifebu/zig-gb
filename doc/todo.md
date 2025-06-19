@@ -1,6 +1,6 @@
 # src3:
 ## CPU:
-- MMIO: DMA, Input, Divider, Timer
+- MMIO: Divider, Timer
 - Interrupt Sources
     - Joypad
     - Serial

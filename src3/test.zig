@@ -2,6 +2,7 @@ const std = @import("std");
 
 const halt_test = @import("tests/halt.test.zig");
 const interrupt_test = @import("tests/interrupt.test.zig");
+const input_test = @import("tests/input.test.zig");
 const singlestep_test = @import("tests/singlestep.test.zig");
 const dma = @import("tests/dma.test.zig");
 
@@ -22,4 +23,8 @@ test "CPU_SingleStepTest" {
 
 test "DMA" {
     try dma.runDMATest();
+}
+
+test "InputTest" {
+    try input_test.runInputTests();
 }

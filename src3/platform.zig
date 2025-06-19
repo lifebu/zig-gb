@@ -16,6 +16,8 @@ pub const State = struct {
     sampler: sokol.gfx.Sampler = .{},
 
     imgui_state: Imgui.State = .{},
+
+    input_state: def.InputState = .{},
 };
 
 pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
@@ -140,15 +142,44 @@ pub fn frame(state: *State, colorids: [def.overscan_resolution]u8, _: [def.num_g
 
 pub export fn event(ev: ?*const sokol.app.Event, state_opaque: ?*anyopaque) void {
     const state: ?*State = @alignCast(@ptrCast(state_opaque));
+    assert(state != null);
     if(ev) |e| {
         _ = sokol.imgui.handleEvent(e.*);
-        if(e.type == .KEY_DOWN) {
-            if(e.key_code == .Q and (e.modifiers & sokol.app.modifier_ctrl != 0)) {
-                sokol.app.requestQuit();
-            } else if (e.key_code == .GRAVE_ACCENT) {
-                assert(state != null);
+        switch(e.key_code) {
+            // TODO: Rebindindable keys
+            .LEFT => {
+                state.?.input_state.left_pressed = e.type == .KEY_DOWN;
+            },
+            .RIGHT => {
+                state.?.input_state.right_pressed = e.type == .KEY_DOWN;
+            },
+            .UP => {
+                state.?.input_state.up_pressed = e.type == .KEY_DOWN;
+            },
+            .DOWN => {
+                state.?.input_state.down_pressed = e.type == .KEY_DOWN;
+            },
+            .W => {
+                state.?.input_state.start_pressed = e.type == .KEY_DOWN;
+            },
+            .A => {
+                state.?.input_state.a_pressed = e.type == .KEY_DOWN;
+            },
+            .S => {
+                state.?.input_state.select_pressed = e.type == .KEY_DOWN;
+            },
+            .D => {
+                state.?.input_state.b_pressed = e.type == .KEY_DOWN;
+            },
+            .Q => {
+                if(e.modifiers & sokol.app.modifier_ctrl != 0) {
+                    sokol.app.requestQuit();
+                }
+            },
+            .GRAVE_ACCENT => {
                 state.?.imgui_state.imgui_visible = !state.?.imgui_state.imgui_visible;
-            }
+            },
+            else => {},
         }
     }
 }
