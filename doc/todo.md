@@ -2,8 +2,25 @@
 ## CPU:
 - Interrupt Sources
     - Stat 
-- CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - MBC
+- Add CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
+- Running actually boot roms.
+    - Use sameboy boot roms.
+- Think about how the code for loading and initializing the emulator should work.
+    - Loading from command line and using the imgui ui.
+    - Initialization and Deinitialization logic for all subsystems.
+    - MBC for example can write the content of CartRAM to disk when you unload a rom or close the program.
+- Add support for savegames.
+- Refactor how the access rights system should work.
+    - CPU returns it's pin state every cycle.
+    - All systems will only get the cpu pins as input in their cycle function.
+    - Consider splitting the memory block into the subsystems?
+        - example: div, timer, timer_mod exists as 3 registers in the state of timer.zig.
+        - So the timer no longer has to know the mmu memory block (better for cache?).
+        - When cpu requests a write or read only the timer reacts to it.
+        - This means there is no longer a race that the correct subsystem reacts before the mmu as their are disjoint.
+        - Splitting memory means we waste loss on unused memory?
+        - How are requests then applied fast? subsystem has to do more tests? With the address we already know which subsystem will do this (can we dispatch?)
 - How should bus conflicts work? especially with the DMA?
 - Refactoring timer, input and dma. They are mostly copied from old source code.
 - STOP
@@ -12,12 +29,9 @@
     - MCycle pins. 
 - Rework my test system and prepare for a better testing enviroment
     - Custom testrunner?
-- Think about how the code for loading and initializing the emulator should work.
-    - Loading from command line and using the imgui ui.
 - Interrupt Sources:
     - Serial.
 - APU
-- Running actually boot roms.
 - Try to unify the Uop Order:
     - Currently one default case and two exceptions exist:
         - Default: AddrIdu => Dbus (PushPins) => ApplyPins + (ALU or MISC or Nop) => Decode or Nop 
