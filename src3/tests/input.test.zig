@@ -10,14 +10,12 @@ pub fn runInputTests() !void {
     var input: INPUT.State = .{};
     var mmu: MMU.State = .{}; 
 
-
     const TestCase = struct {
         name: []const u8,
         write: u8,
         expected: u8,
         input: def.InputState,
     };
-
     const testCases = [_]TestCase {
         TestCase {
             .name = "Nothing selected but have pressed button/dpad",
@@ -140,8 +138,7 @@ pub fn runInputTests() !void {
 
     for(testCases, 0..) |testCase, i| {
         if(i == 0) { // Change value to attach debugger.
-            var val: u32 = 0;
-            val += 1;
+            var val: u32 = 0; val += 1;
         }
         var request_data: u8 = testCase.write;
         mmu.request.write = mem_map.joypad;

@@ -10,6 +10,7 @@ const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
 const Platform = @import("platform.zig");
+const TIMER = @import("timer.zig");
 
 const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
@@ -21,6 +22,7 @@ const state = struct {
     var mmu: MMU.State = .{};
     var platform: Platform.State = .{};
     var ppu: PPU.State = .{};
+    var timer: TIMER.State = .{};
 };
 
 export fn init() void {
@@ -33,6 +35,7 @@ export fn init() void {
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
     Platform.init(&state.platform, imgui_cb);
+    TIMER.init(&state.timer);
 
     // TODO: Better way to do this? Not in main function!
     if(state.cli.dumpFile) |dumpFile| {
@@ -57,6 +60,7 @@ export fn frame() void {
         CPU.cycle(&state.cpu, &state.mmu);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input, &state.mmu);
+        TIMER.cycle(&state.timer, &state.mmu);
         MMU.cycle(&state.mmu);
         APU.cycle(&state.apu, state.mmu.memory);
         PPU.cycle(&state.ppu, &state.mmu.memory);

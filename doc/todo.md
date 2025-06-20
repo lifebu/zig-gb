@@ -1,12 +1,12 @@
 # src3:
 ## CPU:
-- MMIO: Divider, Timer
 - Interrupt Sources
-    - Joypad
+    - Joypad: Add test!
     - Serial
-    - Timer
     - Stat 
 - CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
+- How should bus conflicts work? especially with the DMA?
+- Refactoring timer, input and dma. They are mostly copied from old source code.
 - MBC
 - STOP
 - Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
