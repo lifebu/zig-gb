@@ -5,8 +5,6 @@ const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
 
-// TODO: Split this file into ppu and a define.zig in the ppu subfolder?
-
 const tile_size_x = 8;
 const tile_size_y = 8;
 const tile_size_byte = 16;

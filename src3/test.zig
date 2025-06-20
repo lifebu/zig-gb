@@ -4,6 +4,7 @@ const dma_test = @import("tests/dma.test.zig");
 const halt_test = @import("tests/halt.test.zig");
 const interrupt_test = @import("tests/interrupt.test.zig");
 const input_test = @import("tests/input.test.zig");
+const ppu_test = @import("tests/ppu.test.zig");
 const singlestep_test = @import("tests/singlestep.test.zig");
 const timer_test = @import("tests/timer.test.zig");
 
@@ -32,6 +33,10 @@ test "DMA" {
 
 test "InputTest" {
     try input_test.runInputTests();
+}
+
+test "PPU_InterruptTest" {
+    try ppu_test.runInterruptTests();
 }
 
 test "TimerTest" {
