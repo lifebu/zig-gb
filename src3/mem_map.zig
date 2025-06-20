@@ -73,6 +73,7 @@ pub const bg_palette: u16       = 0xFF47;
 pub const obj_palettes_dmg: u16 = 0xFF48;
 pub const obj_palette_0: u16    = 0xFF48;
 pub const obj_palette_1: u16    = 0xFF49;
+pub const boot_rom: u16         = 0xFF50;
 pub const window_y: u16         = 0xFF4A;
 pub const window_x: u16         = 0xFF4B;
 pub const interrupt_enable: u16 = 0xFFFF;

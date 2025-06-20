@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const APU = @import("apu.zig");
+const BOOT = @import("boot.zig");
 const CLI = @import("cli.zig");
 const CPU = @import("cpu.zig");
 const def = @import("defines.zig");
@@ -15,6 +16,7 @@ const TIMER = @import("timer.zig");
 const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var apu: APU.State = .{};
+    var boot: BOOT.State = .{};
     var cli: CLI.State = .{};
     var cpu: CPU.State = .{};
     var dma: DMA.State = .{};
@@ -28,6 +30,7 @@ const state = struct {
 export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     APU.init(&state.apu);
+    BOOT.init(&state.boot);
     CLI.init(&state.cli, state.allocator.allocator());
     CPU.init(&state.cpu);
     DMA.init(&state.dma);
@@ -58,6 +61,7 @@ export fn frame() void {
         // TODO: Maybe the CPU should return it's pins, so that it is very clear that we communicate between cpu and other system. 
         // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
         CPU.cycle(&state.cpu, &state.mmu);
+        BOOT.cycle(&state.boot, &state.mmu);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input, &state.mmu);
         TIMER.cycle(&state.timer, &state.mmu);

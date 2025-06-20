@@ -15,7 +15,7 @@ pub const InputState = packed struct {
 // graphics
 pub const resolution_width = 160;
 pub const resolution_height = 144;
-pub const scaling = 4;
+pub const scaling = 5;
 
 pub const window_width = resolution_width * scaling;
 pub const window_height = resolution_height * scaling;
@@ -41,3 +41,4 @@ pub const num_gb_samples = (t_cycles_in_60fps / t_cycles_per_sample) * num_chann
 
 // memory
 pub const addr_space = 0x1_0000;
+pub const boot_rom_size = 256;

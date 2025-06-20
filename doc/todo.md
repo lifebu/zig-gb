@@ -4,8 +4,6 @@
     - Stat 
 - MBC
 - Add CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
-- Running actually boot roms.
-    - Use sameboy boot roms.
 - Think about how the code for loading and initializing the emulator should work.
     - Loading from command line and using the imgui ui.
     - Initialization and Deinitialization logic for all subsystems.
