@@ -1,13 +1,11 @@
 # src3:
 ## CPU:
 - Interrupt Sources
-    - Joypad: Add test!
-    - Serial
     - Stat 
 - CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
+- MBC
 - How should bus conflicts work? especially with the DMA?
 - Refactoring timer, input and dma. They are mostly copied from old source code.
-- MBC
 - STOP
 - Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
     - Cycle count.
@@ -16,6 +14,8 @@
     - Custom testrunner?
 - Think about how the code for loading and initializing the emulator should work.
     - Loading from command line and using the imgui ui.
+- Interrupt Sources:
+    - Serial.
 - APU
 - Running actually boot roms.
 - Try to unify the Uop Order:

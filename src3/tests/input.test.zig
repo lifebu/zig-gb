@@ -162,5 +162,14 @@ pub fn runInputTests() !void {
         return err;
     };
 
-    // TODO: Test for the interrupt that is triggered!
+    // Interrupt
+    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
+    mmu.memory[mem_map.joypad] = 0b1111_1111;
+    INPUT.cycle(&input, &mmu);
+    mmu.memory[mem_map.joypad] = 0b0000_0000;
+    INPUT.cycle(&input, &mmu);
+    std.testing.expectEqual(false, mmu.memory[mem_map.interrupt_flag] & mem_map.interrupt_joypad == mem_map.interrupt_joypad) catch |err| {
+        std.debug.print("Failed: Joypad interrupt is not triggered.\n", .{});
+        return err;
+    };
 }
