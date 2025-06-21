@@ -4,6 +4,8 @@
     - VBlanK: Add tests!
     - Stat 
 - MBC
+    - MBC Register ranges for: RAM Enable, Rom Bank Low, Rom Bank High (1bit), Ram Bank, Bank mode (MBC1).
+    - CartHeader => MBC feature set.
 - Add CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - Think about how the code for loading and initializing the emulator should work.
     - Loading from command line and using the imgui ui.
@@ -21,6 +23,10 @@
         - Splitting memory means we waste loss on unused memory?
         - How are requests then applied fast? subsystem has to do more tests? With the address we already know which subsystem will do this (can we dispatch?)
 - How should bus conflicts work? especially with the DMA?
+- Change support for loading memory dumps.
+    - As we don't save some state of the system (like cpu registers) with the dump. Running a dump would create false positive bugs.
+    - I can still support this for testing subsystems like the ppu (draw a specific scene for a test).
+    - And I can expand this for full savestate support.
 - Refactoring timer, input and dma. They are mostly copied from old source code.
 - STOP
 - Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.

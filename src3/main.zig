@@ -2,6 +2,7 @@ const std = @import("std");
 
 const APU = @import("apu.zig");
 const BOOT = @import("boot.zig");
+const CART = @import("cart.zig");
 const CLI = @import("cli.zig");
 const CPU = @import("cpu.zig");
 const def = @import("defines.zig");
@@ -17,6 +18,7 @@ const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var apu: APU.State = .{};
     var boot: BOOT.State = .{};
+    var cart: CART.State = .{};
     var cli: CLI.State = .{};
     var cpu: CPU.State = .{};
     var dma: DMA.State = .{};
@@ -31,6 +33,7 @@ export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     APU.init(&state.apu);
     BOOT.init(&state.boot);
+    CART.init(&state.cart, state.allocator);
     CLI.init(&state.cli, state.allocator.allocator());
     CPU.init(&state.cpu);
     DMA.init(&state.dma);
@@ -50,6 +53,7 @@ fn imgui_cb(dump_path: []const u8) void {
     const file_type: MMU.FileType = MMU.getFileType(dump_path);
     MMU.loadDump(&state.mmu, dump_path, file_type);
     CPU.loadDump(&state.cpu, file_type);
+    CART.loadDump(&state.cart, dump_path, file_type, &state.mmu);
 }
 
 export fn frame() void {
@@ -62,6 +66,7 @@ export fn frame() void {
         // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
         CPU.cycle(&state.cpu, &state.mmu);
         BOOT.cycle(&state.boot, &state.mmu);
+        CART.cycle(&state.cart, &state.mmu);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input, &state.mmu);
         TIMER.cycle(&state.timer, &state.mmu);
@@ -74,6 +79,7 @@ export fn frame() void {
 }
 
 export fn deinit() void {
+    CART.deinit(&state.cart);
     CLI.deinit(&state.cli, state.allocator.allocator());
     Platform.deinit();
     _ = state.allocator.deinit();

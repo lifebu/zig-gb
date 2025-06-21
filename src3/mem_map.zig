@@ -4,6 +4,7 @@
 pub const rom_low: u16          = 0x0000;
 pub const rom_middle: u16       = 0x4000;
 pub const rom_high: u16         = 0x8000;
+pub const rom_header: u16       = 0x0100;
 
 pub const vram_low: u16         = 0x8000;
 pub const vram_high: u16        = 0xA000;
