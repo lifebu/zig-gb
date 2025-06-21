@@ -33,7 +33,7 @@ export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     APU.init(&state.apu);
     BOOT.init(&state.boot);
-    CART.init(&state.cart, state.allocator);
+    CART.init(&state.cart, state.allocator.allocator());
     CLI.init(&state.cli, state.allocator.allocator());
     CPU.init(&state.cpu);
     DMA.init(&state.dma);

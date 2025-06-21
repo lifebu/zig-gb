@@ -19,6 +19,7 @@ pub fn init(state: *State) void {
 }
 
 pub fn cycle(state: *State, mmu: *MMU.State) void {
+    // TODO: Move this logic to the cart.zig?
     // TODO: Can I implement the mapping better, so that I don't have a late check like this?
     if(!state.rom_enabled) {
         return;

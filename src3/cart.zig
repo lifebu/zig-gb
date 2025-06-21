@@ -72,7 +72,7 @@ const cart_type_table = [_]MBC {
 
 pub const State = struct {
     // TODO: Can we do this without an allocator?
-    allocator: std.mem.Allocator,
+    allocator: std.mem.Allocator = undefined,
 
     rom: []u8 = undefined,
     ram: ?[]u8 = null,
@@ -106,46 +106,44 @@ pub fn deinit(state: *State) void {
 pub fn cycle(state: *State, mmu: *MMU.State) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if(mmu.request.write) |address| {
-        const data = mmu.request.data.*;
-        switch(address) {
-            state.mbc_type_info.ram_enable_low...state.mbc_type_info.ram_bank_high => {
-                // TODO: This also enables access to the RTC registers.
-                state.ram_enable = @as(u4, @truncate(data)) == 0xA;
-                ramChanged(state, mmu);
-            },
-            state.mbc_type_info.rom_bank_low...state.mbc_type_info.rom_bank_high => {
-                // TODO: first 8 bits of rom bank.
-                const num_banks: u9 = @truncate(state.rom_size_byte / rom_bank_size_byte);
-                const mask: u9 = @intCast(num_banks - 1);
-                state.rom_bank = @truncate(@max(1, data) & mask);
-                romChanged(state, mmu);
-            },
-            state.mbc_type_info.rom_bank_msb_low...state.mbc_type_info.rom_bank_msb_high => {
-                // TODO: highest 1 bit of rom bank.
-                std.debug.print("Highest ROM bit not supported! \n", .{});
-                unreachable;
-            },
-            state.mbc_type_info.ram_bank_low...state.mbc_type_info.ram_bank_high => {
-                // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
-                // Depending on what you write you can access different registers.
-                const num_banks: u6 = @truncate(state.ram_size_byte / ram_bank_size_byte);
-                // TODO: this better, this is just num_banks - 1 would underflow for one bank.
-                if(num_banks == 1) {
-                    return; // Nothing to switch on 
-                }
+    if (mmu.request.write) |address| {
+        if (address >= mem_map.rom_high ) {
+            return;
+        } 
 
-                const mask: u9 = @intCast(num_banks - 1);
-                state.ram_bank = @truncate(data & mask);
-                ramChanged(state, mmu);
-            },
-            state.mbc_type_info.rtc_low...state.mbc_type_info.rtc_high => {
-                // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
-                // That "latched" data will not change until you do it again by repeating this pattern.
-                // This way you can read the RTC registers while the clocks keeps ticking.
-            },
-            else => {},
+        const data = mmu.request.data.*;
+        if (address >= state.mbc_type_info.ram_enable_low and address <= state.mbc_type_info.ram_bank_high ) {
+            // TODO: This also enables access to the RTC registers.
+            state.ram_enable = @as(u4, @truncate(data)) == 0xA;
+            ramChanged(state, mmu);
+        } else if (address >= state.mbc_type_info.rom_bank_low and address <= state.mbc_type_info.rom_bank_high ) {
+            // TODO: first 8 bits of rom bank.
+            const num_banks: u9 = @truncate(state.rom_size_byte / rom_bank_size_byte);
+            const mask: u9 = @intCast(num_banks - 1);
+            state.rom_bank = @truncate(@max(1, data) & mask);
+            romChanged(state, mmu);
+        } else if (address >= state.mbc_type_info.rom_bank_msb_low and address <= state.mbc_type_info.rom_bank_msb_high ) {
+            // TODO: highest 1 bit of rom bank.
+            std.debug.print("Highest ROM bit not supported! \n", .{});
+            unreachable;
+        } else if (address >= state.mbc_type_info.ram_bank_low and address <= state.mbc_type_info.ram_bank_high ) {
+            // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
+            // Depending on what you write you can access different registers.
+            const num_banks: u6 = @truncate(state.ram_size_byte / ram_bank_size_byte);
+            // TODO: this better, this is just num_banks - 1 would underflow for one bank.
+            if(num_banks == 1) {
+                return; // Nothing to switch on 
+            }
+
+            const mask: u9 = @intCast(num_banks - 1);
+            state.ram_bank = @truncate(data & mask);
+            ramChanged(state, mmu);
+        } else if (address >= state.mbc_type_info.rtc_low and address <= state.mbc_type_info.rtc_high ) {
+            // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
+            // That "latched" data will not change until you do it again by repeating this pattern.
+            // This way you can read the RTC registers while the clocks keeps ticking.
         }
+
         mmu.request.write = null;
     }
 }
@@ -184,7 +182,8 @@ pub fn loadDump(state: *State, path: []const u8, file_type: MMU.FileType, mmu: *
         .gameboy => {
             const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
 
-            state.rom = try file.readToEndAlloc(state.allocator, std.math.maxInt(u32));
+            // TODO: How to handle errors in the emulator?
+            state.rom = file.readToEndAlloc(state.allocator, std.math.maxInt(u32)) catch unreachable;
             errdefer state.allocator.free(state.rom);
 
             // TODO: Check if the cart_features even support ram and don't just use the ram size.
@@ -196,20 +195,20 @@ pub fn loadDump(state: *State, path: []const u8, file_type: MMU.FileType, mmu: *
 
             const cart_type: u8 = state.rom[header_cart_type];
             state.mbc = cart_type_table[cart_type];
-            state.mbc_type_info = mbc_type_table[state.mbc];
+            state.mbc_type_info = mbc_type_table[@intFromEnum(state.mbc)];
 
             // TODO: Do we really want to copy the content?
             // Initial copy of the first banks.
             std.mem.copyForwards(u8, mmu.memory[mem_map.rom_low..mem_map.rom_high], state.rom[0..2 * rom_bank_size_byte]);
 
             if(state.ram_size_byte != 0) {
-                state.ram = try state.allocator.alloc(u8, state.ram_size_byte); 
+                state.ram = state.allocator.alloc(u8, state.ram_size_byte) catch unreachable; 
                 @memset(state.ram.?, 0);
                 errdefer state.allocator.free(state.ram.?);
             }
 
             // TODO: This only exists if we don't have ram support. can I do this better?
-            state.zero_ram_bank = try state.allocator(u8, ram_bank_size_byte);
+            state.zero_ram_bank = state.allocator.alloc(u8, ram_bank_size_byte) catch unreachable;
             @memset(state.zero_ram_bank, 0xFF);
             errdefer state.allocator.free(state.zero_ram_bank);
         },

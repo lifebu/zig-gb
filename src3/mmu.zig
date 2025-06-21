@@ -40,13 +40,8 @@ pub fn cycle(state: *State) void {
         state.request.read = null;
     }
     if(state.request.write) |address| {
-        // TODO: Workaround so that tetris does not crash, remove when the cart can do this!
-        if(address >= mem_map.rom_low and address <= mem_map.rom_high) {
-            state.request.write = null;
-        } else {
-            state.memory[address] = state.request.data.*;
-            state.request.write = null;
-        }
+        state.memory[address] = state.request.data.*;
+        state.request.write = null;
     }
 }
 
