@@ -23,15 +23,15 @@ const TimerControl = packed struct(u8) {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if(mmu.request.write) |address| {
+    if(request.write) |address| {
         if(address == mem_map.divider) {
             state.system_counter = 0;
 
             mmu.memory[address] = 0;
-            mmu.request.write = null;
+            request.write = null;
         }
     }
 

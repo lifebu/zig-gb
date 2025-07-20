@@ -2,6 +2,7 @@ const std = @import("std");
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
+// TODO: Remove that dependency.
 const MMU = @import("mmu.zig");
 
 const header_cart_type = 0x147;
@@ -103,15 +104,15 @@ pub fn deinit(state: *State) void {
     state.allocator.free(state.zero_ram_bank);
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if (mmu.request.write) |address| {
+    if (request.write) |address| {
         if (address >= mem_map.rom_high ) {
             return;
         } 
 
-        const data = mmu.request.data.*;
+        const data = request.data.*;
         if (address >= state.mbc_type_info.ram_enable_low and address <= state.mbc_type_info.ram_bank_high ) {
             // TODO: This also enables access to the RTC registers.
             state.ram_enable = @as(u4, @truncate(data)) == 0xA;
@@ -144,7 +145,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             // This way you can read the RTC registers while the clocks keeps ticking.
         }
 
-        mmu.request.write = null;
+        request.write = null;
     }
 }
 
@@ -177,7 +178,7 @@ fn ramChanged(state: *State, mmu: *MMU.State) void {
 }
 
 // TODO: not a great solution to handle the loading and initializing of the emulator, okay for now.
-pub fn loadDump(state: *State, path: []const u8, file_type: MMU.FileType, mmu: *MMU.State) void {
+pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType, mmu: *MMU.State) void {
     switch(file_type) {
         .gameboy => {
             const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;

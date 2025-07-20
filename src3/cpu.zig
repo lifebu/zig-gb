@@ -4,6 +4,7 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
+// TODO: Try to get rid of mmu dependency. It is currently required to read out IE and IF.
 const MMU = @import("mmu.zig");
 
 // TODO: Think about how we split this file into multiple files.
@@ -816,7 +817,8 @@ pub fn init(state: *State) void {
     state.uop_fifo.write(uops.slice());
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
+    var request: def.MemoryRequest = .{}; 
     const flags = state.registers.r8.f;
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
@@ -999,16 +1001,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         .dbus => {
             const params: DBusParams = uop.params.dbus;
             if(params.source == .dbus) { // Read
-                mmu.request.read = state.address_bus;
-                mmu.request.write = null;
-                mmu.request.data = state.registers.getU8(params.target);
+                request.read = state.address_bus;
+                request.write = null;
+                request.data = state.registers.getU8(params.target);
             } else if(params.target == .dbus) { // Write
-                mmu.request.read = null;
-                mmu.request.write = state.address_bus;
-                mmu.request.data = state.registers.getU8(params.source);
+                request.read = null;
+                request.write = state.address_bus;
+                request.data = state.registers.getU8(params.source);
             } else {
-                mmu.request.read = null;
-                mmu.request.write = null;
+                unreachable;
             }
         },
         .decode => {
@@ -1108,9 +1109,11 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             unreachable;
         },
     }
+
+    return request;
 }
 
-pub fn loadDump(state: *State, file_type: MMU.FileType) void {
+pub fn loadDump(state: *State, file_type: def.FileType) void {
     // TODO: I would need a more stabile and better thought out initialization system when you load files.
     switch(file_type) {
         .gameboy => {

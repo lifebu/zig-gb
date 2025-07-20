@@ -2,6 +2,7 @@ const std = @import("std");
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
+// TODO: Remove that dependency.
 const MMU = @import("mmu.zig");
 
 pub const State = struct {
@@ -14,18 +15,18 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if(mmu.request.write) |address| {
+    if(request.write) |address| {
         if(address == mem_map.dma) {
             state.is_running = true;
-            state.start_addr = @as(u16, mmu.request.data.*) << 8;
+            state.start_addr = @as(u16, request.data.*) << 8;
             state.offset = 0;
             state.counter = 0;
 
-            mmu.memory[address] = mmu.request.data.*;
-            mmu.request.write = null;
+            mmu.memory[address] = request.data.*;
+            request.write = null;
             // TODO: While it is running I need to implement the bus conflict behavior for the cpu, 
             // the cpu will not be able to write and when it reads it will read the current byte of the dma transfer.
         }

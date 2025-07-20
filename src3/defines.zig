@@ -1,3 +1,5 @@
+const std = @import("std");
+
 // input
 // TODO: Is this optimal? Can we make it easier to calculate the dpad and button bytes?
 pub const InputState = packed struct {
@@ -10,6 +12,34 @@ pub const InputState = packed struct {
     b_pressed: bool = false,
     select_pressed: bool = false,
     start_pressed: bool = false,
+};
+
+pub const MemoryRequest = struct {
+    read: ?u16 = null,
+    write: ?u16 = null,
+    data: *u8 = undefined,
+
+    const Self = @This();
+    pub fn print(self: *Self) []u8 {
+        var buf: [3]u8 = undefined;
+        _ = std.fmt.bufPrint(&buf, "{s}{s}{s}", .{ 
+            if(self.read == null) "-" else "R", 
+            if(self.write == null) "-" else "W", 
+            if(self.read == null and self.write == null) "-" else "M" 
+        }) catch unreachable;
+        return &buf;
+    }
+    pub fn getAddress(self: *Self) u16 {
+        return if(self.read != null) self.read.? 
+            else if(self.write != null) self.write.? 
+            else 0;
+    }
+};
+
+pub const FileType = enum{
+    gameboy,
+    dump,
+    unknown
 };
 
 // graphics

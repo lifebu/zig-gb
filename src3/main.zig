@@ -50,7 +50,7 @@ export fn init() void {
 }
 
 fn imgui_cb(dump_path: []const u8) void {
-    const file_type: MMU.FileType = MMU.getFileType(dump_path);
+    const file_type: def.FileType = MMU.getFileType(dump_path);
     MMU.loadDump(&state.mmu, dump_path, file_type);
     CPU.loadDump(&state.cpu, file_type);
     CART.loadDump(&state.cart, dump_path, file_type, &state.mmu);
@@ -64,15 +64,15 @@ export fn frame() void {
     for(0..cycles_per_frame) |_| {
         // TODO: Maybe the CPU should return it's pins, so that it is very clear that we communicate between cpu and other system. 
         // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
-        CPU.cycle(&state.cpu, &state.mmu);
-        BOOT.cycle(&state.boot, &state.mmu);
-        CART.cycle(&state.cart, &state.mmu);
-        DMA.cycle(&state.dma, &state.mmu);
-        INPUT.cycle(&state.input, &state.mmu);
-        TIMER.cycle(&state.timer, &state.mmu);
-        MMU.cycle(&state.mmu);
-        APU.cycle(&state.apu, state.mmu.memory);
-        PPU.cycle(&state.ppu, &state.mmu.memory);
+        var request: def.MemoryRequest = CPU.cycle(&state.cpu, &state.mmu);
+        BOOT.cycle(&state.boot, &request);
+        CART.cycle(&state.cart, &state.mmu, &request);
+        DMA.cycle(&state.dma, &state.mmu, &request);
+        INPUT.cycle(&state.input, &state.mmu, &request);
+        TIMER.cycle(&state.timer, &state.mmu, &request);
+        MMU.cycle(&state.mmu, &request);
+        APU.cycle(&state.apu, &request);
+        PPU.cycle(&state.ppu, &state.mmu.memory, &request);
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds, state.apu.gb_sample_buffer);

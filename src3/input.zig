@@ -2,6 +2,7 @@ const std = @import("std");
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
+// TODO: Remove that dependency.
 const MMU = @import("mmu.zig");
 
 pub const State = struct {
@@ -12,17 +13,17 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if(mmu.request.write) |address| {
+    if(request.write) |address| {
         if(address == mem_map.joypad) {
             const current = mmu.memory[mem_map.joypad];
             // TODO: Is making this read only even necessary? it will be overwritten anyway?
             // Lower nibble is read-only.
-            const new: u8 = (mmu.request.data.* & 0xF0) | (current & 0x0F);
+            const new: u8 = (request.data.* & 0xF0) | (current & 0x0F);
             mmu.memory[address] = new;
-            mmu.request.write = null;
+            request.write = null;
 
             updateJoypad(state, mmu);
         }

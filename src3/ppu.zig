@@ -187,7 +187,8 @@ pub fn init(state: *State) void {
     state.uop_fifo.write(&oam_scan);
 }
 
-pub fn cycle(state: *State, memory: *[def.addr_space]u8) void {
+// TODO: Remove dependency to the memory array.
+pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) void {
     // TODO: PPU also needs to know the mmu, because the ppu needs to discard/change cpu read/write requests into memory that the ppu owns.
     var lcd_stat = LcdStat.fromMem(memory);
     const lcd_control = LcdControl.fromMem(memory);

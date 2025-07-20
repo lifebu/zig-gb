@@ -3,55 +3,25 @@ const std = @import("std");
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
-// TODO: Maybe rename this into the memory pins of the CPU?
-const MemoryRequest = struct {
-    read: ?u16 = null,
-    write: ?u16 = null,
-    data: *u8 = undefined,
-
-    const Self = @This();
-    pub fn print(self: *Self) []u8 {
-        var buf: [3]u8 = undefined;
-        _ = std.fmt.bufPrint(&buf, "{s}{s}{s}", .{ 
-            if(self.read == null) "-" else "R", 
-            if(self.write == null) "-" else "W", 
-            if(self.read == null and self.write == null) "-" else "M" 
-        }) catch unreachable;
-        return &buf;
-    }
-    pub fn getAddress(self: *Self) u16 {
-        return if(self.read != null) self.read.? 
-            else if(self.write != null) self.write.? 
-            else 0;
-    }
-};
-
 pub const State = struct {
     memory: [def.addr_space]u8 = [1]u8{0} ** def.addr_space,
-    request: MemoryRequest = .{},
 };
 
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(state: *State) void {
-    if(state.request.read) |address| {
-        state.request.data.* = state.memory[address];
-        state.request.read = null;
+pub fn cycle(state: *State, request: *def.MemoryRequest) void {
+    if(request.read) |address| {
+        request.data.* = state.memory[address];
+        request.read = null;
     }
-    if(state.request.write) |address| {
-        state.memory[address] = state.request.data.*;
-        state.request.write = null;
+    if(request.write) |address| {
+        state.memory[address] = request.data.*;
+        request.write = null;
     }
 }
 
-pub const FileType = enum{
-    gameboy,
-    dump,
-    unknown
-};
-
-pub fn getFileType(path: []const u8) FileType {
+pub fn getFileType(path: []const u8) def.FileType {
     // TODO: This should be handled in the cli itself. But this is easier for now :)
     var file_extension: []const u8 = undefined;
     var iter = std.mem.splitScalar(u8, path, '.');
@@ -67,7 +37,7 @@ pub fn getFileType(path: []const u8) FileType {
     return .unknown;
 }
 
-pub fn loadDump(state: *State, path: []const u8, file_type: FileType) void {
+pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType) void {
     switch(file_type) {
         .gameboy => {
             const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
