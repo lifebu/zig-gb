@@ -2,6 +2,79 @@
 ## CPU:
 - Split the memory each system manages it's own. systems have a cycle() and memory() function.
     - Both called by main!
+    - How do we handle more generic memory? like the Interrupts?
+- Memory:
+    - Use:
+        - CPU: hram, interrupt_enable (cycle), interrupt_flag (cycle), all memory (cycle)
+        - BOOT: boot_rom, boot_rom_enable 
+        - CART: rom, cart_ram
+        - DMA: dma, rom (cycle), vram (cycle), cart_ram (cycle), work_ram (cycle), oam (cycle)
+        - INPUT: joypad, interrupt_flag (updateInputState) 
+        - TIMER: timer, timer_control, divider, timer_mod, interrupt_flag (cycle). 
+        - PPU: lcd_control, lcd_stat, oam, vram, interrupt_flag (cycle), scroll_x, scroll_y, 
+            window_x, window_y, lcd_y, lcd_y_compare, dmg_palette, bg_palette, obj_palette, obj_palette_0, obj_palette_1
+        - APU: Audio registers
+        - SERIAL: serial_data, serial_control, interrupt_flag (cycle)
+
+    - owned:
+        - CPU: hram.
+            => add memory function to the cpu itself! 
+        - BOOT: boot_rom, boot_rom_enable
+        - CART: rom, cart_ram
+        - DMA: dma
+        - INPUT: joypad
+        - TIMER: timer, timer_control, divider, timer_mod
+        - PPU: lcd_control, lcd_stat, oam, vram, scroll_x, scroll_y, 
+            window_x, window_y, lcd_y, lcd_y_compare, dmg_palette, bg_palette, obj_palette, obj_palette_0, obj_palette_1
+            vram_bank, 
+        - APU: Audio registers
+        - SERIAL: serial_data, serial_control
+        !- RAM: work_ram, echo_ram
+
+    # Issues:
+    - overlaps:
+        - interrupt_flag
+        - dma has a lot.
+            - maybe the dma can also do a memory request and override the cpu?
+            - Or it also returns a request?
+
+    ?- unowned: find a place for them
+        ?- interrupt_flag, interrupt_enable
+            - In a single cycle multiple systems could try to write to interrupt_flag.
+            - interrupt_flag is only read by the cpu.
+            - interrupt_enable is only accessed to by the cpu.
+            => interrupt_enable can be intern to the cpu (just like HRAM).
+            ?- interrupt_flag?
+
+    - Buses:
+        - If we have an internal_bus (soc_bus), reads/writes are protected from the dma and the cpu could access them.
+        => Do research when and how the cpu is reading / accessing the interrupt_flag and interrupt_enable.
+        => Do research how the cpu core accesses systems on the soc (can the cpu access them at tcycle speed).
+        https://retrocomputing.stackexchange.com/questions/11811/how-does-game-boy-sharp-lr35902-hram-work
+        https://iceboy.a-singer.de/doc/mem_patterns.html
+        => This confirms that we have an soc_bus (internal) and external_bus.
+        - How does the cpu "know" which buss to put the data onto?
+            - if (address < 0xFEA0) then external else internal.
+            - 0xFEA0: Start of the first unused area.
+            - or: if(address >= 0xFF00) internal else external.
+            - 0xFF00: Start of I/O registers.
+
+    - Ideas:
+        - Move HRAM to CPU => cpu gets a memory() function.  
+        - Add RAM (work_ram and echo_ram) 
+        - DMA can also return a memory request.
+            - overwrites the cpu memory request.
+                - ONLY FOR THE EXTERNAL BUS.
+            - if the cpu does a write, just discard the request.
+            - if the cpu does a read, first we set the request.data.* to 0xFF (so cpu gets a open buss value response)
+                - Then we will set the bus state to write and request.data to what the dma wants to write.
+        - Rename memory request do bus.
+            => BUS.State (like CPU.State).
+            => DMG only has one external bus and one internal bus (for I/O).
+            => GBC has two external busses (cart_ram + cart_rom vs. work_ram + echo_ram).
+            - Lets me rename the memory() function to request()!
+
+- add define for open bus value as 0xFF!
 - cpu returns memory requests, subsystems react to it.
 - Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
 
@@ -26,6 +99,9 @@
     - So I am saving if a system is active or not out of band instead of in a bool.
     - Maybe keep an inactive system list?
     - A list of systems would also allow to load different versions of the emulator (dmg ppu vs. gbc ppu).
+    pub fn cycle() ?Bus.State {}
+    pub fn memory(bus: *Bus.State) void {}
+    - Those systems can have a cycle function that optionally returns an BUS.State!
 
 - Interrupt Sources
     - VBlanK: Add tests!

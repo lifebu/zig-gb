@@ -68,7 +68,7 @@ export fn frame() void {
         BOOT.memory(&state.boot, &request);
         CART.memory(&state.cart, &state.mmu, &request);
         DMA.memory(&state.dma, &state.mmu, &request);
-        INPUT.memory(&state.input, &state.mmu, &request);
+        INPUT.memory(&state.input, &request);
         TIMER.memory(&state.timer, &state.mmu, &request);
         PPU.memory(&state.ppu, &request);
         APU.memory(&state.apu, &request);

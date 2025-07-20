@@ -6,6 +6,8 @@ const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 
 pub const State = struct {
+    joypad: u8 = 0xFF,
+
     dpad: u4 = 0xF,
     buttons: u4 = 0xF,
 };
@@ -17,19 +19,32 @@ pub fn cycle(_: *State) void {
 
 }
 
-pub fn memory(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
-    // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
-    // And split the on-write behavior and memory request handling from the cycle function?
-    if(request.write) |address| {
-        if(address == mem_map.joypad) {
-            const current = mmu.memory[mem_map.joypad];
-            // TODO: Is making this read only even necessary? it will be overwritten anyway?
-            // Lower nibble is read-only.
-            const new: u8 = (request.data.* & 0xF0) | (current & 0x0F);
-            mmu.memory[address] = new;
-            request.write = null;
+pub fn memory(state: *State, request: *def.MemoryRequest) void {
+    if(request.read) |address| {
+        switch (address) {
+            mem_map.joypad => {
+                request.data.* = state.joypad;
+                request.read = null;
+            },
+            else => {},
+        }
+    }
+    else if(request.write) |address| {
+        switch (address) {
+            mem_map.joypad => {
+                const joyp = (request.data.* & 0xF0) | (state.joypad & 0x0F);
+                const select_dpad: bool = (joyp & 0x10) != 0x10;
+                const select_buttons: bool = (joyp & 0x20) != 0x20;
+                const nibble: u4 = 
+                    if(select_dpad and select_buttons) state.dpad & state.buttons 
+                    else if (select_dpad) state.dpad 
+                    else if (select_buttons) state.buttons
+                    else 0x0F;
 
-            updateJoypad(state, mmu);
+                state.joypad = (joyp & 0xF0) | nibble; 
+                request.write = null;
+            },
+            else => {},
         }
     }
 }
@@ -57,18 +72,4 @@ pub fn updateInputState(state: *State, mmu: *MMU.State, input_state: *const def.
     if (state.dpad < last_dpad or state.buttons < last_buttons) {
         mmu.memory[mem_map.interrupt_flag] |= mem_map.interrupt_joypad;
     }
-}
-
-pub fn updateJoypad(state: *State, mmu: *MMU.State) void {
-    var joyp: u8 = mmu.memory[mem_map.joypad]; 
-    const select_dpad: bool = (joyp & 0x10) != 0x10;
-    const select_buttons: bool = (joyp & 0x20) != 0x20;
-    const nibble: u4 = 
-        if(select_dpad and select_buttons) state.dpad & state.buttons 
-        else if (select_dpad) state.dpad 
-        else if (select_buttons) state.buttons
-        else 0x0F;
-
-    joyp = (joyp & 0xF0) | nibble; 
-    mmu.memory[mem_map.joypad] = joyp;
 }
