@@ -9,5 +9,9 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(_: *State, _: *def.MemoryRequest) void {
+pub fn memory(_: *State, _: *def.MemoryRequest) void {
+
+}
+
+pub fn cycle(_: *State) void {
 }

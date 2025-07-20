@@ -10,7 +10,10 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(state: *State, request: *def.MemoryRequest) void {
+pub fn cycle(_: *State) void {
+}
+
+pub fn memory(state: *State, request: *def.MemoryRequest) void {
     if(request.read) |address| {
         request.data.* = state.memory[address];
         request.read = null;

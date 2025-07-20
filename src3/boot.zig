@@ -17,7 +17,10 @@ pub fn init(state: *State) void {
     state.rom_enabled = true;
 }
 
-pub fn cycle(state: *State, request: *def.MemoryRequest) void {
+pub fn cycle(_: *State) void {
+}
+
+pub fn memory(state: *State, request: *def.MemoryRequest) void {
     // TODO: Move this logic to the cart.zig?
     // TODO: Can I implement the mapping better, so that I don't have a late check like this?
     if(!state.rom_enabled) {

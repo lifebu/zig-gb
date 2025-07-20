@@ -1,6 +1,6 @@
 # src3:
 ## CPU:
-- Split the memory each system manages it's own. systems have a cycle() and request() function.
+- Split the memory each system manages it's own. systems have a cycle() and memory() function.
     - Both called by main!
 - cpu returns memory requests, subsystems react to it.
 - Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 

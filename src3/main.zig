@@ -59,20 +59,29 @@ fn imgui_cb(dump_path: []const u8) void {
 export fn frame() void {
     INPUT.updateInputState(&state.input, &state.mmu, &state.platform.input_state);
     // Note: GB runs at 59.73Hz. This software runs at 60Hz.
-    // TODO: It would be better to just let the system run to the end of the next vblank.
+    // TODO: It would be better to just let the system run to the end of the next vblank. How to do that when the PPU is disabled?
     const cycles_per_frame = 70224; 
     for(0..cycles_per_frame) |_| {
-        // TODO: Maybe the CPU should return it's pins, so that it is very clear that we communicate between cpu and other system. 
-        // This would strengthen decoupling and other systems don't "need" to know the mmu for this then.
+        // TODO: Consider creating a list of active systems that are ticked every cycle by calling their memory and cycle functions.
+        // Deactivating a system means moving it to the inactive set.
         var request: def.MemoryRequest = CPU.cycle(&state.cpu, &state.mmu);
-        BOOT.cycle(&state.boot, &request);
-        CART.cycle(&state.cart, &state.mmu, &request);
-        DMA.cycle(&state.dma, &state.mmu, &request);
-        INPUT.cycle(&state.input, &state.mmu, &request);
-        TIMER.cycle(&state.timer, &state.mmu, &request);
-        MMU.cycle(&state.mmu, &request);
-        APU.cycle(&state.apu, &request);
-        PPU.cycle(&state.ppu, &state.mmu.memory, &request);
+        BOOT.memory(&state.boot, &request);
+        CART.memory(&state.cart, &state.mmu, &request);
+        DMA.memory(&state.dma, &state.mmu, &request);
+        INPUT.memory(&state.input, &state.mmu, &request);
+        TIMER.memory(&state.timer, &state.mmu, &request);
+        PPU.memory(&state.ppu, &request);
+        APU.memory(&state.apu, &request);
+        MMU.memory(&state.mmu, &request);
+
+        BOOT.cycle(&state.boot);
+        CART.cycle(&state.cart);
+        DMA.cycle(&state.dma, &state.mmu);
+        INPUT.cycle(&state.input);
+        TIMER.cycle(&state.timer, &state.mmu);
+        PPU.cycle(&state.ppu, &state.mmu);
+        APU.cycle(&state.apu);
+        MMU.cycle(&state.mmu);
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds, state.apu.gb_sample_buffer);

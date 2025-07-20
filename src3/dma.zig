@@ -15,23 +15,7 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
-    // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
-    // And split the on-write behavior and memory request handling from the cycle function?
-    if(request.write) |address| {
-        if(address == mem_map.dma) {
-            state.is_running = true;
-            state.start_addr = @as(u16, request.data.*) << 8;
-            state.offset = 0;
-            state.counter = 0;
-
-            mmu.memory[address] = request.data.*;
-            request.write = null;
-            // TODO: While it is running I need to implement the bus conflict behavior for the cpu, 
-            // the cpu will not be able to write and when it reads it will read the current byte of the dma transfer.
-        }
-    }
-
+pub fn cycle(state: *State, mmu: *MMU.State) void {
     // Maybe I can use a small uop machine for the dma so that I don't need so many if conditions everywhere?
     if(state.is_running) {
         // first time we overflow after 8 cycles for first write.
@@ -50,5 +34,21 @@ pub fn cycle(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
 
         state.offset += 1;
         state.is_running = (dest_addr + 1) < mem_map.oam_high;
+    }
+}
+
+pub fn memory(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
+    if(request.write) |address| {
+        if(address == mem_map.dma) {
+            state.is_running = true;
+            state.start_addr = @as(u16, request.data.*) << 8;
+            state.offset = 0;
+            state.counter = 0;
+
+            mmu.memory[address] = request.data.*;
+            request.write = null;
+            // TODO: While it is running I need to implement the bus conflict behavior for the cpu, 
+            // the cpu will not be able to write and when it reads it will read the current byte of the dma transfer.
+        }
     }
 }

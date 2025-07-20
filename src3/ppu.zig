@@ -4,6 +4,8 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
+// TODO: Try to get rid of mmu dependency. It is currently required to read out IE and IF.
+const MMU = @import("mmu.zig");
 
 const tile_size_x = 8;
 const tile_size_y = 8;
@@ -51,8 +53,8 @@ const LcdControl = packed struct {
     // When set to false, start add initialize ppu (like on start). 
     lcd_enable: bool = false,
 
-    pub fn fromMem(memory: *[def.addr_space]u8) LcdControl {
-        return @bitCast(memory[mem_map.lcd_control]);
+    pub fn fromMem(mmu: *MMU.State) LcdControl {
+        return @bitCast(mmu.memory[mem_map.lcd_control]);
     } 
 };
 
@@ -70,12 +72,12 @@ pub const LcdStat = packed struct {
     lyc_select: bool = false,
     _: u1 = 0,
 
-    pub fn fromMem(memory: *[def.addr_space]u8) LcdStat {
-        return @bitCast(memory[mem_map.lcd_stat]);
+    pub fn fromMem(mmu: *MMU.State) LcdStat {
+        return @bitCast(mmu.memory[mem_map.lcd_stat]);
     } 
 
-    pub fn toMem(self: LcdStat, memory: *[def.addr_space]u8) void {
-        memory[mem_map.lcd_stat] = @bitCast(self);
+    pub fn toMem(self: LcdStat, mmu: *MMU.State) void {
+        mmu.memory[mem_map.lcd_stat] = @bitCast(self);
     } 
 };
 
@@ -99,9 +101,9 @@ const Object = packed struct {
         priority: ObjectPriority,
     },
 
-    pub fn fromOAM(memory: *[def.addr_space]u8, obj_idx: u6) *align(1) const Object {
+    pub fn fromOAM(mmu: *MMU.State, obj_idx: u6) *align(1) const Object {
         const address: u16 = mem_map.oam_low + (@as(u16, obj_idx) * obj_size_byte);
-        return @ptrCast(&memory[address]);
+        return @ptrCast(&mmu.memory[address]);
     }
 };
 
@@ -188,10 +190,10 @@ pub fn init(state: *State) void {
 }
 
 // TODO: Remove dependency to the memory array.
-pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) void {
-    // TODO: PPU also needs to know the mmu, because the ppu needs to discard/change cpu read/write requests into memory that the ppu owns.
-    var lcd_stat = LcdStat.fromMem(memory);
-    const lcd_control = LcdControl.fromMem(memory);
+pub fn cycle(state: *State, mmu: *MMU.State) void {
+    // TODO: PPU also needs to know the mmu, because the ppu needs to discard/change cpu read/write requests into mmu that the ppu owns.
+    var lcd_stat = LcdStat.fromMem(mmu);
+    const lcd_control = LcdControl.fromMem(mmu);
 
     const uop: MicroOp = state.uop_fifo.readItem().?;
     switch(uop) {
@@ -201,13 +203,13 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) 
             state.uop_fifo.write(state.current_bg_window_uops); 
             state.background_fifo.clear();
             state.object_fifo.clear();
-            assert(state.oam_line_list.isAligned()); // Sort requires contiguous memory.
+            assert(state.oam_line_list.isAligned()); // Sort requires contiguous mmu.
             std.mem.sort(FetcherData, state.oam_line_list.buffer[0..state.oam_line_list.length()], {}, FetcherData.sortObjects);
             state.lcd_overscan_x = 0;
             // Advance is done in the last cycle of oam_scan. We set it to the max value so that it overflows to 0. 
             state.draw_cycles = std.math.maxInt(u9);
             state.line_penalty = 0;
-            checkLcdX(state, memory);
+            checkLcdX(state, mmu);
         },
         .advance_hblank => {
             assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
@@ -228,25 +230,25 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) 
             state.oam_scan_idx = 0;
         },
         .advance_vblank => {
-            memory[mem_map.interrupt_flag] |= mem_map.interrupt_vblank;
+            mmu.memory[mem_map.interrupt_flag] |= mem_map.interrupt_vblank;
             lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
         },
         .fetch_low_bg => {
-            state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.first_bitplane = mmu.memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
-            tryPushPixel(state, memory);
+            tryPushPixel(state, mmu);
         },
         .fetch_low_obj => {
-            state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.first_bitplane = mmu.memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
         },
         .fetch_high_bg => {
-            state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
-            fetchPushBg(state, memory);
+            state.fetcher_data.second_bitplane = mmu.memory[state.fetcher_data.tile_addr];
+            fetchPushBg(state, mmu);
         },
         .fetch_high_obj => {
-            state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.second_bitplane = mmu.memory[state.fetcher_data.tile_addr];
 
             var pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.obj_palettes_dmg);
             inline for(0..pixels.len) |i| {
@@ -259,24 +261,24 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) 
                 // subtract penalty that will be applied by checkLcdX() again.
                 const fifo_length: i9 = @intCast(state.background_fifo.length()); 
                 state.line_penalty -= @max(0, 6 - fifo_length);
-                checkLcdX(state, memory);
+                checkLcdX(state, mmu);
             } else {
                 state.uop_fifo.write(state.current_bg_window_uops);
-                tryPushPixel(state, memory);
+                tryPushPixel(state, mmu);
             }
         },
         .fetch_push_bg => {
-            fetchPushBg(state, memory);
+            fetchPushBg(state, mmu);
         },
         .fetch_tile_bg => {
             const tilemap_addr_type: TileMapAddress = lcd_control.bg_map_area;
-            const scroll_x: u8 = memory[mem_map.scroll_x];
-            const scroll_y: u8 = memory[mem_map.scroll_y];
+            const scroll_x: u8 = mmu.memory[mem_map.scroll_x];
+            const scroll_y: u8 = mmu.memory[mem_map.scroll_y];
             const overscan_x_tile_offset: u5 = tile_map_size_x - 1;
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileMapTileAddr(state, memory, tilemap_addr_type, overscan_x_tile_offset, scroll_x, scroll_y),
+                .tile_addr = getTileMapTileAddr(state, mmu, tilemap_addr_type, overscan_x_tile_offset, scroll_x, scroll_y),
             };
-            tryPushPixel(state, memory);
+            tryPushPixel(state, mmu);
         },
         .fetch_tile_obj => {
             const current_object: FetcherData = state.oam_line_list.readItem() orelse unreachable;
@@ -293,15 +295,15 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) 
         },
         .fetch_tile_window => {
             const tilemap_addr_type: TileMapAddress = lcd_control.window_map_area;
-            const win_overscan_x: u16 = memory[mem_map.window_x] + 1;
-            const win_y: u16 = memory[mem_map.window_y];
+            const win_overscan_x: u16 = mmu.memory[mem_map.window_x] + 1;
+            const win_y: u16 = mmu.memory[mem_map.window_y];
             // Note: this works because we use modulo later to get the tile map address and tile line address.
             const scroll_x: u16 = tile_map_pixel_size_x - win_overscan_x; 
             const scroll_y: u16 = tile_map_pixel_size_y - win_y;
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileMapTileAddr(state, memory, tilemap_addr_type, 0, scroll_x, scroll_y),
+                .tile_addr = getTileMapTileAddr(state, mmu, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
-            tryPushPixel(state, memory);
+            tryPushPixel(state, mmu);
         },
         .halt => {
             state.uop_fifo.writeItem(.halt);
@@ -309,10 +311,10 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) 
         .nop => {
         },
         .nop_draw => {
-            tryPushPixel(state, memory);
+            tryPushPixel(state, mmu);
         },
         .oam_check => {
-            const object = Object.fromOAM(memory, state.oam_scan_idx);
+            const object = Object.fromOAM(mmu, state.oam_scan_idx);
             const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(lcd_control.obj_size)));
             const obj_pixel_y: i16 = @as(i16, state.lcd_y) + obj_double_height - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
@@ -338,10 +340,14 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8, _: *def.MemoryRequest) 
     }
 
     state.draw_cycles +%= 1;
-    memory[mem_map.lcd_y] = state.lcd_y;
-    lcd_stat.ly_is_lyc = state.lcd_y == memory[mem_map.lcd_y_compare];
+    mmu.memory[mem_map.lcd_y] = state.lcd_y;
+    lcd_stat.ly_is_lyc = state.lcd_y == mmu.memory[mem_map.lcd_y_compare];
     // TODO: Add support for stat interrupt.
-    lcd_stat.toMem(memory);
+    lcd_stat.toMem(mmu);
+}
+
+pub fn memory(_: *State, _: *def.MemoryRequest) void {
+
 }
 
 fn advanceBlank(state: *State, length: usize) void {
@@ -351,15 +357,15 @@ fn advanceBlank(state: *State, length: usize) void {
     state.uop_fifo.writeItem(advance);
 }
 
-fn checkLcdX(state: *State, memory: *[def.addr_space]u8) void {
-    const lcd_control = LcdControl.fromMem(memory);
+fn checkLcdX(state: *State, mmu: *MMU.State) void {
+    const lcd_control = LcdControl.fromMem(mmu);
 
-    const scroll_x: u8 = memory[mem_map.scroll_x];
+    const scroll_x: u8 = mmu.memory[mem_map.scroll_x];
     const scroll_overscan_x: u8 = tile_size_x - (scroll_x % tile_size_x);
 
-    const win_x: u8 = memory[mem_map.window_x];
+    const win_x: u8 = mmu.memory[mem_map.window_x];
     const win_overscan_x: u8 = win_x + 1;
-    const win_pos_y: u8 = memory[mem_map.window_y];
+    const win_pos_y: u8 = mmu.memory[mem_map.window_y];
 
     const has_next_object = nextObjectIsAtLcdX(state);
 
@@ -408,7 +414,7 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoDa
     return result;
 }
 
-fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
+fn fetchPushBg(state: *State, mmu: *MMU.State) void {
     if(state.background_fifo.isEmpty()) { // push succeeded
         const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
         state.background_fifo.write(&pixels);
@@ -416,7 +422,7 @@ fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     } else { // push failed 
         state.uop_fifo.writeItem(.fetch_push_bg);
     }
-    tryPushPixel(state, memory);
+    tryPushPixel(state, mmu);
 }
 
 fn getPalette(paletteByte: u8) [def.color_depth]u2 {
@@ -428,8 +434,8 @@ fn getPalette(paletteByte: u8) [def.color_depth]u2 {
     return [def.color_depth]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
-fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
-    const lcd_control = LcdControl.fromMem(memory);
+fn getTileMapTileAddr(state: *State, mmu: *MMU.State, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
+    const lcd_control = LcdControl.fromMem(mmu);
 
     const fifo_pixel_count: u3 = @intCast(state.background_fifo.length());
     const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
@@ -446,7 +452,7 @@ fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_t
     const tile_y = state.lcd_y +% scroll_y;
 
     const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
-    const tile_index: u16 = memory[tilemap_addr];
+    const tile_index: u16 = mmu.memory[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
 
     const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
@@ -472,7 +478,7 @@ fn nextObjectIsAtLcdX(state: *State) bool {
     return object.obj_pos_x == state.lcd_overscan_x;
 }
 
-fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
+fn tryPushPixel(state: *State, mmu: *MMU.State) void {
     if(state.background_fifo.isEmpty()) {
         return;
     }
@@ -484,11 +490,11 @@ fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
 
     const used_pixel: FifoData = mixBackgroundAndObject(bg_pixel, obj_pixel);
     const palette_addr: u16 = used_pixel.palette_addr + used_pixel.palette_index;
-    const palette: [def.color_depth]u2 = getPalette(memory[palette_addr]);
+    const palette: [def.color_depth]u2 = getPalette(mmu.memory[palette_addr]);
     const color_id: u2 = palette[used_pixel.color_id];
 
     const color_index: u16 = state.lcd_overscan_x + @as(u16, def.overscan_width) * state.lcd_y;
     state.colorIds[color_index] = color_id;
     state.lcd_overscan_x += 1;
-    checkLcdX(state, memory);
+    checkLcdX(state, mmu);
 }
