@@ -1,11 +1,37 @@
 # src3:
 ## CPU:
+- Split the memory each system manages it's own. systems have a cycle() and request() function.
+    - Both called by main!
+- cpu returns memory requests, subsystems react to it.
+- Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
+
+- Think about having all subsystems be their own micro op machine?
+    - Are the subsystems machines where they have two steps for each microop.
+        - 1st: Check memory request.
+        - 2nd: Do work.
+        - so we do two microops per cycle in each system?
+    - DMA:
+    - APU:
+    - CART:
+    - BOOT: Only request() function.
+    - INPUT: Only request() function.
+    - TIMER:
+- main function: a way to have an array of "machines" that I can call?
+    - Nice: I can remove systems that are currently not active.
+        => BOOT and DMA will remove itself from the list of systems => No need to check if it is active.
+        - But who will add the DMA to the active list of systems?
+        => When the PPU or APU are turned of => they are removed from the systems list.
+    => This is basically saving that state out of band!
+    => Dynamic list of active systems!
+    - So I am saving if a system is active or not out of band instead of in a bool.
+    - Maybe keep an inactive system list?
+    - A list of systems would also allow to load different versions of the emulator (dmg ppu vs. gbc ppu).
+
 - Interrupt Sources
     - VBlanK: Add tests!
     - Stat 
-- MBC
-    - MBC Register ranges for: RAM Enable, Rom Bank Low, Rom Bank High (1bit), Ram Bank, Bank mode (MBC1).
-    - CartHeader => MBC feature set.
+- Cart:
+    - Add tests for different mbc!
 - Add CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - Think about how the code for loading and initializing the emulator should work.
     - Loading from command line and using the imgui ui.
