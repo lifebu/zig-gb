@@ -38,13 +38,14 @@
             - maybe the dma can also do a memory request and override the cpu?
             - Or it also returns a request?
 
-    ?- unowned: find a place for them
-        ?- interrupt_flag, interrupt_enable
+    - unowned: find a place for them
+        - interrupt_flag, interrupt_enable
             - In a single cycle multiple systems could try to write to interrupt_flag.
             - interrupt_flag is only read by the cpu.
             - interrupt_enable is only accessed to by the cpu.
             => interrupt_enable can be intern to the cpu (just like HRAM).
-            ?- interrupt_flag?
+            - interrupt_flag?
+            => put interrupt flag on the bus state.
 
     - Buses:
         - If we have an internal_bus (soc_bus), reads/writes are protected from the dma and the cpu could access them.
@@ -72,6 +73,8 @@
             => BUS.State (like CPU.State).
             => DMG only has one external bus and one internal bus (for I/O).
             => GBC has two external busses (cart_ram + cart_rom vs. work_ram + echo_ram).
+                - If the memory request functions only take a bus as the argument, you can control and see at the callside which bus this system uses.
+                - Makes it easy to add a new bus to the GBC, just give the function a different pointer to a bus!
             - Lets me rename the memory() function to request()!
 
 - add define for open bus value as 0xFF!

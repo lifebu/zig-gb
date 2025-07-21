@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const APU = @import("apu.zig");
+const BUS = @import("bus.zig");
 const BOOT = @import("boot.zig");
 const CART = @import("cart.zig");
 const CLI = @import("cli.zig");
@@ -11,12 +12,14 @@ const INPUT = @import("input.zig");
 const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 const PPU = @import("ppu.zig");
+const RAM = @import("ram.zig");
 const Platform = @import("platform.zig");
 const TIMER = @import("timer.zig");
 
 const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var apu: APU.State = .{};
+    var bus: BUS.State = .{};
     var boot: BOOT.State = .{};
     var cart: CART.State = .{};
     var cli: CLI.State = .{};
@@ -26,12 +29,14 @@ const state = struct {
     var mmu: MMU.State = .{};
     var platform: Platform.State = .{};
     var ppu: PPU.State = .{};
+    var ram: RAM.State = .{};
     var timer: TIMER.State = .{};
 };
 
 export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     APU.init(&state.apu);
+    BUS.init(&state.bus);
     BOOT.init(&state.boot);
     CART.init(&state.cart, state.allocator.allocator());
     CLI.init(&state.cli, state.allocator.allocator());
@@ -41,6 +46,7 @@ export fn init() void {
     MMU.init(&state.mmu);
     PPU.init(&state.ppu);
     Platform.init(&state.platform, imgui_cb);
+    RAM.init(&state.ram);
     TIMER.init(&state.timer);
 
     // TODO: Better way to do this? Not in main function!
@@ -66,6 +72,7 @@ export fn frame() void {
         // Deactivating a system means moving it to the inactive set.
         var request: def.MemoryRequest = CPU.cycle(&state.cpu, &state.mmu);
         BOOT.memory(&state.boot, &request);
+        BUS.request(&state.bus);
         CART.memory(&state.cart, &state.mmu, &request);
         DMA.memory(&state.dma, &state.mmu, &request);
         INPUT.memory(&state.input, &request);
@@ -73,8 +80,10 @@ export fn frame() void {
         PPU.memory(&state.ppu, &request);
         APU.memory(&state.apu, &request);
         MMU.memory(&state.mmu, &request);
+        RAM.request(&state.ram, &state.bus);
 
         BOOT.cycle(&state.boot);
+        BUS.cycle(&state.bus);
         CART.cycle(&state.cart);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input);
@@ -82,6 +91,7 @@ export fn frame() void {
         PPU.cycle(&state.ppu, &state.mmu);
         APU.cycle(&state.apu);
         MMU.cycle(&state.mmu);
+        RAM.cycle(&state.ram);
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds, state.apu.gb_sample_buffer);
