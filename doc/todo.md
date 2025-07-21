@@ -17,8 +17,9 @@
         - SERIAL: serial_data, serial_control, interrupt_flag (cycle)
 
     - owned:
-        - CPU: hram.
+        - CPU: hram, interrupt_enable
             => add memory function to the cpu itself! 
+        - BUS: interrupt_flag
         - BOOT: boot_rom, boot_rom_enable
         - CART: rom, cart_ram
         - DMA: dma
@@ -32,20 +33,7 @@
         !- RAM: work_ram, echo_ram
 
     # Issues:
-    - overlaps:
-        - interrupt_flag
-        - dma has a lot.
-            - maybe the dma can also do a memory request and override the cpu?
-            - Or it also returns a request?
-
-    - unowned: find a place for them
-        - interrupt_flag, interrupt_enable
-            - In a single cycle multiple systems could try to write to interrupt_flag.
-            - interrupt_flag is only read by the cpu.
-            - interrupt_enable is only accessed to by the cpu.
-            => interrupt_enable can be intern to the cpu (just like HRAM).
-            - interrupt_flag?
-            => put interrupt flag on the bus state.
+    ?- What does the cpu.cycle() return? the BUS.State struct?
 
     - Buses:
         - If we have an internal_bus (soc_bus), reads/writes are protected from the dma and the cpu could access them.
@@ -106,6 +94,7 @@
     pub fn memory(bus: *Bus.State) void {}
     - Those systems can have a cycle function that optionally returns an BUS.State!
 
+- Really standardize the order of declarations and definitions (constants, functions, etc).
 - Interrupt Sources
     - VBlanK: Add tests!
     - Stat 

@@ -80,7 +80,7 @@ export fn frame() void {
         PPU.memory(&state.ppu, &request);
         APU.memory(&state.apu, &request);
         MMU.memory(&state.mmu, &request);
-        RAM.request(&state.ram, &state.bus);
+        RAM.request(&state.ram, &state.bus.external_bus);
 
         BOOT.cycle(&state.boot);
         BUS.cycle(&state.bus);

@@ -7,6 +7,12 @@ const mem_map = @import("mem_map.zig");
 // TODO: Try to get rid of mmu dependency. It is currently required to read out IE and IF.
 const MMU = @import("mmu.zig");
 
+
+// TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
+// I can reach this when I changed ei and interrupt decoding!
+const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
+const hram_size = mem_map.hram_high - mem_map.hram_low;
+
 // TODO: Think about how we split this file into multiple files.
 // I think having a defines.zig + instruction_set.zig would be best.
 
@@ -30,10 +36,6 @@ const FlagFileID = enum(u3) {
     temp_lsb, temp_msb,
     const_one, const_zero,
 };
-
-// TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
-// I can reach this when I changed ei and interrupt decoding!
-const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
 
 const MicroOp = enum(u5) {
     unused,
@@ -713,6 +715,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 }
 pub var opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
 
+// TODO: Do we actually need/want this? Should this be in def?
 // IF and IE flags.
 const InterruptFlags = packed struct(u8) {
     // priority: highest to lowest.
@@ -797,12 +800,14 @@ const RegisterFile = packed union {
 };
 
 pub const State = struct {
+    hram: [hram_size]u8 = undefined,
+    interrupt_enable: u8 = 0,
+
     uop_fifo: MicroOpFifo = .{}, 
 
     registers: RegisterFile = .{ .r8 = .{} },
     address_bus: u16 = 0,
 
-    interrupt_enable: InterruptFlags = .{},
     interrupt_master_enable: bool = false,
 
     // Differentiate the behaviour of halt when it is first encountered vs repeated hits (cpu is halted).
@@ -815,10 +820,13 @@ pub fn init(state: *State) void {
     const opcode_bank = opcode_banks[opcode_bank_default];
     const uops: MicroOpArray = opcode_bank[state.registers.r8.ir];
     state.uop_fifo.write(uops.slice());
+
+    state.hram = [_]u8{ 0 } ** hram_size;
+    state.interrupt_enable = 0;
 }
 
 pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
-    var request: def.MemoryRequest = .{}; 
+    var mem_request: def.MemoryRequest = .{}; 
     const flags = state.registers.r8.f;
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
@@ -1001,13 +1009,13 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
         .dbus => {
             const params: DBusParams = uop.params.dbus;
             if(params.source == .dbus) { // Read
-                request.read = state.address_bus;
-                request.write = null;
-                request.data = state.registers.getU8(params.target);
+                mem_request.read = state.address_bus;
+                mem_request.write = null;
+                mem_request.data = state.registers.getU8(params.target);
             } else if(params.target == .dbus) { // Write
-                request.read = null;
-                request.write = state.address_bus;
-                request.data = state.registers.getU8(params.source);
+                mem_request.read = null;
+                mem_request.write = state.address_bus;
+                mem_request.data = state.registers.getU8(params.source);
             } else {
                 unreachable;
             }
@@ -1110,7 +1118,39 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
         },
     }
 
-    return request;
+    return mem_request;
+}
+
+pub fn request(state: *State, bus: def.Bus) void {
+    if (bus.read) |read_addr| {
+        switch (read_addr) {
+            mem_map.hram_low...(mem_map.hram_high - 1) => {
+                const hram_addr = read_addr - mem_map.hram_low;
+                bus.data.* = state.hram[hram_addr];
+                bus.read = null;
+            },
+            mem_map.interrupt_enable => {
+                bus.data.* = state.interrupt_enable;
+                bus.read = null;
+            },
+            else => {},
+        }
+    } 
+
+    if (bus.write) |write_addr| {
+        switch (write_addr) {
+            mem_map.hram_low...(mem_map.hram_high - 1) => {
+                const hram_addr = write_addr - mem_map.hram_low;
+                state.work_ram[hram_addr] = bus.data.*;
+                bus.read = null;
+            },
+            mem_map.interrupt_enable => {
+                state.work_ram[mem_map.interrupt_enable] = bus.data.*;
+                bus.read = null;
+            },
+            else => {},
+        }
+    } 
 }
 
 pub fn loadDump(state: *State, file_type: def.FileType) void {

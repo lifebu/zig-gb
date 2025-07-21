@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const BUS = @import("bus.zig");
+const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
 const work_ram_size = mem_map.wram_high - mem_map.wram_low;
@@ -16,34 +16,34 @@ pub fn init(state: *State) void {
 pub fn cycle(_: *State) void {
 }
 
-pub fn request(state: *State, bus: *BUS.State) void {
-    if (bus.external_bus.read) |read_addr| {
+pub fn request(state: *State, bus: *def.Bus) void {
+    if (bus.read) |read_addr| {
         switch (read_addr) {
             mem_map.wram_low...(mem_map.wram_high - 1) => {
                 const wram_addr = read_addr - mem_map.wram_low;
-                bus.external_bus.data.* = state.work_ram[wram_addr];
-                bus.external_bus.read = null;
+                bus.data.* = state.work_ram[wram_addr];
+                bus.read = null;
             },
             mem_map.echo_low...mem_map.echo_high => {
                 const echo_addr = read_addr - mem_map.echo_low;
-                bus.external_bus.data.* = state.work_ram[echo_addr];
-                bus.external_bus.read = null;
+                bus.data.* = state.work_ram[echo_addr];
+                bus.read = null;
             },
             else => {},
         }
     } 
 
-    if (bus.external_bus.write) |write_addr| {
+    if (bus.write) |write_addr| {
         switch (write_addr) {
             mem_map.wram_low...(mem_map.wram_high - 1) => {
                 const wram_addr = write_addr - mem_map.wram_low;
-                state.work_ram[wram_addr] = bus.external_bus.data.*;
-                bus.external_bus.read = null;
+                state.work_ram[wram_addr] = bus.data.*;
+                bus.read = null;
             },
             mem_map.echo_low...mem_map.echo_high => {
                 const echo_addr = write_addr - mem_map.echo_low;
-                state.work_ram[echo_addr] = bus.external_bus.data.*;
-                bus.external_bus.read = null;
+                state.work_ram[echo_addr] = bus.data.*;
+                bus.read = null;
             },
             else => {},
         }
