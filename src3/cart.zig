@@ -108,15 +108,15 @@ pub fn cycle(_: *State) void {
 
 }
 
-pub fn memory(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
+pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if (request.write) |address| {
+    if (bus.write) |address| {
         if (address >= mem_map.rom_high ) {
             return;
         } 
 
-        const data = request.data.*;
+        const data = bus.data.*;
         if (address >= state.mbc_type_info.ram_enable_low and address <= state.mbc_type_info.ram_bank_high ) {
             // TODO: This also enables access to the RTC registers.
             state.ram_enable = @as(u4, @truncate(data)) == 0xA;
@@ -149,7 +149,7 @@ pub fn memory(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void 
             // This way you can read the RTC registers while the clocks keeps ticking.
         }
 
-        request.write = null;
+        bus.write = null;
     }
 }
 

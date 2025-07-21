@@ -32,8 +32,7 @@ pub fn request(state: *State, bus: *def.Bus) void {
             else => {},
         }
     } 
-
-    if (bus.write) |write_addr| {
+    else if (bus.write) |write_addr| {
         switch (write_addr) {
             mem_map.wram_low...(mem_map.wram_high - 1) => {
                 const wram_addr = write_addr - mem_map.wram_low;

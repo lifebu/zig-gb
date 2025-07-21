@@ -32,7 +32,7 @@ pub const Bus = struct {
     }
 
     // TODO: Try to implement all reads/writes of the bus and then decide how we can create functions to reduce boilerplate!
-    pub fn address(self: *Self) ?u16 {
+    pub fn address(self: *const Self) ?u16 {
         return if(self.read != null) self.read.? 
             else if(self.write != null) self.write.? 
             else null;
@@ -48,29 +48,6 @@ pub const Bus = struct {
             return self.data.*;
         }
         unreachable; 
-    }
-};
-
-// TODO: Remove
-pub const MemoryRequest = struct {
-    read: ?u16 = null,
-    write: ?u16 = null,
-    data: *u8 = undefined,
-
-    const Self = @This();
-    pub fn print(self: *Self) []u8 {
-        var buf: [3]u8 = undefined;
-        _ = std.fmt.bufPrint(&buf, "{s}{s}{s}", .{ 
-            if(self.read == null) "-" else "R", 
-            if(self.write == null) "-" else "W", 
-            if(self.read == null and self.write == null) "-" else "M" 
-        }) catch unreachable;
-        return &buf;
-    }
-    pub fn getAddress(self: *Self) u16 {
-        return if(self.read != null) self.read.? 
-            else if(self.write != null) self.write.? 
-            else 0;
     }
 };
 

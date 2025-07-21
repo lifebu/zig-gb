@@ -19,20 +19,20 @@ pub fn cycle(_: *State) void {
 
 }
 
-pub fn memory(state: *State, request: *def.MemoryRequest) void {
-    if(request.read) |address| {
+pub fn request(state: *State, bus: *def.Bus) void {
+    if(bus.read) |address| {
         switch (address) {
             mem_map.joypad => {
-                request.data.* = state.joypad;
-                request.read = null;
+                bus.data.* = state.joypad;
+                bus.read = null;
             },
             else => {},
         }
     }
-    else if(request.write) |address| {
+    else if(bus.write) |address| {
         switch (address) {
             mem_map.joypad => {
-                const joyp = (request.data.* & 0xF0) | (state.joypad & 0x0F);
+                const joyp = (bus.data.* & 0xF0) | (state.joypad & 0x0F);
                 const select_dpad: bool = (joyp & 0x10) != 0x10;
                 const select_buttons: bool = (joyp & 0x20) != 0x20;
                 const nibble: u4 = 
@@ -42,7 +42,7 @@ pub fn memory(state: *State, request: *def.MemoryRequest) void {
                     else 0x0F;
 
                 state.joypad = (joyp & 0xF0) | nibble; 
-                request.write = null;
+                bus.write = null;
             },
             else => {},
         }

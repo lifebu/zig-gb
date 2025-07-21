@@ -37,16 +37,16 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     }
 }
 
-pub fn memory(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
-    if(request.write) |address| {
+pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
+    if(bus.write) |address| {
         if(address == mem_map.dma) {
             state.is_running = true;
-            state.start_addr = @as(u16, request.data.*) << 8;
+            state.start_addr = @as(u16, bus.data.*) << 8;
             state.offset = 0;
             state.counter = 0;
 
-            mmu.memory[address] = request.data.*;
-            request.write = null;
+            mmu.memory[address] = bus.data.*;
+            bus.write = null;
             // TODO: While it is running I need to implement the bus conflict behavior for the cpu, 
             // the cpu will not be able to write and when it reads it will read the current byte of the dma transfer.
         }

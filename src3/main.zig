@@ -70,20 +70,21 @@ export fn frame() void {
     for(0..cycles_per_frame) |_| {
         // TODO: Consider creating a list of active systems that are ticked every cycle by calling their memory and cycle functions.
         // Deactivating a system means moving it to the inactive set.
-        var request: def.MemoryRequest = CPU.cycle(&state.cpu, &state.mmu);
-        BOOT.memory(&state.boot, &request);
-        BUS.request(&state.bus);
-        CART.memory(&state.cart, &state.mmu, &request);
-        DMA.memory(&state.dma, &state.mmu, &request);
-        INPUT.memory(&state.input, &request);
-        TIMER.memory(&state.timer, &state.mmu, &request);
-        PPU.memory(&state.ppu, &request);
-        APU.memory(&state.apu, &request);
-        MMU.memory(&state.mmu, &request);
-        RAM.request(&state.ram, &state.bus.external_bus);
+        var single_bus: def.Bus = CPU.cycle(&state.cpu, &state.mmu);
+        // TODO: Would be nice that to make it clear, that this cycle must come before everything else so that we can split the bus.
+        BUS.cycle(&state.bus, single_bus);
+        
+        BOOT.request(&state.boot, &single_bus);
+        CART.request(&state.cart, &state.mmu, &single_bus);
+        DMA.request(&state.dma, &state.mmu, &single_bus);
+        INPUT.request(&state.input, &single_bus);
+        TIMER.request(&state.timer, &state.mmu, &single_bus);
+        PPU.request(&state.ppu, &single_bus);
+        APU.request(&state.apu, &single_bus);
+        MMU.request(&state.mmu, &single_bus);
+        RAM.request(&state.ram, &single_bus);
 
         BOOT.cycle(&state.boot);
-        BUS.cycle(&state.bus);
         CART.cycle(&state.cart);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input);
@@ -92,6 +93,8 @@ export fn frame() void {
         APU.cycle(&state.apu);
         MMU.cycle(&state.mmu);
         RAM.cycle(&state.ram);
+
+        BUS.request(&state.bus, &single_bus);
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds, state.apu.gb_sample_buffer);

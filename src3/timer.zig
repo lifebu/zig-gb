@@ -52,15 +52,15 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     state.timer_last_bit = bit;
 }
 
-pub fn memory(state: *State, mmu: *MMU.State, request: *def.MemoryRequest) void {
+pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
     // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
     // And split the on-write behavior and memory request handling from the cycle function?
-    if(request.write) |address| {
+    if(bus.write) |address| {
         if(address == mem_map.divider) {
             state.system_counter = 0;
 
             mmu.memory[address] = 0;
-            request.write = null;
+            bus.write = null;
         }
     }
 }

@@ -346,7 +346,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     lcd_stat.toMem(mmu);
 }
 
-pub fn memory(_: *State, _: *def.MemoryRequest) void {
+pub fn request(_: *State, _: *def.Bus) void {
 
 }
 

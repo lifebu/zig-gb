@@ -9,7 +9,7 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn memory(_: *State, _: *def.MemoryRequest) void {
+pub fn request(_: *State, _: *def.Bus) void {
 
 }
 

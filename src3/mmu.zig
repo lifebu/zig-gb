@@ -13,14 +13,14 @@ pub fn init(_: *State) void {
 pub fn cycle(_: *State) void {
 }
 
-pub fn memory(state: *State, request: *def.MemoryRequest) void {
-    if(request.read) |address| {
-        request.data.* = state.memory[address];
-        request.read = null;
+pub fn request(state: *State, bus: *def.Bus) void {
+    if(bus.read) |address| {
+        bus.data.* = state.memory[address];
+        bus.read = null;
     }
-    if(request.write) |address| {
-        state.memory[address] = request.data.*;
-        request.write = null;
+    if(bus.write) |address| {
+        state.memory[address] = bus.data.*;
+        bus.write = null;
     }
 }
 

@@ -12,25 +12,35 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(_: *State) void {
+pub fn cycle(state: *State, single_bus: def.Bus) void {
+    if(single_bus.address()) |address| {
+        switch (address) {
+            0x0000...0xFEFF => {
+                state.external_bus = single_bus;
+            },
+            0xFF00...0xFFFF => {
+                state.soc_bus = single_bus;
+            },
+        }
+    }
 }
 
-pub fn request(state: *State) void {
-    if (state.soc_bus.read) |read_addr| {
+pub fn request(state: *State, bus: *def.Bus) void {
+    if (bus.read) |read_addr| {
         switch (read_addr) {
             mem_map.interrupt_flag => {
-                state.soc_bus.data.* = state.interrupt_flag;
-                state.soc_bus.read = null;
+                bus.data.* = state.interrupt_flag;
+                bus.read = null;
             },
             else => {},
         }
     } 
 
-    if (state.soc_bus.write) |write_addr| {
+    if (bus.write) |write_addr| {
         switch (write_addr) {
             mem_map.interrupt_flag => {
-                state.interrupt_flag = state.soc_bus.data.*;
-                state.soc_bus.write = null;
+                state.interrupt_flag = bus.data.*;
+                bus.write = null;
             },
             else => {},
         }

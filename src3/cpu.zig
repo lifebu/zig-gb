@@ -825,8 +825,8 @@ pub fn init(state: *State) void {
     state.interrupt_enable = 0;
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
-    var mem_request: def.MemoryRequest = .{}; 
+pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
+    var bus: def.Bus = .{}; 
     const flags = state.registers.r8.f;
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
@@ -1009,13 +1009,13 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
         .dbus => {
             const params: DBusParams = uop.params.dbus;
             if(params.source == .dbus) { // Read
-                mem_request.read = state.address_bus;
-                mem_request.write = null;
-                mem_request.data = state.registers.getU8(params.target);
+                bus.read = state.address_bus;
+                bus.write = null;
+                bus.data = state.registers.getU8(params.target);
             } else if(params.target == .dbus) { // Write
-                mem_request.read = null;
-                mem_request.write = state.address_bus;
-                mem_request.data = state.registers.getU8(params.source);
+                bus.read = null;
+                bus.write = state.address_bus;
+                bus.data = state.registers.getU8(params.source);
             } else {
                 unreachable;
             }
@@ -1118,7 +1118,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.MemoryRequest {
         },
     }
 
-    return mem_request;
+    return bus;
 }
 
 pub fn request(state: *State, bus: def.Bus) void {
