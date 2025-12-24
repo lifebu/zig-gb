@@ -332,6 +332,16 @@ https://github.com/aracitdev/GameBoyEmu/tree/master/Apu
 # Version 3.0:
 - GBA
 
+Try out different types of emulation:
+    => MattKC talking about types of emulation:
+    https://www.youtube.com/watch?v=lMGu6Ng_3yA
+- Interpreter (current version).
+- JIT-Dynamic recompilation.
+https://rodrigodd.github.io/2023/09/02/gameroy-jit.html
+- Dynamic recompilation
+    - Coulde try to advance.
+- Static recompilation => Save recompilation into asm file.
+
 # Maybe:
 - MMU:
     - ECHO-RAM: Not used by any licenced game (forbidden by nintendo).
