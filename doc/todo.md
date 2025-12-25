@@ -142,6 +142,8 @@
     - replace ConditionalCheck with FlagFileID?
 
 ## Other:
+- Compile the sdhc (sokol shader compiler) myself instead of having binaries here.
+    => Has build.zig: https://github.com/floooh/sokol-tools/blob/master/build.zig
 - Run emulator itself in thread. Use double-buffer to communicate audio and video data to platform.
     => Errors in the emulator do not crash software (logs with errors).
     => You can re-run emulator at crash (dll hot-reload)!

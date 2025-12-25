@@ -4,7 +4,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "zig build -Dcpu=x86_64 -Doptimize=Debug",
+            "command": "zig build -Dcpu=x86_64 -Doptimize=Debug -Denable-llvm=true",
             "problemMatcher": [],
             "group": {
                 "kind": "build",

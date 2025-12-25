@@ -72,7 +72,7 @@ pub fn ShowFileDialogue(state: *State, file_extension: []const u8) void {
                 }
             },
             .file => {
-                var sequence = std.mem.split(u8, entry.name, ".");
+                var sequence = std.mem.splitAny(u8, entry.name, ".");
                 _ = sequence.next(); // skip filename
                 if(sequence.next()) |extension| {
                     if(!std.mem.eql(u8, extension, file_extension)) {

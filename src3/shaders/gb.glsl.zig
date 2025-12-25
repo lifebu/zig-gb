@@ -19,24 +19,24 @@ const shaderTypes = @import("shader_types.zig");
 //            ATTR_gb_pos_in => 0
 //            ATTR_gb_uv_in => 1
 //    Bindings:
-//        Image 'color_texture':
+//        Texture 'color_texture':
 //            Image type: ._2D
 //            Sample type: .FLOAT
 //            Multisampled: false
-//            Bind slot: IMG_color_texture => 0
-//        Image 'palette_texture':
+//            Bind slot: VIEW_color_texture => 0
+//        Texture 'palette_texture':
 //            Image type: ._2D
 //            Sample type: .FLOAT
 //            Multisampled: false
-//            Bind slot: IMG_palette_texture => 1
+//            Bind slot: VIEW_palette_texture => 1
 //        Sampler 'texture_sampler':
 //            Type: .FILTERING
 //            Bind slot: SMP_texture_sampler => 0
 //
 pub const ATTR_gb_pos_in = 0;
 pub const ATTR_gb_uv_in = 1;
-pub const IMG_color_texture = 0;
-pub const IMG_palette_texture = 1;
+pub const VIEW_color_texture = 0;
+pub const VIEW_palette_texture = 1;
 pub const SMP_texture_sampler = 0;
 //
 //    #version 430
@@ -71,8 +71,8 @@ const vs_source_glsl430 = [218]u8 {
 //
 //    #version 430
 //
-//    layout(binding = 16) uniform sampler2D color_texture_texture_sampler;
-//    layout(binding = 17) uniform sampler2D palette_texture_texture_sampler;
+//    layout(binding = 0) uniform sampler2D color_texture_texture_sampler;
+//    layout(binding = 1) uniform sampler2D palette_texture_texture_sampler;
 //
 //    layout(location = 0) in vec2 uv;
 //    layout(location = 0) out vec4 frag_color;
@@ -83,32 +83,32 @@ const vs_source_glsl430 = [218]u8 {
 //    }
 //
 //
-const fs_source_glsl430 = [389]u8 {
+const fs_source_glsl430 = [387]u8 {
     0x23,0x76,0x65,0x72,0x73,0x69,0x6f,0x6e,0x20,0x34,0x33,0x30,0x0a,0x0a,0x6c,0x61,
-    0x79,0x6f,0x75,0x74,0x28,0x62,0x69,0x6e,0x64,0x69,0x6e,0x67,0x20,0x3d,0x20,0x31,
-    0x36,0x29,0x20,0x75,0x6e,0x69,0x66,0x6f,0x72,0x6d,0x20,0x73,0x61,0x6d,0x70,0x6c,
-    0x65,0x72,0x32,0x44,0x20,0x63,0x6f,0x6c,0x6f,0x72,0x5f,0x74,0x65,0x78,0x74,0x75,
+    0x79,0x6f,0x75,0x74,0x28,0x62,0x69,0x6e,0x64,0x69,0x6e,0x67,0x20,0x3d,0x20,0x30,
+    0x29,0x20,0x75,0x6e,0x69,0x66,0x6f,0x72,0x6d,0x20,0x73,0x61,0x6d,0x70,0x6c,0x65,
+    0x72,0x32,0x44,0x20,0x63,0x6f,0x6c,0x6f,0x72,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,
+    0x65,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x73,0x61,0x6d,0x70,0x6c,0x65,
+    0x72,0x3b,0x0a,0x6c,0x61,0x79,0x6f,0x75,0x74,0x28,0x62,0x69,0x6e,0x64,0x69,0x6e,
+    0x67,0x20,0x3d,0x20,0x31,0x29,0x20,0x75,0x6e,0x69,0x66,0x6f,0x72,0x6d,0x20,0x73,
+    0x61,0x6d,0x70,0x6c,0x65,0x72,0x32,0x44,0x20,0x70,0x61,0x6c,0x65,0x74,0x74,0x65,
+    0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,
+    0x5f,0x73,0x61,0x6d,0x70,0x6c,0x65,0x72,0x3b,0x0a,0x0a,0x6c,0x61,0x79,0x6f,0x75,
+    0x74,0x28,0x6c,0x6f,0x63,0x61,0x74,0x69,0x6f,0x6e,0x20,0x3d,0x20,0x30,0x29,0x20,
+    0x69,0x6e,0x20,0x76,0x65,0x63,0x32,0x20,0x75,0x76,0x3b,0x0a,0x6c,0x61,0x79,0x6f,
+    0x75,0x74,0x28,0x6c,0x6f,0x63,0x61,0x74,0x69,0x6f,0x6e,0x20,0x3d,0x20,0x30,0x29,
+    0x20,0x6f,0x75,0x74,0x20,0x76,0x65,0x63,0x34,0x20,0x66,0x72,0x61,0x67,0x5f,0x63,
+    0x6f,0x6c,0x6f,0x72,0x3b,0x0a,0x0a,0x76,0x6f,0x69,0x64,0x20,0x6d,0x61,0x69,0x6e,
+    0x28,0x29,0x0a,0x7b,0x0a,0x20,0x20,0x20,0x20,0x66,0x72,0x61,0x67,0x5f,0x63,0x6f,
+    0x6c,0x6f,0x72,0x20,0x3d,0x20,0x76,0x65,0x63,0x34,0x28,0x74,0x65,0x78,0x74,0x75,
+    0x72,0x65,0x28,0x70,0x61,0x6c,0x65,0x74,0x74,0x65,0x5f,0x74,0x65,0x78,0x74,0x75,
     0x72,0x65,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x73,0x61,0x6d,0x70,0x6c,
-    0x65,0x72,0x3b,0x0a,0x6c,0x61,0x79,0x6f,0x75,0x74,0x28,0x62,0x69,0x6e,0x64,0x69,
-    0x6e,0x67,0x20,0x3d,0x20,0x31,0x37,0x29,0x20,0x75,0x6e,0x69,0x66,0x6f,0x72,0x6d,
-    0x20,0x73,0x61,0x6d,0x70,0x6c,0x65,0x72,0x32,0x44,0x20,0x70,0x61,0x6c,0x65,0x74,
-    0x74,0x65,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x74,0x65,0x78,0x74,0x75,
-    0x72,0x65,0x5f,0x73,0x61,0x6d,0x70,0x6c,0x65,0x72,0x3b,0x0a,0x0a,0x6c,0x61,0x79,
-    0x6f,0x75,0x74,0x28,0x6c,0x6f,0x63,0x61,0x74,0x69,0x6f,0x6e,0x20,0x3d,0x20,0x30,
-    0x29,0x20,0x69,0x6e,0x20,0x76,0x65,0x63,0x32,0x20,0x75,0x76,0x3b,0x0a,0x6c,0x61,
-    0x79,0x6f,0x75,0x74,0x28,0x6c,0x6f,0x63,0x61,0x74,0x69,0x6f,0x6e,0x20,0x3d,0x20,
-    0x30,0x29,0x20,0x6f,0x75,0x74,0x20,0x76,0x65,0x63,0x34,0x20,0x66,0x72,0x61,0x67,
-    0x5f,0x63,0x6f,0x6c,0x6f,0x72,0x3b,0x0a,0x0a,0x76,0x6f,0x69,0x64,0x20,0x6d,0x61,
-    0x69,0x6e,0x28,0x29,0x0a,0x7b,0x0a,0x20,0x20,0x20,0x20,0x66,0x72,0x61,0x67,0x5f,
-    0x63,0x6f,0x6c,0x6f,0x72,0x20,0x3d,0x20,0x76,0x65,0x63,0x34,0x28,0x74,0x65,0x78,
-    0x74,0x75,0x72,0x65,0x28,0x70,0x61,0x6c,0x65,0x74,0x74,0x65,0x5f,0x74,0x65,0x78,
-    0x74,0x75,0x72,0x65,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x73,0x61,0x6d,
-    0x70,0x6c,0x65,0x72,0x2c,0x20,0x76,0x65,0x63,0x32,0x28,0x74,0x65,0x78,0x74,0x75,
-    0x72,0x65,0x28,0x63,0x6f,0x6c,0x6f,0x72,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,
-    0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x73,0x61,0x6d,0x70,0x6c,0x65,0x72,
-    0x2c,0x20,0x75,0x76,0x29,0x2e,0x78,0x20,0x2a,0x20,0x36,0x34,0x2e,0x30,0x2c,0x20,
-    0x30,0x2e,0x30,0x29,0x29,0x2e,0x78,0x79,0x7a,0x2c,0x20,0x31,0x2e,0x30,0x29,0x3b,
-    0x0a,0x7d,0x0a,0x0a,0x00,
+    0x65,0x72,0x2c,0x20,0x76,0x65,0x63,0x32,0x28,0x74,0x65,0x78,0x74,0x75,0x72,0x65,
+    0x28,0x63,0x6f,0x6c,0x6f,0x72,0x5f,0x74,0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x74,
+    0x65,0x78,0x74,0x75,0x72,0x65,0x5f,0x73,0x61,0x6d,0x70,0x6c,0x65,0x72,0x2c,0x20,
+    0x75,0x76,0x29,0x2e,0x78,0x20,0x2a,0x20,0x36,0x34,0x2e,0x30,0x2c,0x20,0x30,0x2e,
+    0x30,0x29,0x29,0x2e,0x78,0x79,0x7a,0x2c,0x20,0x31,0x2e,0x30,0x29,0x3b,0x0a,0x7d,
+    0x0a,0x0a,0x00,
 };
 //
 //    #version 300 es
@@ -466,52 +466,56 @@ pub fn gbShaderDesc(backend: sg.Backend) sg.ShaderDesc {
             desc.vertex_func.entry = "main";
             desc.fragment_func.source = &fs_source_glsl430;
             desc.fragment_func.entry = "main";
+            desc.attrs[0].base_type = .FLOAT;
             desc.attrs[0].glsl_name = "pos_in";
+            desc.attrs[1].base_type = .FLOAT;
             desc.attrs[1].glsl_name = "uv_in";
-            desc.images[0].stage = .FRAGMENT;
-            desc.images[0].multisampled = false;
-            desc.images[0].image_type = ._2D;
-            desc.images[0].sample_type = .FLOAT;
-            desc.images[1].stage = .FRAGMENT;
-            desc.images[1].multisampled = false;
-            desc.images[1].image_type = ._2D;
-            desc.images[1].sample_type = .FLOAT;
+            desc.views[0].texture.stage = .FRAGMENT;
+            desc.views[0].texture.image_type = ._2D;
+            desc.views[0].texture.sample_type = .FLOAT;
+            desc.views[0].texture.multisampled = false;
+            desc.views[1].texture.stage = .FRAGMENT;
+            desc.views[1].texture.image_type = ._2D;
+            desc.views[1].texture.sample_type = .FLOAT;
+            desc.views[1].texture.multisampled = false;
             desc.samplers[0].stage = .FRAGMENT;
             desc.samplers[0].sampler_type = .FILTERING;
-            desc.image_sampler_pairs[0].stage = .FRAGMENT;
-            desc.image_sampler_pairs[0].image_slot = 0;
-            desc.image_sampler_pairs[0].sampler_slot = 0;
-            desc.image_sampler_pairs[0].glsl_name = "color_texture_texture_sampler";
-            desc.image_sampler_pairs[1].stage = .FRAGMENT;
-            desc.image_sampler_pairs[1].image_slot = 1;
-            desc.image_sampler_pairs[1].sampler_slot = 0;
-            desc.image_sampler_pairs[1].glsl_name = "palette_texture_texture_sampler";
+            desc.texture_sampler_pairs[0].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[0].view_slot = 0;
+            desc.texture_sampler_pairs[0].sampler_slot = 0;
+            desc.texture_sampler_pairs[0].glsl_name = "color_texture_texture_sampler";
+            desc.texture_sampler_pairs[1].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[1].view_slot = 1;
+            desc.texture_sampler_pairs[1].sampler_slot = 0;
+            desc.texture_sampler_pairs[1].glsl_name = "palette_texture_texture_sampler";
         },
         .GLES3 => {
             desc.vertex_func.source = &vs_source_glsl300es;
             desc.vertex_func.entry = "main";
             desc.fragment_func.source = &fs_source_glsl300es;
             desc.fragment_func.entry = "main";
+            desc.attrs[0].base_type = .FLOAT;
             desc.attrs[0].glsl_name = "pos_in";
+            desc.attrs[1].base_type = .FLOAT;
             desc.attrs[1].glsl_name = "uv_in";
-            desc.images[0].stage = .FRAGMENT;
-            desc.images[0].multisampled = false;
-            desc.images[0].image_type = ._2D;
-            desc.images[0].sample_type = .FLOAT;
-            desc.images[1].stage = .FRAGMENT;
-            desc.images[1].multisampled = false;
-            desc.images[1].image_type = ._2D;
-            desc.images[1].sample_type = .FLOAT;
+            desc.views[0].texture.stage = .FRAGMENT;
+            desc.views[0].texture.image_type = ._2D;
+            desc.views[0].texture.sample_type = .FLOAT;
+            desc.views[0].texture.multisampled = false;
+            desc.views[1].texture.stage = .FRAGMENT;
+            desc.views[1].texture.image_type = ._2D;
+            desc.views[1].texture.sample_type = .FLOAT;
+            desc.views[1].texture.multisampled = false;
             desc.samplers[0].stage = .FRAGMENT;
             desc.samplers[0].sampler_type = .FILTERING;
-            desc.image_sampler_pairs[0].stage = .FRAGMENT;
-            desc.image_sampler_pairs[0].image_slot = 0;
-            desc.image_sampler_pairs[0].sampler_slot = 0;
-            desc.image_sampler_pairs[0].glsl_name = "color_texture_texture_sampler";
-            desc.image_sampler_pairs[1].stage = .FRAGMENT;
-            desc.image_sampler_pairs[1].image_slot = 1;
-            desc.image_sampler_pairs[1].sampler_slot = 0;
-            desc.image_sampler_pairs[1].glsl_name = "palette_texture_texture_sampler";
+            desc.texture_sampler_pairs[0].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[0].view_slot = 0;
+            desc.texture_sampler_pairs[0].sampler_slot = 0;
+            desc.texture_sampler_pairs[0].glsl_name = "color_texture_texture_sampler";
+            desc.texture_sampler_pairs[1].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[1].view_slot = 1;
+            desc.texture_sampler_pairs[1].sampler_slot = 0;
+            desc.texture_sampler_pairs[1].glsl_name = "palette_texture_texture_sampler";
         },
         .D3D11 => {
             desc.vertex_func.source = &vs_source_hlsl5;
@@ -520,54 +524,58 @@ pub fn gbShaderDesc(backend: sg.Backend) sg.ShaderDesc {
             desc.fragment_func.source = &fs_source_hlsl5;
             desc.fragment_func.d3d11_target = "ps_5_0";
             desc.fragment_func.entry = "main";
+            desc.attrs[0].base_type = .FLOAT;
             desc.attrs[0].hlsl_sem_name = "TEXCOORD";
             desc.attrs[0].hlsl_sem_index = 0;
+            desc.attrs[1].base_type = .FLOAT;
             desc.attrs[1].hlsl_sem_name = "TEXCOORD";
             desc.attrs[1].hlsl_sem_index = 1;
-            desc.images[0].stage = .FRAGMENT;
-            desc.images[0].multisampled = false;
-            desc.images[0].image_type = ._2D;
-            desc.images[0].sample_type = .FLOAT;
-            desc.images[0].hlsl_register_t_n = 0;
-            desc.images[1].stage = .FRAGMENT;
-            desc.images[1].multisampled = false;
-            desc.images[1].image_type = ._2D;
-            desc.images[1].sample_type = .FLOAT;
-            desc.images[1].hlsl_register_t_n = 1;
+            desc.views[0].texture.stage = .FRAGMENT;
+            desc.views[0].texture.image_type = ._2D;
+            desc.views[0].texture.sample_type = .FLOAT;
+            desc.views[0].texture.multisampled = false;
+            desc.views[0].texture.hlsl_register_t_n = 0;
+            desc.views[1].texture.stage = .FRAGMENT;
+            desc.views[1].texture.image_type = ._2D;
+            desc.views[1].texture.sample_type = .FLOAT;
+            desc.views[1].texture.multisampled = false;
+            desc.views[1].texture.hlsl_register_t_n = 1;
             desc.samplers[0].stage = .FRAGMENT;
             desc.samplers[0].sampler_type = .FILTERING;
             desc.samplers[0].hlsl_register_s_n = 0;
-            desc.image_sampler_pairs[0].stage = .FRAGMENT;
-            desc.image_sampler_pairs[0].image_slot = 0;
-            desc.image_sampler_pairs[0].sampler_slot = 0;
-            desc.image_sampler_pairs[1].stage = .FRAGMENT;
-            desc.image_sampler_pairs[1].image_slot = 1;
-            desc.image_sampler_pairs[1].sampler_slot = 0;
+            desc.texture_sampler_pairs[0].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[0].view_slot = 0;
+            desc.texture_sampler_pairs[0].sampler_slot = 0;
+            desc.texture_sampler_pairs[1].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[1].view_slot = 1;
+            desc.texture_sampler_pairs[1].sampler_slot = 0;
         },
         .METAL_MACOS => {
             desc.vertex_func.source = &vs_source_metal_macos;
             desc.vertex_func.entry = "main0";
             desc.fragment_func.source = &fs_source_metal_macos;
             desc.fragment_func.entry = "main0";
-            desc.images[0].stage = .FRAGMENT;
-            desc.images[0].multisampled = false;
-            desc.images[0].image_type = ._2D;
-            desc.images[0].sample_type = .FLOAT;
-            desc.images[0].msl_texture_n = 0;
-            desc.images[1].stage = .FRAGMENT;
-            desc.images[1].multisampled = false;
-            desc.images[1].image_type = ._2D;
-            desc.images[1].sample_type = .FLOAT;
-            desc.images[1].msl_texture_n = 1;
+            desc.attrs[0].base_type = .FLOAT;
+            desc.attrs[1].base_type = .FLOAT;
+            desc.views[0].texture.stage = .FRAGMENT;
+            desc.views[0].texture.image_type = ._2D;
+            desc.views[0].texture.sample_type = .FLOAT;
+            desc.views[0].texture.multisampled = false;
+            desc.views[0].texture.msl_texture_n = 0;
+            desc.views[1].texture.stage = .FRAGMENT;
+            desc.views[1].texture.image_type = ._2D;
+            desc.views[1].texture.sample_type = .FLOAT;
+            desc.views[1].texture.multisampled = false;
+            desc.views[1].texture.msl_texture_n = 1;
             desc.samplers[0].stage = .FRAGMENT;
             desc.samplers[0].sampler_type = .FILTERING;
             desc.samplers[0].msl_sampler_n = 0;
-            desc.image_sampler_pairs[0].stage = .FRAGMENT;
-            desc.image_sampler_pairs[0].image_slot = 0;
-            desc.image_sampler_pairs[0].sampler_slot = 0;
-            desc.image_sampler_pairs[1].stage = .FRAGMENT;
-            desc.image_sampler_pairs[1].image_slot = 1;
-            desc.image_sampler_pairs[1].sampler_slot = 0;
+            desc.texture_sampler_pairs[0].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[0].view_slot = 0;
+            desc.texture_sampler_pairs[0].sampler_slot = 0;
+            desc.texture_sampler_pairs[1].stage = .FRAGMENT;
+            desc.texture_sampler_pairs[1].view_slot = 1;
+            desc.texture_sampler_pairs[1].sampler_slot = 0;
         },
         else => {},
     }
@@ -582,11 +590,11 @@ pub fn gbAttrSlot(attr_name: []const u8) ?usize {
     }
     return null;
 }
-pub fn gbImageSlot(img_name: []const u8) ?usize {
-    if (std.mem.eql(u8, img_name, "color_texture")) {
+pub fn gbTextureSlot(tex_name: []const u8) ?usize {
+    if (std.mem.eql(u8, tex_name, "color_texture")) {
         return 0;
     }
-    if (std.mem.eql(u8, img_name, "palette_texture")) {
+    if (std.mem.eql(u8, tex_name, "palette_texture")) {
         return 1;
     }
     return null;
@@ -597,11 +605,11 @@ pub fn gbSamplerSlot(smp_name: []const u8) ?usize {
     }
     return null;
 }
-pub fn gbUniformblockSlot(ub_name: []const u8) ?usize {
+pub fn gbUniformBlockSlot(ub_name: []const u8) ?usize {
     _ = ub_name;
     return null;
 }
-pub fn gbUniformblockSize(ub_name: []const u8) ?usize {
+pub fn gbUniformBlockSize(ub_name: []const u8) ?usize {
     _ = ub_name;
     return null;
 }
@@ -615,7 +623,11 @@ pub fn gbUniformDesc(ub_name: []const u8, u_name: []const u8) ?sg.GlslShaderUnif
     _ = u_name;
     return null;
 }
-pub fn gbStoragebufferSlot(sbuf_name: []const u8) ?usize {
+pub fn gbStorageBufferSlot(sbuf_name: []const u8) ?usize {
     _ = sbuf_name;
+    return null;
+}
+pub fn gbStorageImageSlot(simg_name: []const u8) ?usize {
+    _ = simg_name;
     return null;
 }

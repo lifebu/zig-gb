@@ -40,7 +40,7 @@ export fn init() void {
     BOOT.init(&state.boot);
     CART.init(&state.cart, state.allocator.allocator());
     CLI.init(&state.cli, state.allocator.allocator());
-    CPU.init(&state.cpu);
+    CPU.init(&state.cpu, state.allocator.allocator());
     DMA.init(&state.dma);
     INPUT.init(&state.input);
     MMU.init(&state.mmu);
@@ -58,7 +58,7 @@ export fn init() void {
 fn imgui_cb(dump_path: []const u8) void {
     const file_type: def.FileType = MMU.getFileType(dump_path);
     MMU.loadDump(&state.mmu, dump_path, file_type);
-    CPU.loadDump(&state.cpu, file_type);
+    CPU.loadDump(&state.cpu, file_type, state.allocator.allocator());
     CART.loadDump(&state.cart, dump_path, file_type, &state.mmu);
 }
 
@@ -101,6 +101,7 @@ export fn frame() void {
 }
 
 export fn deinit() void {
+    CPU.deinit(&state.cpu, state.allocator.allocator());
     CART.deinit(&state.cart);
     CLI.deinit(&state.cli, state.allocator.allocator());
     Platform.deinit();

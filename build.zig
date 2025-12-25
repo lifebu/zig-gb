@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const sfml = @import("sfml");
+// TODO: https://github.com/Guigui220D/zig-sfml-wrapper has not been updated for 0.15, so removed for now.
+//const sfml = @import("sfml");
 
 const src_folder = "src3/";
 
@@ -12,21 +13,30 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "zig-gb",
-        .root_source_file = b.path(src_folder ++ "main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(src_folder ++ "main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     b.installArtifact(exe);
 
-    // TODO: Remove sfml once we moved completly to sokol.
-    // sfml
-    const sfmlDep = b.dependency("sfml", .{}).module("sfml");
-    exe.root_module.addImport("sfml", sfmlDep);
+    // llvm backend required for vscode debug symbols.
+    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
+    exe.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
 
-    sfmlDep.addIncludePath(b.path("csfml/include"));
-    exe.addLibraryPath(b.path("csfml/lib/msvc"));
-    sfml.link(exe);
+    // TODO: Remove sfml once we moved completly to sokol.
+    if (std.mem.eql(u8, src_folder, "src/"))
+    {
+        // sfml
+        // const sfmlDep = b.dependency("sfml", .{}).module("sfml");
+        // exe.root_module.addImport("sfml", sfmlDep);
+
+        // sfmlDep.addIncludePath(b.path("csfml/include"));
+        // exe.addLibraryPath(b.path("csfml/lib/msvc"));
+        // sfml.link(exe);
+    }
 
     // sokol
     const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .with_sokol_imgui = true });
@@ -54,9 +64,10 @@ pub fn build(b: *std.Build) void {
     // TODO: Put this in it's own build script?
     // TODO: Think about a beter test setup using modules.
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path(src_folder ++ "test.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = exe.root_module,
+        //.root_source_file = b.path(src_folder ++ "test.zig"),
+        //.target = target,
+        //.optimize = optimize,
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

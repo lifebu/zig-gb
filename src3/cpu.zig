@@ -10,6 +10,7 @@ const MMU = @import("mmu.zig");
 
 // TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
 // I can reach this when I changed ei and interrupt decoding!
+// TODO: This wastes a lost of memory, as the pseudo bank all have to pay the size of the largest.
 const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
 const hram_size = mem_map.hram_high - mem_map.hram_low;
 
@@ -142,7 +143,7 @@ const MicroOpData = struct {
     },
 };
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOpData, longest_instruction_cycles);
-pub const MicroOpArray = std.BoundedArray(MicroOpData, longest_instruction_cycles);
+pub const MicroOpArray = std.ArrayList(MicroOpData);
 
 fn AddrIdu(addr: RegisterFileID, idu: i2, idu_out: RegisterFileID) MicroOpData {
     return .{ .operation = .addr_idu, .params = .{ .addr_idu = AddrIduParams{ .addr = addr, .idu = idu, .idu_out = idu_out } } };
@@ -196,7 +197,7 @@ pub const opcode_bank_prefix = 1;
 pub const opcode_bank_pseudo = 2;
 pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
-fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
+fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]MicroOpArray {
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
     @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
 
@@ -221,14 +222,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     //
 
     // NOP
-    returnVal[opcode_bank_default][0x00].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0x00].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD r16, imm16
     const ld_r16_imm_opcodes = [_]u8{ 0x01, 0x11, 0x21, 0x31 };
     for (ld_r16_imm_opcodes, r16_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z),  Nop(),  Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w),  Nop(),  Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscWB(rfid), Decode(opcode_bank_default),
@@ -240,7 +241,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r16mem_a_idu = [_]i2{ 0, 0, 1, -1 }; 
     const ld_r16mem_a_rfids = [_]RegisterFileID{ .c, .e, .l, .l };
     for(ld_r16mem_a_opcodes, ld_r16mem_a_rfids, ld_r16mem_a_idu) |opcode, rfid, idu| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(rfid, idu, rfid), Dbus(.a, .dbus),  Nop(),                  Nop(),
             AddrIdu(.pcl, 1, .pcl),   Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -253,7 +254,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     };
     for(inc_dec_r16_opcodes, inc_dec_r16_delta) |opcodes, delta| {
         for(opcodes, r16_rfids) |opcode, rfid| {
-            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                 AddrIdu(rfid, delta, rfid), Nop(),            Nop(), Nop(),
                 AddrIdu(.pcl, 1, .pcl),     Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
             }) catch unreachable;
@@ -268,14 +269,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(inc_dec_r8_opcodes, inc_dec_r8_delta) |opcodes, delta| {
         for(opcodes, r8_rfids) |opcode, rfid| {
             if(rfid == .dbus) {
-                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                     // TODO: Why does this not follow the default microop order?
                     AddrIdu(.l, 0, .l), AluValueRel(.alu_inc, .z, delta, .z), Dbus(.z, .dbus), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else {
-                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluValueRel(.alu_inc, rfid, delta, rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
@@ -286,13 +287,13 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_r8_imm8_opcodes = [_]u8{ 0x06, 0x0E, 0x16, 0x1E, 0x26, 0x2E, 0x36, 0x3E };
     for(ld_r8_imm8_opcodes, r8_rfids) |opcode, rfid| {
         if(rfid == .dbus) {
-            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                 AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z),  Nop(), Nop(),
                 AddrIdu(.l, 0, .l), Dbus(.z, .dbus), Nop(), Nop(),
                 AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
             }) catch unreachable;
         } else {
-            returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+            returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                 AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z),  Nop(),                    Nop(),
                 AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, rfid), Decode(opcode_bank_default),
             }) catch unreachable;
@@ -304,13 +305,13 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const rotate_uops = [_]MicroOp{ .alu_slf, .alu_srf, .alu_slf, .alu_srf };
     const rotate_flags = [_]FlagFileID{ .temp_msb, .temp_lsb, .carry, .carry };
     for(rotate_opcodes, rotate_uops, rotate_flags) |opcode, uop, flag| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(uop, .a, .b, flag, .a), Decode(opcode_bank_default),
         }) catch unreachable;
     }
 
     // LD (imm16),SP
-    returnVal[opcode_bank_default][0x08].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0x08].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z),   Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w),   Nop(), Nop(),
         AddrIdu(.z, 1, .z),   Dbus(.spl, .dbus), Nop(), Nop(),
@@ -323,7 +324,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const ld_a_r16mem_rfids = [_]RegisterFileID{ .c, .e, .l, .l };
     const ld_a_r16mem_idu = [_]i2{ 0, 0, 1, -1 };
     for(ld_a_r16mem_opcodes, ld_a_r16mem_rfids, ld_a_r16mem_idu) |opcode, rfid, idu| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(rfid, idu, rfid), Dbus(.dbus, .z),   Nop(),               Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir),  Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -333,21 +334,21 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const add_hl_r16_opcodes = [_]u8{ 0x09, 0x19, 0x29, 0x39 };
     for(add_hl_r16_opcodes, r16_rfids) |opcode, rfid| {
         const r16_msb: RegisterFileID = @enumFromInt((@intFromEnum(rfid) + 1));
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             Nop(), Nop(), AluFlag(.alu_adf, .l, rfid, .const_zero, .l), Nop(),
             AddrIdu(.pcl, 1, .pcl),   Dbus(.dbus, .ir), AluFlag(.alu_adf, .h, r16_msb, .carry, .h), Decode(opcode_bank_default),
         }) catch unreachable;
     }
 
     // STOP
-    returnVal[opcode_bank_default][0x10].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0x10].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
     // JR imm8, JR cond imm8
     const jr_opcodes = [_]u8{ 0x20, 0x28, 0x30, 0x38, 0x18 };
     for(jr_opcodes, cond_cc_one) |opcode, cc| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), MiscCC(cc), Nop(),
             IduAdjust(.pcl, false), Nop(), Nop(), Nop(),
             AddrIdu(.z, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
@@ -358,7 +359,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const misc_opcodes = [_]u8{ 0x27, 0x2F, 0x37, 0x3F };
     const misc_uops = [_]MicroOp{ .alu_daa_adjust, .alu_not, .alu_scf, .alu_ccf };
     for(misc_opcodes, misc_uops) |opcode, uop| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(uop, .a, .a, .a), Decode(opcode_bank_default),
         }) catch unreachable;
     }
@@ -368,22 +369,22 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(r8_rfids) |target_rfid| {
         for (r8_rfids) |source_rfid| {
             if(source_rfid == .dbus and target_rfid == .dbus) { // HALT
-                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.pcl, 0, .pcl), Dbus(.dbus, .ir), MiscHALT(), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else if (source_rfid == .dbus) {
-                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, target_rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else if (target_rfid == .dbus) {
-                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(source_rfid, .dbus), Nop(), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
             else {
-                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][ld_r8_r8_opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, source_rfid, source_rfid, target_rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
@@ -401,12 +402,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(arithmetic_r8_opcodes, arithmetic_r8_uops, arithmetic_r8_flags) |opcodes, uop, flag| {
         for(opcodes, r8_rfids) |opcode, rfid| {
             if(rfid == .dbus) {
-                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(uop, .a, .z, flag, .a), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else {
-                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(uop, .a, rfid, flag, .a), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
@@ -422,12 +423,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(logic_r8_opcodes, logic_r8_uops) |opcodes, uop| {
         for(opcodes, r8_rfids) |opcode, rfid| {
             if(rfid == .dbus) {
-                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(uop, .a, .z, .a), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else {
-                returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(uop, .a, rfid, .a), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
@@ -438,7 +439,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // TODO: RET and RET cond are mostly the same, but RET cond has one Mcycle more, can we still combine them?
     const ret_cond_opcodes = [_]u8{ 0xC0, 0xC8, 0xD0, 0xD8 };
     for(ret_cond_opcodes, cond_cc) |opcode, cc| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             Nop(), Nop(), MiscCC(cc), Nop(),
             AddrIdu(.spl, 1, .spl), Dbus(.dbus, .z), Nop(), Nop(),
             AddrIdu(.spl, 1, .spl), Dbus(.dbus, .w), Nop(), Nop(),
@@ -450,7 +451,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // POP r16stk
     const pop_rr_opcodes = [_]u8{ 0xC1, 0xD1, 0xE1, 0xF1 };
     for(pop_rr_opcodes, r16_stack_rfids) |opcode, rfid| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.spl, 1, .spl), Dbus(.dbus, .z), Nop(), Nop(),
             AddrIdu(.spl, 1, .spl), Dbus(.dbus, .w), Nop(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscWB(rfid), Decode(opcode_bank_default),
@@ -460,7 +461,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // JP cond imm16, JP imm16
     const jp_opcodes = [_]u8{ 0xC2, 0xCA, 0xD2, 0xDA, 0xC3 };
     for(jp_opcodes, cond_cc_one) |opcode, cc| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), MiscCC(cc), Nop(),
             Nop(), Nop(), MiscWB(.pcl), Nop(),
@@ -472,7 +473,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const push_rr_opcodes = [_]u8{ 0xC5, 0xD5, 0xE5, 0xF5 };
     for(push_rr_opcodes, r16_stack_rfids) |opcode, rfid| {
         const msb_rfid: RegisterFileID = @enumFromInt(@intFromEnum(rfid) + 1);
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.spl, -1, .spl), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl), Dbus(msb_rfid, .dbus), Nop(), Nop(),
             AddrIdu(.spl, 0, .spl), Dbus(rfid, .dbus), Nop(), Nop(),
@@ -483,7 +484,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     // CALL cond imm16, CALL imm16
     const call_opcodes = [_]u8{ 0xC4, 0xCC, 0xD4, 0xDC, 0xCD };
     for(call_opcodes, cond_cc_one) |opcodes, cc| {
-        returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcodes].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), MiscCC(cc), Nop(),
             AddrIdu(.spl, -1, .spl), Nop(), Nop(), Nop(),
@@ -498,7 +499,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const arithmetic_imm8_uops = [_]MicroOp{ .alu_adf, .alu_adf, .alu_sbf, .alu_sbf };
     const arithmetic_imm8_flags = [_]FlagFileID{ .const_zero, .carry, .const_zero, .carry };
     for(arithmetic_imm8_opcodes, arithmetic_imm8_uops, arithmetic_imm8_flags) |opcode, uop, flag| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(uop, .a, .z, flag, .a), Decode(opcode_bank_default),
         }) catch unreachable;
@@ -508,7 +509,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const rst_opcodes = [_]u8{ 0xC7, 0xCF, 0xD7, 0xDF, 0xE7, 0xEF, 0xF7, 0xFF };
     const rst_idx = [_]u4{ 0, 1, 2, 3, 4, 5, 6, 7 };
     for(rst_opcodes, rst_idx) |opcodes, idx| {
-        returnVal[opcode_bank_default][opcodes].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcodes].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.spl, -1, .spl), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl), Dbus(.pch, .dbus), Nop(), Nop(),
             AddrIdu(.spl, 0, .spl), Dbus(.pcl, .dbus), MiscRST(idx), Nop(),
@@ -517,7 +518,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }
 
     // RET
-    returnVal[opcode_bank_default][0xC9].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xC9].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .w), Nop(), Nop(),
         Nop(), Nop(), MiscWB(.pcl), Nop(),
@@ -525,13 +526,13 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // Prefix
-    returnVal[opcode_bank_default][0xCB].appendSlice(&[_]MicroOpData{ // prefix
+    returnVal[opcode_bank_default][0xCB].appendSlice(alloc, &[_]MicroOpData{ // prefix
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_prefix),
     }) catch unreachable;
 
     // RETI
     // TODO: RET and RETI differ only in the MiscIME() call. If we can set the IME to itself
-    returnVal[opcode_bank_default][0xD9].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xD9].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.spl, 1, .spl), Dbus(.dbus, .w), Nop(), Nop(),
         Nop(), Nop(), MiscWB(.pcl), Nop(),
@@ -539,14 +540,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LDH [imm8], a
-    returnVal[opcode_bank_default][0xE0].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xE0].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIduLow(.z, 0, .z), Dbus(.a, .dbus), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LDH [c], a
-    returnVal[opcode_bank_default][0xE2].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xE2].appendSlice(alloc, &[_]MicroOpData{
         AddrIduLow(.c, 0, .c), Dbus(.a, .dbus), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
     }) catch unreachable;
@@ -555,14 +556,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const logic_imm8_opcodes = [_]u8{ 0xE6, 0xEE, 0xF6, 0xFE };
     const logic_imm8_uops = [_]MicroOp{ .alu_and, .alu_xor, .alu_or, .alu_cp };
     for(logic_imm8_opcodes, logic_imm8_uops) |opcode, uop| {
-        returnVal[opcode_bank_default][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_default][opcode].appendSlice(alloc, &[_]MicroOpData{
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(uop, .a, .z, .a), Decode(opcode_bank_default),
         }) catch unreachable;
     }
 
     // ADD SP, imm8 (signed)
-    returnVal[opcode_bank_default][0xE8].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xE8].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
         // Note: Using IduAdjust + WZ-Writebak differs from the definition from gekkio. They use a special adjust add.
         IduAdjust(.spl, true), Nop(), Nop(), Nop(),
@@ -571,12 +572,12 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // JP HL
-    returnVal[opcode_bank_default][0xE9].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xE9].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.l, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD [imm16], a
-    returnVal[opcode_bank_default][0xEA].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xEA].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), Nop(), Nop(),
         AddrIdu(.z, 0, .z), Dbus(.a, .dbus), Nop(), Nop(),
@@ -584,20 +585,20 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LDH a, [imm8]
-    returnVal[opcode_bank_default][0xF0].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xF0].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIduLow(.z, 0, .z), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LDH a, [c]
-    returnVal[opcode_bank_default][0xF2].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xF2].appendSlice(alloc, &[_]MicroOpData{
         AddrIduLow(.c, 0, .c), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Alu(.alu_assign, .z, .z, .a), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // LD a, [imm16]
-    returnVal[opcode_bank_default][0xFA].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xFA].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .w), Nop(), Nop(),
         AddrIdu(.z, 0, .z), Dbus(.dbus, .z), Nop(), Nop(),
@@ -605,18 +606,18 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // DI (Disable Interrupts)
-    returnVal[opcode_bank_default][0xF3].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xF3].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(false), Decode(opcode_bank_default),
     }) catch unreachable;
 
     // EI (Enable Interrupts)
-    returnVal[opcode_bank_default][0xFB].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xFB].appendSlice(alloc, &[_]MicroOpData{
         // Note: switching MiscIME with Decode allowes the effect of the EI instruction to be delayed by one instruction.
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Decode(opcode_bank_default), MiscIME(true),
     }) catch unreachable;
 
     // LD HL, SP+imm8(signed)
-    returnVal[opcode_bank_default][0xF8].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xF8].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .z), Nop(), Nop(),
         // Note: Using IduAdjust + WZ-Writebak differs from the definition from gekkio. They use a special adjust add.
         IduAdjust(.spl, true), Nop(), MiscWB(.l), Nop(),
@@ -624,7 +625,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     }) catch unreachable;
 
     // LD SP, HL
-    returnVal[opcode_bank_default][0xF9].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_default][0xF9].appendSlice(alloc, &[_]MicroOpData{
         AddrIdu(.l, 0, .spl), Dbus(.dbus, .z), Nop(), Nop(),
         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
     }) catch unreachable;
@@ -639,14 +640,14 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     for(bit_shift_uops, bit_shift_flags) |bit_shift_uop, flag| {
         for(r8_rfids) |rfid| {
             if(rfid == .dbus) {
-                returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                     // TODO: Why does this not follow the default microop order?
                     AddrIdu(.l, 0, .l), AluFlag(bit_shift_uop, .z, .z, flag, .z), Dbus(.z, .dbus), Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                 }) catch unreachable;
             } else {
-                returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(&[_]MicroOpData{
+                returnVal[opcode_bank_prefix][bit_shift_opcode].appendSlice(alloc, &[_]MicroOpData{
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluFlag(bit_shift_uop, rfid, rfid, flag, rfid), Decode(opcode_bank_default),
                 }) catch unreachable;
             }
@@ -664,13 +665,13 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
                     // TODO: Strange that only the bit dbus version is shorter then the rest of the bit uops.
                     // According to the opcode tables all of them should be shorter.
                     if(bit_uop == .alu_bit) {
-                        returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                        returnVal[opcode_bank_prefix][bit_opcode].appendSlice(alloc, &[_]MicroOpData{
                             AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                             AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluValue(bit_uop, .z, @intCast(bit_index), .z), Decode(opcode_bank_default),
                         }) catch unreachable;
                     }
                     else {
-                        returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                        returnVal[opcode_bank_prefix][bit_opcode].appendSlice(alloc, &[_]MicroOpData{
                             AddrIdu(.l, 0, .l), Dbus(.dbus, .z), Nop(), Nop(),
                             // TODO: Why does this not follow the default microop order?
                             AddrIdu(.l, 0, .l), AluValue(bit_uop, .z, @intCast(bit_index), .z), Dbus(.z, .dbus), Nop(),
@@ -678,7 +679,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
                         }) catch unreachable;
                     }
                 } else {
-                    returnVal[opcode_bank_prefix][bit_opcode].appendSlice(&[_]MicroOpData{
+                    returnVal[opcode_bank_prefix][bit_opcode].appendSlice(alloc, &[_]MicroOpData{
                         AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), AluValue(bit_uop, rfid, @intCast(bit_index), rfid), Decode(opcode_bank_default),
                     }) catch unreachable;
                 }
@@ -695,7 +696,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
     const interrupt_idx = [_]u4{ 8, 9, 10, 11, 12 };
     const interrupt_opcodes = [_]u8{ 0x00, 0x01, 0x02, 0x03, 0x04 };
     for(interrupt_opcodes, interrupt_idx) |opcode, idx| {
-        returnVal[opcode_bank_pseudo][opcode].appendSlice(&[_]MicroOpData{
+        returnVal[opcode_bank_pseudo][opcode].appendSlice(alloc, &[_]MicroOpData{
             Nop(), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl), Nop(), Nop(), Nop(),
             AddrIdu(.spl, -1, .spl), Dbus(.pch, .dbus), MiscIME(false), Nop(),
@@ -706,7 +707,7 @@ fn genOpcodeBanks() [num_opcode_banks][num_opcodes]MicroOpArray {
 
     // TODO: Placeholder: Need an actual implementation for STOP.
     // STOP
-    returnVal[opcode_bank_pseudo][0x10].appendSlice(&[_]MicroOpData{
+    returnVal[opcode_bank_pseudo][0x10].appendSlice(alloc, &[_]MicroOpData{
         Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
@@ -814,15 +815,23 @@ pub const State = struct {
     halt_again: bool = false,
 };
 
-pub fn init(state: *State) void {
-    opcode_banks = genOpcodeBanks();
+pub fn init(state: *State, alloc: std.mem.Allocator) void {
+    opcode_banks = genOpcodeBanks(alloc);
 
     const opcode_bank = opcode_banks[opcode_bank_default];
     const uops: MicroOpArray = opcode_bank[state.registers.r8.ir];
-    state.uop_fifo.write(uops.slice());
+    state.uop_fifo.write(uops.items);
 
     state.hram = [_]u8{ 0 } ** hram_size;
     state.interrupt_enable = 0;
+}
+
+pub fn deinit(_: *State, alloc: std.mem.Allocator) void {
+    for(&opcode_banks) |*bank| {
+        for(bank) |*instruction| {
+            instruction.deinit(alloc);
+        }
+    }
 }
 
 pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
@@ -1033,7 +1042,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
             if(state.interrupt_master_enable and interrupt_signal != 0) {
                 const interrupt_idx: u3 = getLowestSetBit(interrupt_signal);
                 const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
-                state.uop_fifo.write(interrupt_uops.slice());
+                state.uop_fifo.write(interrupt_uops.items);
 
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
                 const result: u8 = mmu.memory[mem_map.interrupt_flag] & ~mask;
@@ -1049,7 +1058,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
                 const opcode_bank = opcode_banks[params.bank_idx];
                 const opcode: u8 = state.registers.r8.ir;
                 const uops: MicroOpArray = opcode_bank[opcode];
-                state.uop_fifo.write(uops.slice());
+                state.uop_fifo.write(uops.items);
             }
         },
         .halt => {
@@ -1153,13 +1162,13 @@ pub fn request(state: *State, bus: def.Bus) void {
     } 
 }
 
-pub fn loadDump(state: *State, file_type: def.FileType) void {
+pub fn loadDump(state: *State, file_type: def.FileType, alloc: std.mem.Allocator) void {
     // TODO: I would need a more stabile and better thought out initialization system when you load files.
     switch(file_type) {
         .gameboy => {
         },
         .dump => {
-            init(state);
+            init(state, alloc);
         },
         .unknown => {
         }

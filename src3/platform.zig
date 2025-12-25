@@ -38,7 +38,7 @@ pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
         .width = def.overscan_width,
         .height = def.resolution_height,
         .pixel_format = .R8,
-        .usage = .STREAM,
+        .usage = .{ .stream_update = true },
     });
     state.sampler = sokol.gfx.makeSampler(.{
         .min_filter = .NEAREST,
@@ -52,7 +52,7 @@ pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
         .pixel_format = .RGBA8,
         .data =   init: {
             var data: sokol.gfx.ImageData = .{};
-            data.subimage[0][0] = sokol.gfx.asRange(&[_]u32{
+            data.mip_levels[0] = sokol.gfx.asRange(&[_]u32{
                 shaderTypes.shaderRgbaU32(224, 248, 208, 255),
                 shaderTypes.shaderRgbaU32(136, 192, 112, 255),
                 shaderTypes.shaderRgbaU32(52,  104,  86,  255),
@@ -73,8 +73,16 @@ pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
             1.0, 1.0, 1.0,              0.0, // top-right
         })
     });
-    state.bind.images[shader.IMG_color_texture] = state.colorids;
-    state.bind.images[shader.IMG_palette_texture] = state.palette;
+    state.bind.views[shader.VIEW_color_texture] = sokol.gfx.makeView(.{
+        .texture = .{
+            .image = state.colorids,
+        }
+    });
+    state.bind.views[shader.VIEW_palette_texture] = sokol.gfx.makeView(.{
+        .texture = .{
+            .image = state.palette,
+        }
+    });
     state.bind.samplers[shader.SMP_texture_sampler] = state.sampler;
 
     state.pip = sokol.gfx.makePipeline(.{
@@ -127,7 +135,7 @@ pub fn frame(state: *State, colorids: [def.overscan_resolution]u8, _: [def.num_g
     sokol.app.setWindowTitle(new_title);
 
     var img_data = sokol.gfx.ImageData{};
-    img_data.subimage[0][0] = sokol.gfx.asRange(&colorids);
+    img_data.mip_levels[0] = sokol.gfx.asRange(&colorids);
     sokol.gfx.updateImage(state.colorids, img_data);
 
     sokol.gfx.beginPass(.{ .action = state.pass_action, .swapchain = sokol.glue.swapchain() });
@@ -185,9 +193,9 @@ pub export fn event(ev: ?*const sokol.app.Event, state_opaque: ?*anyopaque) void
 }
 
 pub fn run(
-    init_cb: ?*const fn () callconv(.C) void, 
-    frame_cb: ?*const fn () callconv(.C) void,
-    deinit_cb: ?*const fn () callconv(.C) void,
+    init_cb: ?*const fn () callconv(.c) void, 
+    frame_cb: ?*const fn () callconv(.c) void,
+    deinit_cb: ?*const fn () callconv(.c) void,
     state: *State) void {
 
     sokol.app.run(.{
