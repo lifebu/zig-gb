@@ -1,5 +1,9 @@
 # src3:
 ## CPU:
+- Interrupt Sources
+    - VBlanK: Add tests!
+    - Stat 
+
 - Split the memory each system manages it's own. systems have a cycle() and memory() function.
     - Both called by main!
     - How do we handle more generic memory? like the Interrupts?
@@ -95,9 +99,6 @@
     - Those systems can have a cycle function that optionally returns an BUS.State!
 
 - Really standardize the order of declarations and definitions (constants, functions, etc).
-- Interrupt Sources
-    - VBlanK: Add tests!
-    - Stat 
 - Cart:
     - Add tests for different mbc!
 - Add CPU memory access rights (writing to vram), onwrite behaviour, memory requests.

@@ -57,7 +57,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     // Load a nop instruction to fetch the required instruction.
     const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
     const uops = opcode_bank[0];
-    cpu.uop_fifo.write(uops.slice());
+    cpu.uop_fifo.write(uops.items);
 }
 
 fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
@@ -132,7 +132,8 @@ pub fn runSingleStepTests() !void {
 
     // Initialized once to only initialize the opcode banks once!
     var cpu: CPU.State = .{};
-    CPU.init(&cpu);
+    CPU.init(&cpu, alloc);
+    defer CPU.deinit(&cpu, alloc);
 
     var iter: std.fs.Dir.Iterator = test_dir.iterate();
     var idx: u16 = 0;
@@ -175,10 +176,7 @@ pub fn runSingleStepTests() !void {
                     break;
                 }
 
-                inline for(0..4) |_| {
-                    CPU.cycle(&cpu, &mmu);
-                    MMU.cycle(&mmu);
-                }
+                cpu_helper.executeCPUFor(&cpu, &mmu, 4);
                 
                 // TODO: Ignore M-Cycle mmmu test for now. This does not work because the cpu is removing the request after it has been handled.
                 // const m_cycle_values = test_case.cycles[m_cycle];

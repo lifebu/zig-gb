@@ -11,8 +11,8 @@ pub fn runDividerTests() !void {
     var mmu: MMU.State = .{}; 
 
     var request_data: u8 = 255;
-    mmu.request.write = mem_map.divider;
-    mmu.request.data = &request_data;
+    var request: def.Bus = .{ .data = &request_data, .write = mem_map.divider };
+    TIMER.request(&timer, &mmu, &request);
     TIMER.cycle(&timer, &mmu);
     std.testing.expectEqual(0, mmu.memory[mem_map.divider]) catch |err| {
         std.debug.print("Failed: Divider is reset by writing to DIV.\n", .{});

@@ -20,9 +20,9 @@ pub fn runDMATest() !void {
     }
 
     // correct address calculation.
-    var request_data: u8 = 0x03;
-    mmu.request.write = mem_map.dma;
-    mmu.request.data = &request_data;
+    var bus_data: u8 = 0x03;
+    var bus: def.Bus = .{ .data = &bus_data, .write = mem_map.dma };
+    DMA.request(&dma, &mmu, &bus);
     DMA.cycle(&dma, &mmu);
     std.testing.expectEqual(true, dma.is_running) catch |err| {
         std.debug.print("Failed: DMA is triggered by a write request.\n", .{});

@@ -141,10 +141,10 @@ pub fn runInputTests() !void {
             var val: u32 = 0; val += 1;
         }
         var request_data: u8 = testCase.write;
-        mmu.request.write = mem_map.joypad;
-        mmu.request.data = &request_data;
+        var bus: def.Bus = .{ .data = &request_data, .write = mem_map.joypad };
         INPUT.updateInputState(&input, &mmu, &testCase.input);
-        INPUT.cycle(&input, &mmu);
+        INPUT.request(&input, &bus);
+        INPUT.cycle(&input);
         std.testing.expectEqual(testCase.expected, mmu.memory[mem_map.joypad]) catch |err| {
             std.debug.print("Failed {d}: {s}\n", .{ i, testCase.name });
             return err;
@@ -154,9 +154,9 @@ pub fn runInputTests() !void {
     // Lower nibble is read-only to cpu.
     mmu.memory[mem_map.joypad] = 0b1111_1111;
     var request_data: u8 = 0b1111_0000;
-    mmu.request.write = mem_map.joypad;
-    mmu.request.data = &request_data;
-    INPUT.cycle(&input, &mmu);
+    var bus: def.Bus = .{ .data = &request_data, .write = mem_map.joypad };
+    INPUT.request(&input, &bus);
+    INPUT.cycle(&input);
     std.testing.expectEqual(0b1111_1111, mmu.memory[mem_map.joypad]) catch |err| {
         std.debug.print("Failed {d}: {s}\n", .{ testCases.len, "Lower nibble is ready-only to cpu" });
         return err;
@@ -165,9 +165,9 @@ pub fn runInputTests() !void {
     // Interrupt
     mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
     mmu.memory[mem_map.joypad] = 0b1111_1111;
-    INPUT.cycle(&input, &mmu);
+    INPUT.cycle(&input);
     mmu.memory[mem_map.joypad] = 0b0000_0000;
-    INPUT.cycle(&input, &mmu);
+    INPUT.cycle(&input);
     std.testing.expectEqual(false, mmu.memory[mem_map.interrupt_flag] & mem_map.interrupt_joypad == mem_map.interrupt_joypad) catch |err| {
         std.debug.print("Failed: Joypad interrupt is not triggered.\n", .{});
         return err;

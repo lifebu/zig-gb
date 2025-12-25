@@ -9,9 +9,12 @@ const MMU = @import("../mmu.zig");
 const cpu_helper = @import("cpu_helper.zig");
 
 pub fn runInterruptTests() !void {
+    const alloc = std.testing.allocator;
+
     var mmu: MMU.State = .{}; 
     var cpu: CPU.State = .{};
-    CPU.init(&cpu);
+    CPU.init(&cpu, alloc);
+    defer CPU.deinit(&cpu, alloc);
 
     // CPU can write to IF.
     mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;

@@ -6,6 +6,9 @@ const builtin = @import("builtin");
 const src_folder = "src3/";
 
 pub fn build(b: *std.Build) void {
+    // llvm backend required for vscode debug symbols.
+    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
+
     // exe
     // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
     const target = b.standardTargetOptions(.{});
@@ -19,12 +22,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    exe.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
 
     b.installArtifact(exe);
 
-    // llvm backend required for vscode debug symbols.
-    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
-    exe.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
 
     // TODO: Remove sfml once we moved completly to sokol.
     if (std.mem.eql(u8, src_folder, "src/"))
@@ -64,11 +65,13 @@ pub fn build(b: *std.Build) void {
     // TODO: Put this in it's own build script?
     // TODO: Think about a beter test setup using modules.
     const exe_unit_tests = b.addTest(.{
-        .root_module = exe.root_module,
-        //.root_source_file = b.path(src_folder ++ "test.zig"),
-        //.target = target,
-        //.optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(src_folder ++ "test.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
+    exe_unit_tests.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");
