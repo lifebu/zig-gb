@@ -7,7 +7,6 @@ const APU = @import("../apu.zig");
 const Platform = @import("../platform.zig");
 const mem_map = @import("../mem_map.zig");
 
-// TODO: Need to update vscode running tests to make this debugable.
 const sokol = @import("sokol");
 
 
@@ -74,14 +73,14 @@ fn mixChannels(channels: [4]u4, panning: Panning, volume: Volume) struct{ f32, f
 }
 
 const platform_volume: f32 = 0.2;
-// TODO: with stereo, the audio sounds half as fast?
-const is_stereo: bool = false;
+const is_stereo: bool = true;
+const samples_per_frame: i32 = if(is_stereo) 2 else 1;
 const sample_rate = 44_100;
 const t_cycles_per_sample = def.system_freq / sample_rate;
 export fn init() void {
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = if(is_stereo) 2 else 1,
+        .num_channels = samples_per_frame,
         .sample_rate = sample_rate,
     });
 }
@@ -90,8 +89,9 @@ var samples_pushed: usize = 0;
 var result_samples: std.ArrayList(f32) = .empty;
 var audio_done: bool = false;
 export fn frame() void {
-    const samples_used = sokol.audio.push(&result_samples.items[samples_pushed], @intCast(result_samples.items.len));
-    samples_pushed += @intCast(samples_used);
+    // TODO: use sokol.audio.expect() instead? How would this work on the real APU?
+    const frames_used = sokol.audio.push(&result_samples.items[samples_pushed], @intCast(result_samples.items.len));
+    samples_pushed += @as(usize, @intCast(frames_used)) * samples_per_frame;
     if(samples_pushed >= result_samples.items.len) {
         audio_done = true;
         sokol.app.quit();
@@ -145,6 +145,7 @@ pub fn runApuOutputTest() !void {
         // Note: Sameboy uses [0, 16] ranges (sometimes), but all channels has [0, 15].
         const value: u4 = if(value_raw > 15) 15 else @intCast(value_raw);
 
+        // TODO: Try to re-write this so that it better matches the cycle() function of the real apu.
         while(curr_cycles < cycles) : (curr_cycles += 1) {
             // TODO: t_cycles_per_sample does not cleanly divide into integer, so we are slightly of with our sample rate.
             if(curr_cycles % t_cycles_per_sample == 0) {
