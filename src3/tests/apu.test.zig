@@ -32,23 +32,65 @@ pub fn runApuSamplerTests() !void {
 }
 
 
-const num_channels = 1; // 1 = Mono, 2 = Stereo.
+
+
+const Control = packed struct(u8) {
+    ch1_on: bool, ch2_on: bool, ch3_on: bool, ch4_on: bool,
+    _: u3, enable_apu: bool,
+};
+const Volume = packed struct(u8) {
+    right_volume: u3, vin_right: bool,
+    left_volume: u3,  vin_left: bool,
+};
+const Panning = packed struct(u8) {
+    ch1_right: bool, ch2_right: bool, ch3_right: bool, ch4_right: bool,
+    ch1_left: bool,  ch2_left: bool,  ch3_left: bool,  ch4_left: bool,
+};
+
+fn mixChannels(ch1: u5, ch2: u5, ch3: u5, ch4: u5, panning: Panning, volume: Volume) struct{ u4, u4 } {
+    _ = volume; // TODO: Volume is in [0, 7] but sampels are in [0, 15]
+
+    const ch1_left: u6 = ch1 * @intFromBool(panning.ch1_left);
+    const ch2_left: u6 = ch2 * @intFromBool(panning.ch2_left);
+    const ch3_left: u6 = ch3 * @intFromBool(panning.ch3_left);
+    const ch4_left: u6 = ch4 * @intFromBool(panning.ch4_left);
+    const mix_left: u6 = (ch1_left + ch2_left + ch3_left + ch4_left) / 4;
+    const sample_left: u4 = @intCast(mix_left);
+
+    const ch1_right: u6 = ch1 * @intFromBool(panning.ch1_right);
+    const ch2_right: u6 = ch2 * @intFromBool(panning.ch2_right);
+    const ch3_right: u6 = ch3 * @intFromBool(panning.ch3_right);
+    const ch4_right: u6 = ch4 * @intFromBool(panning.ch4_right);
+    const mix_right: u6 = (ch1_right + ch2_right + ch3_right + ch4_right) / 4;
+    const sample_right: u4 = @intCast(mix_right);
+
+    return .{ sample_left, sample_right };
+}
+fn sampleToPlatform(sample: u5, volume: f32) f32 {
+    const normalized: f32 = @as(f32, @floatFromInt(sample)) / 16.0;
+    const ranged: f32 = (normalized * 2.0) - 1.0;
+    const result: f32 = ranged * volume;
+    return result;
+}
+
+const platform_volume: f32 = 0.1;
+const is_stereo: bool = false;
 const sample_rate = 48_000;
 const t_cycles_per_sample = def.system_freq / sample_rate;
 export fn init() void {
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = num_channels,
+        .num_channels = if(is_stereo) 2 else 1,
         .sample_rate = sample_rate,
     });
 }
 
 var samples_pushed: usize = 0;
 var result_samples: std.ArrayList(f32) = .empty;
-var used_all_samples: bool = false;
+var audio_done: bool = false;
 export fn frame() void {
     if(samples_pushed > result_samples.items.len) {
-        used_all_samples = true;
+        audio_done = true;
         sokol.app.quit();
         return;
     }
@@ -58,6 +100,7 @@ export fn frame() void {
 }
 export fn deinit() void {
     sokol.audio.shutdown();
+    audio_done = true;
 }
 fn imgui_cb(_: []const u8) void {}
 
@@ -72,7 +115,16 @@ pub fn runApuOutputTest() !void {
     var lineIt = std.mem.splitScalar(u8, sample_txt, '\n');
     _ = lineIt.next().?; // ignore first line which initializes the channels to 0.
 
+    const volume: Volume = .{ 
+        .left_volume = 0, .right_volume = 0, .vin_left = false, .vin_right = false 
+    };
+    const panning: Panning = .{
+        .ch1_right = true, .ch2_right = true, .ch3_right = true, .ch4_right = true,
+        .ch1_left = true,  .ch2_left = true,  .ch3_left = true,  .ch4_left = true,
+    };
+
     var curr_cycles: u64 = 0;
+    // TODO: Make my samples u4 as they should be. For some reason, SameBoy uses 16 as an off value sometimes?
     var samples: [4]u5 = [_]u5{0} ** 4;
     while(lineIt.next()) |line| {
         if(line.len == 0) {
@@ -85,13 +137,22 @@ pub fn runApuOutputTest() !void {
         const value: u5 = try std.fmt.parseInt(u5, elemIt.next().?, 10);
 
         while(curr_cycles < cycles) : (curr_cycles += 1) {
+            // TODO: t_cycles_per_sample does not cleanly divide into integer, so we are slightly of with our sample rate.
             if(curr_cycles % t_cycles_per_sample == 0) {
-                const average: u6 = (@as(u6, samples[0]) + @as(u6, samples[1]) + @as(u6, samples[2]) + @as(u6, samples[3])) / 4;
-                const average_sample: u4 = @intCast(average);
-                const normalized: f32 = @as(f32, @floatFromInt(average_sample)) / 16.0;
-                const ranged: f32 = (normalized * 2.0) - 1.0;
-                const volumed: f32 = ranged * 0.1;
-                try result_samples.append(alloc, volumed);
+                const sample_left: u4, const sample_right = mixChannels(samples[0], samples[1], samples[2], samples[3], panning, volume);
+                if(is_stereo) {
+                    // TODO: with stereo, the audio sounds half as fast?
+                    var sample_platform: f32 = sampleToPlatform(sample_left, platform_volume);
+                    try result_samples.append(alloc, sample_platform);
+
+                    sample_platform = sampleToPlatform(sample_right, platform_volume);
+                    try result_samples.append(alloc, sample_platform);
+                } else {
+                    const mix_mono: u6 = @as(u6, sample_left) + @as(u6, sample_right) / 2;
+                    const sample_mono: u5 = @intCast(mix_mono);
+                    const sample_platform: f32 = sampleToPlatform(sample_mono, platform_volume);
+                    try result_samples.append(alloc, sample_platform);
+                }
             }
         }
 
@@ -108,5 +169,5 @@ pub fn runApuOutputTest() !void {
         .window_title = "Audio Test",
         .logger = .{ .func = sokol.log.func },
     });
-    try std.testing.expectEqual(true, used_all_samples);
+    try std.testing.expectEqual(true, audio_done);
 }
