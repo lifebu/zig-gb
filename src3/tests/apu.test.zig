@@ -47,7 +47,7 @@ const Panning = packed struct(u8) {
     ch1_left: bool,  ch2_left: bool,  ch3_left: bool,  ch4_left: bool,
 };
 
-fn mixChannels(channels: [4]u5, panning: Panning, volume: Volume) struct{ f32, f32 } {
+fn mixChannels(channels: [4]u4, panning: Panning, volume: Volume) struct{ f32, f32 } {
     var sample_flt: [4]f32 = undefined;
     for(&sample_flt, channels) |*flt, channel_val| {
         const channel_flt: f32 = @floatFromInt(channel_val);
@@ -135,8 +135,7 @@ pub fn runApuOutputTest() !void {
     };
 
     var curr_cycles: u64 = 0;
-    // TODO: Make my states u4 as they should be. For some reason, SameBoy uses 16 as an off value sometimes?
-    var channels: [4]u5 = [_]u5{0} ** 4;
+    var channels: [4]u4 = [_]u4{0} ** 4;
     var state_left: f32 = 0;
     var state_right: f32 = 0;
     while(lineIt.next()) |line| {
@@ -146,7 +145,9 @@ pub fn runApuOutputTest() !void {
         var elemIt = std.mem.splitScalar(u8, line, ',');
         const cycles: u64 = try std.fmt.parseInt(u64, elemIt.next().?, 10);
         const channel_idx: u2 = try std.fmt.parseInt(u2, elemIt.next().?, 10);
-        const value: u5 = try std.fmt.parseInt(u5, elemIt.next().?, 10);
+        const value_raw: u5 = try std.fmt.parseInt(u5, elemIt.next().?, 10);
+        // Note: Sameboy uses [0, 16] ranges (sometimes), but all channels has [0, 15].
+        const value: u4 = if(value_raw > 15) 15 else @intCast(value_raw);
 
         while(curr_cycles < cycles) : (curr_cycles += 1) {
             // TODO: t_cycles_per_sample does not cleanly divide into integer, so we are slightly of with our sample rate.
