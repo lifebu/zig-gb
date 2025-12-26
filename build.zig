@@ -65,6 +65,7 @@ pub fn build(b: *std.Build) void {
     // TODO: Put this in it's own build script?
     // TODO: Think about a beter test setup using modules.
     const exe_unit_tests = b.addTest(.{
+        .name = "test",
         .root_module = b.createModule(.{
             .root_source_file = b.path(src_folder ++ "test.zig"),
             .target = target,
@@ -73,6 +74,7 @@ pub fn build(b: *std.Build) void {
     });
     exe_unit_tests.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
     exe_unit_tests.root_module.addImport("sokol", sokol.module("sokol"));
+    b.installArtifact(exe_unit_tests);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");

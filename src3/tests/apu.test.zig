@@ -48,28 +48,24 @@ const Panning = packed struct(u8) {
 };
 
 fn mixChannels(channels: [4]u4, panning: Panning, volume: Volume) struct{ f32, f32 } {
-    var sample_flt: [4]f32 = undefined;
-    for(&sample_flt, channels) |*flt, channel_val| {
-        const channel_flt: f32 = @floatFromInt(channel_val);
-        const normalized: f32 = channel_flt / 15.0;
-        const result: f32 = normalized * 2.0 - 1.0;
-        flt.* = result;
+    const panning_left: [4]bool = .{ panning.ch1_left, panning.ch2_left, panning.ch3_left, panning.ch4_left };
+    const panning_right: [4]bool = .{ panning.ch1_right, panning.ch2_right, panning.ch3_right, panning.ch4_right };
+    const scaling: f32 = 1.0 / 4.0;
+
+    var mix_left: f32 = 0.0;
+    var mix_right: f32 = 0.0;
+    for(channels, panning_left, panning_right) |state, left, right| {
+        const channel: f32 = @floatFromInt(state);
+        const normalized: f32 = channel / 15.0;
+        const value: f32 = normalized * 2.0 - 1.0;
+        mix_left += if(left) value * scaling else 0.0;
+        mix_right += if(right) value * scaling else 0.0;
     }
 
-    const ch1_left: f32 = if(panning.ch1_left) sample_flt[0] else 0.0;
-    const ch2_left: f32 = if(panning.ch2_left) sample_flt[1] else 0.0;
-    const ch3_left: f32 = if(panning.ch3_left) sample_flt[2] else 0.0;
-    const ch4_left: f32 = if(panning.ch4_left) sample_flt[3] else 0.0;
-    const mix_left: f32 = (ch1_left + ch2_left + ch3_left + ch4_left) / 4.0;
     const volume_left: f32 = @floatFromInt(volume.left_volume);
     const volume_left_normal: f32 = (volume_left + 1.0) / 8.0;
     const state_left: f32 = mix_left * volume_left_normal;
 
-    const ch1_right: f32 = if(panning.ch1_right) sample_flt[0] else 0.0;
-    const ch2_right: f32 = if(panning.ch2_right) sample_flt[1] else 0.0;
-    const ch3_right: f32 = if(panning.ch3_right) sample_flt[2] else 0.0;
-    const ch4_right: f32 = if(panning.ch4_right) sample_flt[3] else 0.0;
-    const mix_right: f32 = (ch1_right + ch2_right + ch3_right + ch4_right) / 4.0;
     const volume_right: f32 = @floatFromInt(volume.right_volume);
     const volume_right_normal: f32 = (volume_right + 1.0) / 8.0;
     const state_right: f32 = mix_right * volume_right_normal;
