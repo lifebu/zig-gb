@@ -72,6 +72,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     exe_unit_tests.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
+    exe_unit_tests.root_module.addImport("sokol", sokol.module("sokol"));
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");
