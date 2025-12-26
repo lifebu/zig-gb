@@ -47,39 +47,36 @@ const Panning = packed struct(u8) {
     ch1_left: bool,  ch2_left: bool,  ch3_left: bool,  ch4_left: bool,
 };
 
-fn mixChannels(ch1: u5, ch2: u5, ch3: u5, ch4: u5, panning: Panning, volume: Volume) struct{ u4, u4 } {
-    // TODO: Try to do the volume without float conversion.
-    const ch1_left: u6 = ch1 * @intFromBool(panning.ch1_left);
-    const ch2_left: u6 = ch2 * @intFromBool(panning.ch2_left);
-    const ch3_left: u6 = ch3 * @intFromBool(panning.ch3_left);
-    const ch4_left: u6 = ch4 * @intFromBool(panning.ch4_left);
-    const mix_left: u6 = (ch1_left + ch2_left + ch3_left + ch4_left) / 4;
-    const volume_left: f32 = @as(f32, @floatFromInt(volume.left_volume)) / 7.0;
-    const mix_left_volume: f32 = @as(f32, @floatFromInt(mix_left)) * volume_left;
-    const state_left: u4 = @intFromFloat(@trunc(mix_left_volume));
+fn mixChannels(channels: [4]u5, panning: Panning, volume: Volume) struct{ f32, f32 } {
+    var sample_flt: [4]f32 = undefined;
+    for(&sample_flt, channels) |*flt, channel_val| {
+        const channel_flt: f32 = @floatFromInt(channel_val);
+        const normalized: f32 = channel_flt / 15.0;
+        const result: f32 = normalized * 2.0 - 1.0;
+        flt.* = result;
+    }
 
-    const ch1_right: u6 = ch1 * @intFromBool(panning.ch1_right);
-    const ch2_right: u6 = ch2 * @intFromBool(panning.ch2_right);
-    const ch3_right: u6 = ch3 * @intFromBool(panning.ch3_right);
-    const ch4_right: u6 = ch4 * @intFromBool(panning.ch4_right);
-    const mix_right: u6 = (ch1_right + ch2_right + ch3_right + ch4_right) / 4;
-    // TODO: This is wrong, a volume of 0 is very quiet, but not 0.
-    const volume_right: f32 = @as(f32, @floatFromInt(volume.right_volume)) / 7.0;
-    const mix_right_volume: f32 = @as(f32, @floatFromInt(mix_right)) * volume_right;
-    const state_right: u4 = @intFromFloat(@trunc(mix_right_volume));
+    const ch1_left: f32 = if(panning.ch1_left) sample_flt[0] else 0.0;
+    const ch2_left: f32 = if(panning.ch2_left) sample_flt[1] else 0.0;
+    const ch3_left: f32 = if(panning.ch3_left) sample_flt[2] else 0.0;
+    const ch4_left: f32 = if(panning.ch4_left) sample_flt[3] else 0.0;
+    const mix_left: f32 = (ch1_left + ch2_left + ch3_left + ch4_left) / 4.0;
+    const volume_left: f32 = @floatFromInt(volume.left_volume);
+    const volume_left_normal: f32 = (volume_left + 1.0) / 8.0;
+    const state_left: f32 = mix_left * volume_left_normal;
+
+    const ch1_right: f32 = if(panning.ch1_right) sample_flt[0] else 0.0;
+    const ch2_right: f32 = if(panning.ch2_right) sample_flt[1] else 0.0;
+    const ch3_right: f32 = if(panning.ch3_right) sample_flt[2] else 0.0;
+    const ch4_right: f32 = if(panning.ch4_right) sample_flt[3] else 0.0;
+    const mix_right: f32 = (ch1_right + ch2_right + ch3_right + ch4_right) / 4.0;
+    const volume_right: f32 = @floatFromInt(volume.right_volume);
+    const volume_right_normal: f32 = (volume_right + 1.0) / 8.0;
+    const state_right: f32 = mix_right * volume_right_normal;
 
     return .{ state_left, state_right };
 }
-fn sampleState(state: u5, volume: f32) f32 {
-    const state_flt: f32 = @floatFromInt(state);
-    const normalized: f32 = state_flt / 16.0;
-    const ranged: f32 = (normalized * 2.0) - 1.0;
-    const result: f32 = ranged * volume;
-    return result;
-}
 
-
-const use_flt: bool = true;
 const platform_volume: f32 = 0.2;
 // TODO: with stereo, the audio sounds half as fast?
 const is_stereo: bool = false;
@@ -118,36 +115,6 @@ export fn deinit() void {
     audio_done = true;
 }
 
-fn pushSamplesFlt(channels: [4]u5, panning: Panning, volume: Volume) struct{ f32, f32 } {
-    var sample_flt: [4]f32 = undefined;
-    for(&sample_flt, channels) |*flt, channel_val| {
-        const channel_flt: f32 = @floatFromInt(channel_val);
-        const normalized: f32 = channel_flt / 15.0;
-        const result: f32 = normalized * 2.0 - 1.0;
-        flt.* = result;
-    }
-
-    const ch1_right: f32 = if(panning.ch1_right) sample_flt[0] else 0.0;
-    const ch2_right: f32 = if(panning.ch2_right) sample_flt[1] else 0.0;
-    const ch3_right: f32 = if(panning.ch3_right) sample_flt[2] else 0.0;
-    const ch4_right: f32 = if(panning.ch4_right) sample_flt[3] else 0.0;
-    var right: f32 = ch1_right + ch2_right + ch3_right + ch4_right;
-    const right_volume: f32 = (@as(f32, @floatFromInt(volume.right_volume)) + 1.0) / 8.0;
-    right *= right_volume * platform_volume;
-    right /= 4.0;
-
-    const ch1_left: f32 = if(panning.ch1_left) sample_flt[0] else 0.0;
-    const ch2_left: f32 = if(panning.ch2_left) sample_flt[1] else 0.0;
-    const ch3_left: f32 = if(panning.ch3_left) sample_flt[2] else 0.0;
-    const ch4_left: f32 = if(panning.ch4_left) sample_flt[3] else 0.0;
-    var left: f32 = ch1_left + ch2_left + ch3_left + ch4_left;
-    const left_volume: f32 = (@as(f32, @floatFromInt(volume.left_volume)) + 1.0) / 8.0;
-    left *= left_volume * platform_volume;
-    left /= 4.0;
-
-    return .{ left, right };
-}
-
 pub fn runApuOutputTest() !void {
     const alloc = std.testing.allocator;
 
@@ -160,7 +127,6 @@ pub fn runApuOutputTest() !void {
     _ = lineIt.next().?; // ignore first line which initializes the channels to 0.
 
     const volume: Volume = .{ 
-        // TODO: Reducing volume does reduce it, but it also sounds like we are missing sound information?
         .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false 
     };
     const panning: Panning = .{
@@ -171,8 +137,8 @@ pub fn runApuOutputTest() !void {
     var curr_cycles: u64 = 0;
     // TODO: Make my states u4 as they should be. For some reason, SameBoy uses 16 as an off value sometimes?
     var channels: [4]u5 = [_]u5{0} ** 4;
-    var state_left: u5 = 0;
-    var state_right: u5 = 0;
+    var state_left: f32 = 0;
+    var state_right: f32 = 0;
     while(lineIt.next()) |line| {
         if(line.len == 0) {
             continue;
@@ -185,35 +151,20 @@ pub fn runApuOutputTest() !void {
         while(curr_cycles < cycles) : (curr_cycles += 1) {
             // TODO: t_cycles_per_sample does not cleanly divide into integer, so we are slightly of with our sample rate.
             if(curr_cycles % t_cycles_per_sample == 0) {
-                // TODO: Flt version works, but not the u4 version, why?
-                if(use_flt) {
-                    const left_ref: f32, const right_ref: f32 = pushSamplesFlt(channels, panning, volume);
-                    if(is_stereo) {
-                        try result_samples.append(alloc, left_ref);
-                        try result_samples.append(alloc, right_ref);
-                    } else {
-                        const mono_ref: f32 = (left_ref + right_ref) / 2.0;
-                        try result_samples.append(alloc, mono_ref);
-                    }
+                const sample_left: f32 = state_left * platform_volume;
+                const sample_right: f32 = state_right * platform_volume;
+                if(is_stereo) {
+                    try result_samples.append(alloc, sample_left);
+                    try result_samples.append(alloc, sample_right);
                 } else {
-                    if(is_stereo) {
-                        var sample: f32 = sampleState(state_left, platform_volume);
-                        try result_samples.append(alloc, sample);
-
-                        sample = sampleState(state_right, platform_volume);
-                        try result_samples.append(alloc, sample);
-                    } else {
-                        const mix_mono: u6 = @as(u6, state_left) + @as(u6, state_right) / 2;
-                        const state_mono: u5 = @intCast(mix_mono);
-                        const sample: f32 = sampleState(state_mono, platform_volume);
-                        try result_samples.append(alloc, sample);
-                    }
+                    const mono: f32 = (sample_left + sample_right) / 2.0;
+                    try result_samples.append(alloc, mono);
                 }
             }
         }
 
         channels[channel_idx] = value;
-        state_left, state_right = mixChannels(channels[0], channels[1], channels[2], channels[3], panning, volume);
+        state_left, state_right = mixChannels(channels, panning, volume);
     }
 
     sokol.app.run(.{
