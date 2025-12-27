@@ -17,7 +17,7 @@ test "APU_Output" {
 }
 
 test "APU_Sampler" {
-    try apu_test.runApuSamplerTests();
+    try apu_test.runApuSamplingTests();
 }
 
 test "CPU_Halt" {

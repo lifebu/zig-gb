@@ -79,10 +79,15 @@ pub const t_cycles_per_m_cycle = 4;
 
 // audio
 // TODO: When I try to push stereo to sokol, i get super loud garbage data out? 
-pub const num_channels = 1; 
-pub const sample_rate = 48_000;
-pub const t_cycles_per_sample = (system_freq / sample_rate);
-pub const num_gb_samples = (t_cycles_in_60fps / t_cycles_per_sample) * num_channels;
+pub const is_stereo = true;
+pub const samples_per_frame: i32 = if(is_stereo) 2 else 1;
+pub const sample_rate = 44_100;
+pub const t_cycles_per_sample = system_freq / sample_rate;
+pub const num_gb_samples = (t_cycles_in_60fps / t_cycles_per_sample) * samples_per_frame;
+
+pub const Sample = struct {
+    left: f32 = 0.0, right: f32 = 0.0,
+};
 
 // memory
 pub const addr_space = 0x1_0000;

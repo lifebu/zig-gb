@@ -69,9 +69,56 @@
                 - Makes it easy to add a new bus to the GBC, just give the function a different pointer to a bus!
             - Lets me rename the memory() function to request()!
 
+    - Memory Request v2:
+        - remove mmu.
+        - only have memory request that is returned from cpu or the dma.
+        - each subsystem only has the memory that it needs to (so emulator data and their registers).
+        example main:
+        pub const Request = struct {
+            read: ?u16 = null,
+            write: ?u16 = null,
+            data: *u8 = undefined,
+        }
+
+        var cpu_request: ?def.Request = cpu.cycle();
+        dma.request(&request); // DMA conflict here!
+        dma.cycle(&request);
+        // TODO: Could also move this into each subsystem.
+        switch(cpu_request.getAddress()) {
+            mem_map.rom_low..mem_map.rom_high => {
+                boot.request(&request);
+                cart.request(&request);
+            },
+            mem_map.wram_low..mem_map.wram_high,
+            mem_map.echo_low..mem_map.echo_high => {
+                ram.request(&request);
+            },
+            mem_map.joypad => {
+                input.request(&request);
+            },
+            mem_map.timer_low..mem_map.timer_high => {
+                timer.request(&request);
+            },
+            mem_map.vram_low..mem_map.vram_high,
+            mem_map.oam_low..mem_map.oam_high => {
+                ppu.request(&request);
+            },
+            mem_map.audio_low..mem_map.audio_high => {
+                apu.request(&request);
+            },
+        }
+        
+        boot.cycle();
+        cart.cycle();
+        input.cycle();
+        timer.cycle();
+        ppu.cycle();
+        apu.cycle();
+
 - add define for open bus value as 0xFF!
 - cpu returns memory requests, subsystems react to it.
 - Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
+- Cart: Merge boot rom onto cart?
 
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.
@@ -98,6 +145,7 @@
     pub fn memory(bus: *Bus.State) void {}
     - Those systems can have a cycle function that optionally returns an BUS.State!
 
+- go from functions with the state as first parameter, to "c++ objects" that load the state implicitly!
 - Really standardize the order of declarations and definitions (constants, functions, etc).
 - Cart:
     - Add tests for different mbc!

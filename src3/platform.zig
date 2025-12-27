@@ -104,7 +104,7 @@ pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
     // audio
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = def.num_channels,
+        .num_channels = def.samples_per_frame,
         .sample_rate = def.sample_rate,
     });
 }

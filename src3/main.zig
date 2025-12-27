@@ -80,7 +80,7 @@ export fn frame() void {
         INPUT.request(&state.input, &single_bus);
         TIMER.request(&state.timer, &state.mmu, &single_bus);
         PPU.request(&state.ppu, &single_bus);
-        APU.request(&state.apu, &single_bus);
+        //APU.request(&state.apu, &single_bus);
         MMU.request(&state.mmu, &single_bus);
         RAM.request(&state.ram, &single_bus);
 
@@ -90,7 +90,7 @@ export fn frame() void {
         INPUT.cycle(&state.input);
         TIMER.cycle(&state.timer, &state.mmu);
         PPU.cycle(&state.ppu, &state.mmu);
-        APU.cycle(&state.apu);
+        //APU.cycle(&state.apu);
         MMU.cycle(&state.mmu);
         RAM.cycle(&state.ram);
 

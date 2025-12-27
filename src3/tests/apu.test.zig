@@ -9,89 +9,135 @@ const mem_map = @import("../mem_map.zig");
 
 const sokol = @import("sokol");
 
+// TODO: Implement channels:
+// 3: Period, Volume shift, Length, Wave-Table
+// 2: Period, Volume envelope, Length, Duty-Table
+// 3: Period, Volume envelope, Length, Sweep, Duty-Table 
+// 4: Period, Volume envelope, Length, LFSR 
 
-pub fn runApuSamplerTests() !void {
-    // 1st: Test that the sample rate was hit.
-    // 2nd: Test that the Master Volume for l/r is applied.
-    // 3rd: Test that the Stereo vs mono samples can be generated.
-    // 4th: Test that the panning works
-    // 5th: Test conversion from [0, 15] to [-1, 1] range for the platform output.
+// APU structure:
+// - apu.cycle() returns an optional sample (sampler part of apu). try push sample to platform.
+// - emulator has no sound buffer. sokol.audio already has a buffer.
 
+fn drawSample(apu: *APU.State, mmu: *MMU.State, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
+    apu.channels[0] = ch1;
+    apu.channels[1] = ch2;
+    apu.channels[2] = ch3;
+    apu.channels[3] = ch4;
+    apu.sample_counter = 0;
+    return APU.cycle(apu, mmu).?;
+}
+
+pub fn runApuSamplingTests() !void {
+    // TODO: Can we detect when the audio device has starved at any moment?
+    // TODO: Test that the sample rate was hit over a period of time?
+
+    var apu: APU.State = .{};
     var mmu: MMU.State = .{}; 
+    APU.init(&apu);
 
-    // Initialize with test memory.
-    for(0x0300..0x039F, 1..) |addr, i| {
-        mmu.memory[@intCast(addr)] = @truncate(i);
-    }
-    for(mem_map.oam_low..mem_map.oam_high + 1) |addr| {
-        mmu.memory[@intCast(addr)] = 0;
+    var sample: def.Sample = .{};
+    mmu.memory[mem_map.master_volume] = @bitCast(APU.Volume {
+        .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false,
+    });
+    mmu.memory[mem_map.sound_panning] = @bitCast(APU.Panning {
+        .ch1_right = true, .ch2_right = true, .ch3_right = true, .ch4_right = true,
+        .ch1_left = true,  .ch2_left = true,  .ch3_left = true,  .ch4_left = true,
+    });
+
+    // correct sample range [-1, 1]
+    sample = drawSample(&apu, &mmu, 0, 0, 0, 0);
+    std.testing.expectApproxEqAbs(-1.0, sample.left, std.math.floatEps(f32)) catch |err| {
+        std.debug.print("Failed: Channels not in [-1, 1] range.\n", .{});
+        return err;
+    };
+    sample = drawSample(&apu, &mmu, 8, 7, 7, 8);
+    std.testing.expectApproxEqAbs(0.0, sample.left, std.math.floatEps(f32)) catch |err| {
+        std.debug.print("Failed: Channels not in [-1, 1] range.\n", .{});
+        return err;
+    };
+    sample = drawSample(&apu, &mmu, 15, 15, 15, 15);
+    std.testing.expectApproxEqAbs(1.0, sample.left, std.math.floatEps(f32)) catch |err| {
+        std.debug.print("Failed: Channels not in [-1, 1] range.\n", .{});
+        return err;
+    };
+
+    // master volume is applied
+    for(0..std.math.maxInt(u3)) |input| {
+        const input_flt: f32 = @floatFromInt(input);
+        const expected: f32 = (input_flt + 1.0) / 8.0;
+        mmu.memory[mem_map.master_volume] = @bitCast(APU.Volume {
+            .left_volume = @intCast(input), .right_volume = 7, .vin_left = false, .vin_right = false 
+        });
+        sample = drawSample(&apu, &mmu, 15, 15, 15, 15);
+        std.testing.expectApproxEqAbs(expected, sample.left, std.math.floatEps(f32)) catch |err| {
+            std.debug.print("Failed: Master volume not correctly applied.\n", .{});
+            return err;
+        };
+        std.testing.expectApproxEqAbs(1.0, sample.right, std.math.floatEps(f32)) catch |err| {
+            std.debug.print("Failed: Master volume not correctly applied.\n", .{});
+            return err;
+        };
     }
 
-    try std.testing.expectEqual(true, true);
+    // panning is correctly applied (stereo).    
+    mmu.memory[mem_map.master_volume] = @bitCast(APU.Volume {
+        .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false,
+    });
+    for(0..apu.channels.len) |channel_idx| {
+        apu.channels = [_]u4{ 0 } ** apu.channels.len;
+        apu.channels[channel_idx] = 15;
+
+        const lower_nibble_on: u8 = @as(u8, 1) << @intCast(channel_idx);
+        const higher_nibble_on: u8 = lower_nibble_on << 4;
+
+        const PanningCase = struct {
+            left: bool, right: bool
+        };
+        const test_cases = [4]PanningCase{
+            .{ .left = false, .right = false },
+            .{ .left = false, .right = true },
+            .{ .left = true, .right = false },
+            .{ .left = true, .right = true },
+        };
+        for (test_cases) |test_case| {
+            const lower_nibble: u8 = if(test_case.right) lower_nibble_on else 0;
+            const high_nibble: u8 = if(test_case.left) higher_nibble_on else 0;
+            mmu.memory[mem_map.sound_panning] = lower_nibble | high_nibble;
+
+            apu.sample_counter = 0;
+            sample = APU.cycle(&apu, &mmu).?;
+
+            const expected_left: f32 = if(test_case.left) 0.25 else 0.0;
+            std.testing.expectApproxEqAbs(expected_left, sample.left, std.math.floatEps(f32)) catch |err| {
+                std.debug.print("Failed: Panning (L:{}, R:{}): Left sample must be {}.\n", .{ test_case.left, test_case.right, expected_left });
+                return err;
+            };
+
+            const expected_right: f32 = if(test_case.right) 0.25 else 0.0;
+            std.testing.expectApproxEqAbs(expected_right, sample.right, std.math.floatEps(f32)) catch |err| {
+                std.debug.print("Failed: Panning (L:{}, R:{}): Right sample must be {}.\n", .{ test_case.left, test_case.right, expected_right });
+                return err;
+            };
+
+        } 
+    }
 }
 
-
-
-
-const Control = packed struct(u8) {
-    ch1_on: bool, ch2_on: bool, ch3_on: bool, ch4_on: bool,
-    _: u3, enable_apu: bool,
-};
-const Volume = packed struct(u8) {
-    right_volume: u3, vin_right: bool,
-    left_volume: u3,  vin_left: bool,
-};
-const Panning = packed struct(u8) {
-    ch1_right: bool, ch2_right: bool, ch3_right: bool, ch4_right: bool,
-    ch1_left: bool,  ch2_left: bool,  ch3_left: bool,  ch4_left: bool,
-};
-
-fn mixChannels(channels: [4]u4, panning: Panning, volume: Volume) struct{ f32, f32 } {
-    const panning_left: [4]bool = .{ panning.ch1_left, panning.ch2_left, panning.ch3_left, panning.ch4_left };
-    const panning_right: [4]bool = .{ panning.ch1_right, panning.ch2_right, panning.ch3_right, panning.ch4_right };
-    const scaling: f32 = 1.0 / 4.0;
-
-    var mix_left: f32 = 0.0;
-    var mix_right: f32 = 0.0;
-    for(channels, panning_left, panning_right) |state, left, right| {
-        const channel: f32 = @floatFromInt(state);
-        const normalized: f32 = channel / 15.0;
-        const value: f32 = normalized * 2.0 - 1.0;
-        mix_left += if(left) value * scaling else 0.0;
-        mix_right += if(right) value * scaling else 0.0;
-    }
-
-    const volume_left: f32 = @floatFromInt(volume.left_volume);
-    const volume_left_normal: f32 = (volume_left + 1.0) / 8.0;
-    const state_left: f32 = mix_left * volume_left_normal;
-
-    const volume_right: f32 = @floatFromInt(volume.right_volume);
-    const volume_right_normal: f32 = (volume_right + 1.0) / 8.0;
-    const state_right: f32 = mix_right * volume_right_normal;
-
-    return .{ state_left, state_right };
-}
-
-const platform_volume: f32 = 0.2;
-const is_stereo: bool = true;
-const samples_per_frame: i32 = if(is_stereo) 2 else 1;
-const sample_rate = 44_100;
-const t_cycles_per_sample = def.system_freq / sample_rate;
 export fn init() void {
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = samples_per_frame,
-        .sample_rate = sample_rate,
+        .num_channels = def.samples_per_frame,
+        .sample_rate = def.sample_rate,
     });
 }
-
 var samples_pushed: usize = 0;
 var result_samples: std.ArrayList(f32) = .empty;
 var audio_done: bool = false;
 export fn frame() void {
     // TODO: use sokol.audio.expect() instead? How would this work on the real APU?
     const frames_used = sokol.audio.push(&result_samples.items[samples_pushed], @intCast(result_samples.items.len));
-    samples_pushed += @as(usize, @intCast(frames_used)) * samples_per_frame;
+    samples_pushed += @as(usize, @intCast(frames_used)) * def.samples_per_frame;
     if(samples_pushed >= result_samples.items.len) {
         audio_done = true;
         sokol.app.quit();
@@ -100,9 +146,7 @@ export fn frame() void {
 pub export fn event(ev: ?*const sokol.app.Event) void {
     const e: *const sokol.app.Event = ev orelse &.{};
     switch(e.key_code) {
-        .ESCAPE, .CAPS_LOCK => {
-            sokol.app.quit();
-        },
+        .ESCAPE, .CAPS_LOCK => { sokol.app.quit(); },
         else => {},
     }
 }
@@ -112,8 +156,11 @@ export fn deinit() void {
 }
 
 pub fn runApuOutputTest() !void {
-    const alloc = std.testing.allocator;
+    var apu: APU.State = .{};
+    var mmu: MMU.State = .{}; 
+    APU.init(&apu);
 
+    const alloc = std.testing.allocator;
     const sample_file = "test_data/apu/aceman_apu_samples.txt";
     const sample_txt = try std.fs.cwd().readFileAlloc(alloc, sample_file, std.math.maxInt(u32));
     defer alloc.free(sample_txt);
@@ -121,19 +168,16 @@ pub fn runApuOutputTest() !void {
 
     var lineIt = std.mem.splitScalar(u8, sample_txt, '\n');
     _ = lineIt.next().?; // ignore first line which initializes the channels to 0.
-
-    const volume: Volume = .{ 
-        .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false 
-    };
-    const panning: Panning = .{
+    
+    mmu.memory[mem_map.master_volume] = @bitCast(APU.Volume {
+        .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false,
+    });
+    mmu.memory[mem_map.sound_panning] = @bitCast(APU.Panning {
         .ch1_right = true, .ch2_right = true, .ch3_right = true, .ch4_right = true,
         .ch1_left = true,  .ch2_left = true,  .ch3_left = true,  .ch4_left = true,
-    };
+    });
 
     var curr_cycles: u64 = 0;
-    var channels: [4]u4 = [_]u4{0} ** 4;
-    var state_left: f32 = 0;
-    var state_right: f32 = 0;
     while(lineIt.next()) |line| {
         if(line.len == 0) {
             continue;
@@ -141,17 +185,17 @@ pub fn runApuOutputTest() !void {
         var elemIt = std.mem.splitScalar(u8, line, ',');
         const cycles: u64 = try std.fmt.parseInt(u64, elemIt.next().?, 10);
         const channel_idx: u2 = try std.fmt.parseInt(u2, elemIt.next().?, 10);
-        const value_raw: u5 = try std.fmt.parseInt(u5, elemIt.next().?, 10);
         // Note: Sameboy uses [0, 16] ranges (sometimes), but all channels has [0, 15].
+        const value_raw: u5 = try std.fmt.parseInt(u5, elemIt.next().?, 10);
         const value: u4 = if(value_raw > 15) 15 else @intCast(value_raw);
 
-        // TODO: Try to re-write this so that it better matches the cycle() function of the real apu.
         while(curr_cycles < cycles) : (curr_cycles += 1) {
-            // TODO: t_cycles_per_sample does not cleanly divide into integer, so we are slightly of with our sample rate.
-            if(curr_cycles % t_cycles_per_sample == 0) {
-                const sample_left: f32 = state_left * platform_volume;
-                const sample_right: f32 = state_right * platform_volume;
-                if(is_stereo) {
+            const sample: ?def.Sample = APU.cycle(&apu, &mmu);
+            if(sample) |sample_val| {
+                const platform_volume: f32 = 0.15;
+                const sample_left: f32 = sample_val.left * platform_volume;
+                const sample_right: f32 = sample_val.right * platform_volume;
+                if(def.is_stereo) {
                     try result_samples.append(alloc, sample_left);
                     try result_samples.append(alloc, sample_right);
                 } else {
@@ -161,8 +205,7 @@ pub fn runApuOutputTest() !void {
             }
         }
 
-        channels[channel_idx] = value;
-        state_left, state_right = mixChannels(channels, panning, volume);
+        apu.channels[channel_idx] = value;
     }
 
     sokol.app.run(.{
