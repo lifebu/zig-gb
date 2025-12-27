@@ -13,7 +13,8 @@ const timer_test = @import("tests/timer.test.zig");
 // TODO: Move tests into it's own module so that we don't have it loitering in the src folder!
 // TODO: Maybe split up the tests?
 test "APU_Output" {
-    try apu_test.runApuOutputTest();
+    const pre_calc: bool = false;
+    try apu_test.runApuOutputTest(pre_calc);
 }
 
 test "APU_Sampler" {

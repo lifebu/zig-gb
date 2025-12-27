@@ -15,10 +15,6 @@ const sokol = @import("sokol");
 // 3: Period, Volume envelope, Length, Sweep, Duty-Table 
 // 4: Period, Volume envelope, Length, LFSR 
 
-// APU structure:
-// - apu.cycle() returns an optional sample (sampler part of apu). try push sample to platform.
-// - emulator has no sound buffer. sokol.audio already has a buffer.
-
 fn drawSample(apu: *APU.State, mmu: *MMU.State, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
     apu.channels[0] = ch1;
     apu.channels[1] = ch2;
@@ -31,6 +27,7 @@ fn drawSample(apu: *APU.State, mmu: *MMU.State, ch1: u4, ch2: u4, ch3: u4, ch4: 
 pub fn runApuSamplingTests() !void {
     // TODO: Can we detect when the audio device has starved at any moment?
     // TODO: Test that the sample rate was hit over a period of time?
+    // TODO: Test that we never wasted any samples.
 
     var apu: APU.State = .{};
     var mmu: MMU.State = .{}; 
@@ -124,24 +121,33 @@ pub fn runApuSamplingTests() !void {
     }
 }
 
-export fn init() void {
+const platform_volume: f32 = 0.15;
+const Inputs = struct {
+    cycles: u64, channel_idx: u2, value: u4,
+};
+const State = struct {
+    use_precalc: bool,
+
+    // precalc
+    result_samples: std.ArrayList(f32) = .empty,
+    samples_pushed: usize = 0,
+    audio_done: bool = false,
+
+    // sync
+    curr_cycles: u64 = 0,
+    curr_input_idx: usize = 0,
+    input_states: std.ArrayList(Inputs) = .empty,
+    apu: *APU.State,
+    mmu: *MMU.State,
+};
+export fn init(state_opaque: ?*anyopaque) void {
+    const state: *State = @alignCast(@ptrCast(state_opaque.?));
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
         .num_channels = def.samples_per_frame,
         .sample_rate = def.sample_rate,
     });
-}
-var samples_pushed: usize = 0;
-var result_samples: std.ArrayList(f32) = .empty;
-var audio_done: bool = false;
-export fn frame() void {
-    // TODO: use sokol.audio.expect() instead? How would this work on the real APU?
-    const frames_used = sokol.audio.push(&result_samples.items[samples_pushed], @intCast(result_samples.items.len));
-    samples_pushed += @as(usize, @intCast(frames_used)) * def.samples_per_frame;
-    if(samples_pushed >= result_samples.items.len) {
-        audio_done = true;
-        sokol.app.quit();
-    }
+    APU.init(state.apu);
 }
 pub export fn event(ev: ?*const sokol.app.Event) void {
     const e: *const sokol.app.Event = ev orelse &.{};
@@ -150,21 +156,74 @@ pub export fn event(ev: ?*const sokol.app.Event) void {
         else => {},
     }
 }
-export fn deinit() void {
+export fn deinit(state_opaque: ?*anyopaque) void {
+    const state: *State = @alignCast(@ptrCast(state_opaque.?));
+
     sokol.audio.shutdown();
-    audio_done = true;
+    state.audio_done = true;
 }
 
-pub fn runApuOutputTest() !void {
+fn platformPushSample(sample: def.Sample) void {
+    // TODO: use sokol.audio.expect() to know if we starved and if we will waste samples here.
+    const sample_left: f32 = sample.left * platform_volume;
+    const sample_right: f32 = sample.right * platform_volume;
+    if(def.is_stereo) {
+        const sample_arr: [2]f32 = .{ sample_left, sample_right };
+        const samples_used: i32 = sokol.audio.push(&sample_arr[0], 1);
+        if(samples_used == 0) {} // TODO: Samples wasted? Error?
+    } else {
+        const mono: f32 = (sample_left + sample_right) / 2.0;
+        const sample_arr: [1]f32 = .{ mono };
+        const samples_used: i32 = sokol.audio.push(&sample_arr[0], sample_arr.len);
+        if(samples_used == 0) {} // TODO: Samples wasted? Error?
+    }
+}
+
+export fn frame(state_opaque: ?*anyopaque) void {
+    const state: *State = @alignCast(@ptrCast(state_opaque.?));
+    if(state.use_precalc) {
+        const frames_used: i32 = sokol.audio.push(&state.result_samples.items[state.samples_pushed], @intCast(state.result_samples.items.len));
+        state.samples_pushed += @as(usize, @intCast(frames_used)) * def.samples_per_frame;
+        if(state.samples_pushed >= state.result_samples.items.len) {
+            state.audio_done = true;
+            sokol.app.quit();
+        }
+    } else {
+        const cycles_per_frame = 70224; 
+        for(0..cycles_per_frame) |_| {
+            const sample: ?def.Sample = APU.cycle(state.apu, state.mmu);
+            if(sample) |value| {
+                platformPushSample(value);
+            }
+
+            state.curr_cycles += 1;
+            const curr_input: Inputs = state.input_states.items[state.curr_input_idx];
+            if(state.curr_cycles >= curr_input.cycles) {
+                state.apu.channels[curr_input.channel_idx] = curr_input.value;
+                state.curr_input_idx += 1;
+                if(state.curr_input_idx >= state.input_states.items.len) {
+                    state.audio_done = true;
+                    sokol.app.quit();
+                }
+            }
+        }
+    }
+}
+
+pub fn runApuOutputTest(use_precalc: bool) !void {
     var apu: APU.State = .{};
     var mmu: MMU.State = .{}; 
     APU.init(&apu);
 
     const alloc = std.testing.allocator;
+
+    var state: State = .{ .use_precalc = use_precalc, .apu = &apu, .mmu = &mmu };
+    defer state.result_samples.deinit(alloc);
+    defer state.input_states.deinit(alloc);
+
     const sample_file = "test_data/apu/aceman_apu_samples.txt";
     const sample_txt = try std.fs.cwd().readFileAlloc(alloc, sample_file, std.math.maxInt(u32));
     defer alloc.free(sample_txt);
-    defer result_samples.deinit(alloc);
 
     var lineIt = std.mem.splitScalar(u8, sample_txt, '\n');
     _ = lineIt.next().?; // ignore first line which initializes the channels to 0.
@@ -182,6 +241,7 @@ pub fn runApuOutputTest() !void {
         if(line.len == 0) {
             continue;
         }
+
         var elemIt = std.mem.splitScalar(u8, line, ',');
         const cycles: u64 = try std.fmt.parseInt(u64, elemIt.next().?, 10);
         const channel_idx: u2 = try std.fmt.parseInt(u2, elemIt.next().?, 10);
@@ -189,35 +249,38 @@ pub fn runApuOutputTest() !void {
         const value_raw: u5 = try std.fmt.parseInt(u5, elemIt.next().?, 10);
         const value: u4 = if(value_raw > 15) 15 else @intCast(value_raw);
 
-        while(curr_cycles < cycles) : (curr_cycles += 1) {
-            const sample: ?def.Sample = APU.cycle(&apu, &mmu);
-            if(sample) |sample_val| {
-                const platform_volume: f32 = 0.15;
-                const sample_left: f32 = sample_val.left * platform_volume;
-                const sample_right: f32 = sample_val.right * platform_volume;
-                if(def.is_stereo) {
-                    try result_samples.append(alloc, sample_left);
-                    try result_samples.append(alloc, sample_right);
-                } else {
-                    const mono: f32 = (sample_left + sample_right) / 2.0;
-                    try result_samples.append(alloc, mono);
+        if(use_precalc) {
+            while(curr_cycles < cycles) : (curr_cycles += 1) {
+                const sample: ?def.Sample = APU.cycle(&apu, &mmu);
+                if(sample) |sample_val| {
+                    const sample_left: f32 = sample_val.left * platform_volume;
+                    const sample_right: f32 = sample_val.right * platform_volume;
+                    if(def.is_stereo) {
+                        try state.result_samples.append(alloc, sample_left);
+                        try state.result_samples.append(alloc, sample_right);
+                    } else {
+                        const mono: f32 = (sample_left + sample_right) / 2.0;
+                        try state.result_samples.append(alloc, mono);
+                    }
                 }
             }
+            apu.channels[channel_idx] = value;
+        } else {
+            try state.input_states.append(alloc, .{ .cycles = cycles, .channel_idx = channel_idx, .value = value });
         }
-
-        apu.channels[channel_idx] = value;
     }
 
     sokol.app.run(.{
-        .init_cb = init,
-        .frame_cb = frame,
-        .cleanup_cb = deinit,
+        .init_userdata_cb = init,
+        .frame_userdata_cb = frame,
+        .cleanup_userdata_cb = deinit,
         .event_cb = event,
+        .user_data = &state,
         .width = def.window_width,
         .height = def.window_height,
         .icon = .{ .sokol_default = true },
         .window_title = "Audio Test",
         .logger = .{ .func = sokol.log.func },
     });
-    try std.testing.expectEqual(true, audio_done);
+    try std.testing.expectEqual(true, state.audio_done);
 }
