@@ -12,7 +12,7 @@ const sokol = @import("sokol");
 // TODO: Implement channels:
 // 3: Period, Volume shift, Length, Wave-Table
 // 2: Period, Volume envelope, Length, Duty-Table
-// 3: Period, Volume envelope, Length, Sweep, Duty-Table 
+// 1: Period, Volume envelope, Length, Sweep, Duty-Table 
 // 4: Period, Volume envelope, Length, LFSR 
 
 fn drawSample(apu: *APU.State, mmu: *MMU.State, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {

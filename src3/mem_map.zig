@@ -41,28 +41,42 @@ pub const timer: u16            = 0xFF05;
 pub const timer_mod: u16        = 0xFF06;
 pub const timer_control: u16    = 0xFF07;
 pub const interrupt_flag: u16   = 0xFF0F;
+
+pub const ch1_low: u16          = 0xFF10;
 pub const ch1_sweep: u16        = 0xFF10;
 pub const ch1_length: u16       = 0xFF11;
 pub const ch1_volume: u16       = 0xFF12;
 pub const ch1_low_period: u16   = 0xFF13;
 pub const ch1_high_period: u16  = 0xFF14;
+pub const ch1_high: u16         = 0xFF14;
+
+pub const ch2_low: u16          = 0xFF16;
 pub const ch2_length: u16       = 0xFF16;
 pub const ch2_volume: u16       = 0xFF17;
 pub const ch2_low_period: u16   = 0xFF18;
 pub const ch2_high_period: u16  = 0xFF19;
+pub const ch2_high: u16         = 0xFF19;
+
+pub const ch3_low: u16          = 0xFF1A;
 pub const ch3_dac: u16          = 0xFF1A;
 pub const ch3_length: u16       = 0xFF1B;
 pub const ch3_volume: u16       = 0xFF1C;
 pub const ch3_low_period: u16   = 0xFF1D;
 pub const ch3_high_period: u16  = 0xFF1E;
+pub const ch3_high: u16         = 0xFF1E;
+
+pub const ch4_low: u16          = 0xFF20;
 pub const ch4_length: u16       = 0xFF20;
 pub const ch4_volume: u16       = 0xFF21;
 pub const ch4_freq: u16         = 0xFF22;
 pub const ch4_control: u16      = 0xFF23;
+pub const ch4_high: u16         = 0xFF23;
+
 pub const master_volume: u16    = 0xFF24;
 pub const sound_panning: u16    = 0xFF25;
 pub const sound_control: u16    = 0xFF26;
 pub const sound_waveform: u16   = 0xFF30;
+
 pub const lcd_control: u16      = 0xFF40;
 pub const lcd_stat: u16         = 0xFF41;
 pub const scroll_y: u16         = 0xFF42;
@@ -77,6 +91,7 @@ pub const obj_palette_1: u16    = 0xFF49;
 pub const boot_rom: u16         = 0xFF50;
 pub const window_y: u16         = 0xFF4A;
 pub const window_x: u16         = 0xFF4B;
+
 pub const interrupt_enable: u16 = 0xFFFF;
 
 // Interrupts

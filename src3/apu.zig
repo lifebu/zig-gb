@@ -7,10 +7,10 @@ const MMU = @import("mmu.zig");
 
 const apu_channels = 4;
 
+// general
 const Control = packed struct(u8) {
     ch1_on: bool, ch2_on: bool, ch3_on: bool, ch4_on: bool,
     _: u3, enable_apu: bool,
-
     // TODO: When we remove the mmu like this all subsystems control their own registers and react to read/write request on the bus.
     // Then we don't need "fromMem()" and "toMem()".
     pub fn fromMem(mmu: *MMU.State) Control {
@@ -20,7 +20,6 @@ const Control = packed struct(u8) {
 pub const Volume = packed struct(u8) {
     right_volume: u3, vin_right: bool,
     left_volume: u3,  vin_left: bool,
-
     pub fn fromMem(mmu: *MMU.State) Volume {
         return @bitCast(mmu.memory[mem_map.master_volume]);
     } 
@@ -28,9 +27,48 @@ pub const Volume = packed struct(u8) {
 pub const Panning = packed struct(u8) {
     ch1_right: bool, ch2_right: bool, ch3_right: bool, ch4_right: bool,
     ch1_left: bool,  ch2_left: bool,  ch3_left: bool,  ch4_left: bool,
-
     pub fn fromMem(mmu: *MMU.State) Panning {
         return @bitCast(mmu.memory[mem_map.sound_panning]);
+    } 
+};
+
+// TODO: Does splitting these channel registers make memory requests easier?
+pub const Channel1 = packed struct(u40) {
+    freq_step: u3, freq_decrease: bool, freq_pace: u3, _: u1,
+    length_init: u6, duty_cycle: u2,
+    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    period: u11, 
+    __: u3, length_enable: bool, trigger: bool,  
+    pub fn fromMem(mmu: *MMU.State) Channel1 {
+        return std.mem.bytesToValue(Channel1, mmu.memory[mem_map.ch1_low..mem_map.ch1_high]);
+    } 
+};
+pub const Channel2 = packed struct(u32) {
+    length_init: u6, duty_cycle: u2,
+    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    period: u11, 
+    __: u3, length_enable: bool, trigger: bool,  
+    pub fn fromMem(mmu: *MMU.State) Channel2 {
+        return std.mem.bytesToValue(Channel2, mmu.memory[mem_map.ch2_low..mem_map.ch2_high]);
+    } 
+};
+pub const Channel3 = packed struct(u40) {
+    _: u6, dac_on: bool,
+    length_init: u8,
+    __: u5, vol_shift: u2, ___: u1, 
+    period: u11, 
+    ____: u3, length_enable: bool, trigger: bool,
+    pub fn fromMem(mmu: *MMU.State) Channel3 {
+        return std.mem.bytesToValue(Channel3, mmu.memory[mem_map.ch3_low..mem_map.ch3_high]);
+    } 
+};
+pub const Channel4 = packed struct(u32) {
+    length_init: u6, _: u2,
+    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    lfsr_divider: u3, lfsr_width: u1, lfsr_shift: u4,
+    __: u6, length_enable: bool, trigger: bool, 
+    pub fn fromMem(mmu: *MMU.State) Channel4 {
+        return std.mem.bytesToValue(Channel4, mmu.memory[mem_map.ch4_low..mem_map.ch4_high]);
     } 
 };
 
