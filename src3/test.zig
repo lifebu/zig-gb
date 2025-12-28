@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const apu_test = @import("tests/apu.test.zig");
+const apu_sampling_test = @import("tests/apu_sampling.test.zig");
 const dma_test = @import("tests/dma.test.zig");
 const halt_test = @import("tests/halt.test.zig");
 const interrupt_test = @import("tests/interrupt.test.zig");
@@ -12,13 +13,16 @@ const timer_test = @import("tests/timer.test.zig");
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 // TODO: Move tests into it's own module so that we don't have it loitering in the src folder!
 // TODO: Maybe split up the tests?
+test "APU_Channel" {
+    try apu_test.runApuChannelTests();
+}
 test "APU_Output" {
     const pre_calc: bool = false;
-    try apu_test.runApuOutputTest(pre_calc);
+    try apu_sampling_test.runApuOutputTest(pre_calc);
 }
 
 test "APU_Sampler" {
-    try apu_test.runApuSamplingTests();
+    try apu_sampling_test.runApuSamplingTests();
 }
 
 test "CPU_Halt" {

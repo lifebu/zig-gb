@@ -73,9 +73,6 @@ pub const Channel4 = packed struct(u32) {
 };
 
 pub const State = struct {
-    // TODO: Remove this: no buffering on gb side.
-    gb_sample_buffer: [def.num_gb_samples]f32 = [1]f32{ 0.0 } ** def.num_gb_samples,
-
     channels: [apu_channels]u4 = [_]u4{0} ** apu_channels,
     sample_counter: u16 = 0, 
 };

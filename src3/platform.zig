@@ -115,10 +115,7 @@ pub fn deinit() void {
     sokol.audio.shutdown();
 }
 
-pub fn frame(state: *State, colorids: [def.overscan_resolution]u8, _: [def.num_gb_samples]f32) void {
-    // TODO: To avoid popping we might need to dynamically adjust the number of samples we write.
-    //_ = sokol.audio.push(&samples[0], samples.len);
-
+pub fn frame(state: *State, colorids: [def.overscan_resolution]u8) void {
     // ui
     sokol.imgui.newFrame(.{
         .width = sokol.app.width(),
@@ -146,6 +143,22 @@ pub fn frame(state: *State, colorids: [def.overscan_resolution]u8, _: [def.num_g
     sokol.imgui.render();
     sokol.gfx.endPass();
     sokol.gfx.commit();
+}
+
+pub fn pushSample(_: *State, sample: def.Sample) void {
+    // TODO: use sokol.audio.expect() to know if we starved and if we will waste samples here.
+    const sample_left: f32 = sample.left * def.default_platform_volume;
+    const sample_right: f32 = sample.right * def.default_platform_volume;
+    if(def.is_stereo) {
+        const sample_arr: [2]f32 = .{ sample_left, sample_right };
+        const samples_used: i32 = sokol.audio.push(&sample_arr[0], 1);
+        if(samples_used == 0) {} // TODO: Samples wasted? Error?
+    } else {
+        const mono: f32 = (sample_left + sample_right) / 2.0;
+        const sample_arr: [1]f32 = .{ mono };
+        const samples_used: i32 = sokol.audio.push(&sample_arr[0], sample_arr.len);
+        if(samples_used == 0) {} // TODO: Samples wasted? Error?
+    }
 }
 
 pub export fn event(ev: ?*const sokol.app.Event, state_opaque: ?*anyopaque) void {

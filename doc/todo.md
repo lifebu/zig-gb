@@ -1,4 +1,24 @@
 # src3:
+## APU:
+- CH3: Wave Table is read left-to-right in any frequency
+     - Pattern: 0,1,0,1,1,2,1,2,2,3,2,3,... 
+- CH3: Wave Table is read in correct frequency for different period values.
+- CH3: Volume Shift is implemented.
+- CH3: Length timer + "Frame Sequencer" is working.
+     - Test this on CH 1,2,4 later as well.
+- CH2,CH1: Is Square duty pattern correctly read (left-to-right) for any frequency and all duty patterns?
+- CH2,CH1: Is Duty table read at correct frequency for all period value?
+- CH2,CH1: Is Volume sweep implemented for: Different initial volumes, both directions, different paces?
+     - Test this on CH4 later as well.
+- CH1: Is frequency sweep implemented for different step sizes, both directions, different paces?
+- CH4: Is LFSR implemented for: Different shifts + divides and both widths (7 or 15).
+- CH1-4: Does trigger bit and is_channel_on status bit work?
+- Test All channels and their timing va a generated .txt file.
+     - Input: CPU writes to APU registers at given cycle count.
+     - Output: APU channel state change at given cycle count.
+- Write some tests (or atleast todos) for more specific audio behaviour from documentations.
+- Audio cleanup (HPF, etc).
+
 ## CPU:
 - Interrupt Sources
     - VBlanK: Add tests!
