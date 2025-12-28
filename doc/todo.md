@@ -16,6 +16,7 @@
 - Test All channels and their timing va a generated .txt file.
      - Input: CPU writes to APU registers at given cycle count.
      - Output: APU channel state change at given cycle count.
+- APU can be turned on and off.
 - Write some tests (or atleast todos) for more specific audio behaviour from documentations.
 - Audio cleanup (HPF, etc).
 

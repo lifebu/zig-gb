@@ -34,11 +34,11 @@ pub const Panning = packed struct(u8) {
 
 // TODO: Does splitting these channel registers make memory requests easier?
 pub const Channel1 = packed struct(u40) {
-    freq_step: u3, freq_decrease: bool, freq_pace: u3, _: u1,
+    freq_step: u3, freq_decrease: bool, freq_pace: u3, _: u1 = 0,
     length_init: u6, duty_cycle: u2,
     vol_step: u3, vol_increase: bool, vol_initial: u4,
     period: u11, 
-    __: u3, length_enable: bool, trigger: bool,  
+    __: u3 = 0, length_enable: bool, trigger: bool,  
     pub fn fromMem(mmu: *MMU.State) Channel1 {
         return std.mem.bytesToValue(Channel1, mmu.memory[mem_map.ch1_low..mem_map.ch1_high]);
     } 
@@ -47,26 +47,47 @@ pub const Channel2 = packed struct(u32) {
     length_init: u6, duty_cycle: u2,
     vol_step: u3, vol_increase: bool, vol_initial: u4,
     period: u11, 
-    __: u3, length_enable: bool, trigger: bool,  
+    _: u3 = 0, length_enable: bool, trigger: bool,  
     pub fn fromMem(mmu: *MMU.State) Channel2 {
         return std.mem.bytesToValue(Channel2, mmu.memory[mem_map.ch2_low..mem_map.ch2_high]);
     } 
 };
-pub const Channel3 = packed struct(u40) {
-    _: u6, dac_on: bool,
+
+pub const Channel3Dac = packed struct(u8) {
+    _: u7 = 0, dac_on: bool,
+    pub fn fromMem(mmu: *MMU.State) Channel3Dac {
+        return std.mem.bytesToValue(Channel3Dac, mmu.memory[mem_map.ch3_dac]);
+    } 
+};
+pub const Channel3Length = packed struct(u8) {
     length_init: u8,
-    __: u5, vol_shift: u2, ___: u1, 
-    period: u11, 
-    ____: u3, length_enable: bool, trigger: bool,
-    pub fn fromMem(mmu: *MMU.State) Channel3 {
-        return std.mem.bytesToValue(Channel3, mmu.memory[mem_map.ch3_low..mem_map.ch3_high]);
+    pub fn fromMem(mmu: *MMU.State) Channel3Length {
+        return std.mem.bytesToValue(Channel3Length, mmu.memory[mem_map.ch3_length]);
+    } 
+};
+pub const Channel3Volume = packed struct(u8) {
+    _: u5 = 0, vol_shift: u2, __: u1 = 0, 
+    pub fn fromMem(mmu: *MMU.State) Channel3Volume {
+        return std.mem.bytesToValue(Channel3Volume, mmu.memory[mem_map.ch3_volume]);
+    } 
+};
+pub const Channel3PeriodLow = packed struct(u8) {
+    period: u8,
+    pub fn fromMem(mmu: *MMU.State) Channel3PeriodLow {
+        return std.mem.bytesToValue(Channel3PeriodLow, mmu.memory[mem_map.ch3_low_period]);
+    } 
+};
+pub const Channel3PeriodHigh = packed struct(u8) {
+    period: u3, _: u3 = 0, length_enable: bool, trigger: bool,
+    pub fn fromMem(mmu: *MMU.State) Channel3PeriodHigh {
+        return std.mem.bytesToValue(Channel3PeriodHigh, mmu.memory[mem_map.ch3_high_period]);
     } 
 };
 pub const Channel4 = packed struct(u32) {
-    length_init: u6, _: u2,
+    length_init: u6, _: u2 = 0,
     vol_step: u3, vol_increase: bool, vol_initial: u4,
     lfsr_divider: u3, lfsr_width: u1, lfsr_shift: u4,
-    __: u6, length_enable: bool, trigger: bool, 
+    __: u6 = 0, length_enable: bool, trigger: bool, 
     pub fn fromMem(mmu: *MMU.State) Channel4 {
         return std.mem.bytesToValue(Channel4, mmu.memory[mem_map.ch4_low..mem_map.ch4_high]);
     } 

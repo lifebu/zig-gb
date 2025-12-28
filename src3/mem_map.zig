@@ -1,5 +1,6 @@
 /// Ranges are: [LOW, HIGH) (high excluding!). 
 
+// TODO: mem_map could likely also be part of defines.zig?
 // Memory
 pub const rom_low: u16          = 0x0000;
 pub const rom_middle: u16       = 0x4000;
@@ -75,7 +76,8 @@ pub const ch4_high: u16         = 0xFF23;
 pub const master_volume: u16    = 0xFF24;
 pub const sound_panning: u16    = 0xFF25;
 pub const sound_control: u16    = 0xFF26;
-pub const sound_waveform: u16   = 0xFF30;
+pub const wave_low: u16         = 0xFF30;
+pub const wave_high: u16        = 0xFF40;
 
 pub const lcd_control: u16      = 0xFF40;
 pub const lcd_stat: u16         = 0xFF41;
