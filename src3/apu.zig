@@ -6,9 +6,15 @@ const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 
 const apu_channels = 4;
+// TODO: Pandocs talks about a DIV-APU that triggers those functions. When DIV is reset these might trigger again, so this is inprecise.
+pub const t_cycles_per_vol_step = 65_536;
+pub const t_cycles_per_freq_step = 32_768;
+pub const t_cycles_per_length_step = 16_384;
 pub const ch3_t_cycles_per_period = 2;
 // TODO: Not sure if this would be correct. This value would generate a permanent -1.0 in the audio output.
 pub const ch3_dac_off_value = 0;
+
+const channel_length_table: [apu_channels]u8 = .{ 63, 63, 255, 63 };
 
 // general
 pub const Control = packed struct(u8) {
@@ -101,12 +107,31 @@ pub const Channel4 = packed struct(u32) {
 
 pub const State = struct {
     channels: [apu_channels]u4 = [_]u4{0} ** apu_channels,
-    sample_counter: u16 = def.t_cycles_per_sample, 
+    sample_counter: u16 = def.t_cycles_per_sample - 1, 
+
+    // functions
+    volume_sweep_counter: u16 = t_cycles_per_vol_step - 1,
+    freq_sweep_counter: u15 = t_cycles_per_freq_step - 1,
+    length_counter: u14 = t_cycles_per_length_step - 1,
+    length_values: [apu_channels]u8 = .{0} ** apu_channels,
+
+    // ch1
+    ch1_is_on: bool = false,
+    ch1_length_on: bool = false,
+
+    // ch2
+    ch2_is_on: bool = false,
+    ch2_length_on: bool = false,
 
     // ch3
     ch3_is_on: bool = false,
     ch3_period_counter: u12 = 0,
     ch3_wave_ram_idx: u5 = 0,
+    ch3_length_on: bool = false,
+
+    // ch4
+    ch4_is_on: bool = false,
+    ch4_length_on: bool = false,
 };
 
 pub fn init(state: *State) void {
@@ -133,8 +158,12 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 bus.write = null;
             },
             mem_map.ch3_high_period => {
+                mmu.memory[address] = bus.data.*;
+                bus.write = null;
+
+                const length: Channel3Length = .fromMem(mmu);
                 const period_low: Channel3PeriodLow = .fromMem(mmu);
-                const period_high: Channel3PeriodHigh = @bitCast(bus.data.*);
+                const period_high: Channel3PeriodHigh = .fromMem(mmu);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
@@ -145,8 +174,11 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                     control.ch3_on = true;
                     control.toMem(mmu);
                 }
-                mmu.memory[address] = bus.data.*;
-                bus.write = null;
+                state.ch3_length_on = period_high.length_enable;
+                if(state.ch3_is_on and state.ch3_length_on) {
+                    state.length_values[2] = channel_length_table[2] - length.length_init;
+                }
+
             },
             else => {},
         }
@@ -155,32 +187,58 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
 
 // TODO: Remove dependency to the memory array.
 pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
-    if(state.ch3_is_on) {
-        state.ch3_period_counter, const overflow = @subWithOverflow(state.ch3_period_counter, 1);
-        if(overflow == 1) {
-            const dac: Channel3Dac = .fromMem(mmu);
-            const period_low: Channel3PeriodLow = .fromMem(mmu);
-            const period_high: Channel3PeriodHigh = .fromMem(mmu);
-            const volume: Channel3Volume = .fromMem(mmu);
-            
-            var ch3_value: u4 = ch3_dac_off_value;
-            if(dac.dac_on) {
-                const byte_idx: u4 = @intCast(state.ch3_wave_ram_idx / 2);
-                const mem_idx: u16 = mem_map.wave_low + @as(u16, byte_idx);
-                const byte: u8 = mmu.memory[mem_idx];
+    state.freq_sweep_counter, var overflow = @subWithOverflow(state.freq_sweep_counter, 1);
+    if(overflow == 1) {
+        // TODO: Implement frequency sweep for ch1.
+    }
 
-                const nibble_idx: u3 = @intCast(state.ch3_wave_ram_idx % 2);
-                const shift: u3 = nibble_idx * 4;
-                const mask: u8 = @as(u8, 0xF0) >> shift;
-                ch3_value = @intCast((byte & mask) >> (4 - shift));
+    state.volume_sweep_counter, overflow = @subWithOverflow(state.volume_sweep_counter, 1);
+    if(overflow == 1) {
+        // TODO: Implement volume sweep for ch1, ch2, ch4.
+    }
+
+    // TODO: We are duplicating the mmu control with the chx_is_on values (another case for removing mmu!).
+    var control: Control = .fromMem(mmu);
+    state.length_counter, overflow = @subWithOverflow(state.length_counter, 1);
+    if(overflow == 1) {
+        inline for(0..4) |channel_idx| {
+            // TODO: Where should we use a table of channel values and where a value for each channel?
+            state.length_values[channel_idx], overflow = @subWithOverflow(state.length_values[channel_idx], 1);
+            switch (channel_idx) {
+                inline 0 => if(overflow == 1 and state.ch1_is_on and state.ch1_length_on) { state.ch1_is_on = false; control.ch1_on = false; },
+                inline 1 => if(overflow == 1 and state.ch2_is_on and state.ch2_length_on) { state.ch2_is_on = false; control.ch2_on = false; },
+                inline 2 => if(overflow == 1 and state.ch3_is_on and state.ch3_length_on) { state.ch3_is_on = false; control.ch3_on = false; },
+                inline 3 => if(overflow == 1 and state.ch4_is_on and state.ch4_length_on) { state.ch4_is_on = false; control.ch4_on = false; },
+                else => unreachable,
             }
-            ch3_value = if(volume.vol_shift == 0b00) 0 else ch3_value >> (volume.vol_shift - 1);
-            state.channels[2] = ch3_value;
-
-            const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
-            state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
-            state.ch3_wave_ram_idx +%= 1;
         }
+    }
+    control.toMem(mmu);
+
+    state.ch3_period_counter, overflow = @subWithOverflow(state.ch3_period_counter, 1);
+    if(state.ch3_is_on and overflow == 1) {
+        const dac: Channel3Dac = .fromMem(mmu);
+        const period_low: Channel3PeriodLow = .fromMem(mmu);
+        const period_high: Channel3PeriodHigh = .fromMem(mmu);
+        const volume: Channel3Volume = .fromMem(mmu);
+
+        var ch3_value: u4 = ch3_dac_off_value;
+        if(dac.dac_on) {
+            const byte_idx: u4 = @intCast(state.ch3_wave_ram_idx / 2);
+            const mem_idx: u16 = mem_map.wave_low + @as(u16, byte_idx);
+            const byte: u8 = mmu.memory[mem_idx];
+
+            const nibble_idx: u3 = @intCast(state.ch3_wave_ram_idx % 2);
+            const shift: u3 = nibble_idx * 4;
+            const mask: u8 = @as(u8, 0xF0) >> shift;
+            ch3_value = @intCast((byte & mask) >> (4 - shift));
+        }
+        ch3_value = if(volume.vol_shift == 0b00) 0 else ch3_value >> (volume.vol_shift - 1);
+        state.channels[2] = ch3_value;
+
+        const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+        state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
+        state.ch3_wave_ram_idx +%= 1;
     }
 
     return sample(state, mmu);
@@ -192,7 +250,7 @@ fn sample(state: *State, mmu: *MMU.State) ?def.Sample {
         return null;
     }
 
-    state.sample_counter = def.t_cycles_per_sample;
+    state.sample_counter = def.t_cycles_per_sample - 1;
     const panning = Panning.fromMem(mmu);
     const volume = Volume.fromMem(mmu);
     return mixChannels(state.channels, panning, volume);
