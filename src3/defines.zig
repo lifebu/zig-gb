@@ -83,8 +83,7 @@ pub const t_cycles_per_m_cycle = 4;
 pub const is_stereo = true; // TODO: configureable.
 pub const samples_per_frame: i32 = if(is_stereo) 2 else 1;
 pub const sample_rate = 44_100;
-pub const t_cycles_per_sample = system_freq / sample_rate;
-pub const num_gb_samples = (t_cycles_in_60fps / t_cycles_per_sample) * samples_per_frame;
+pub const t_cycles_per_sample = (system_freq / sample_rate);
 pub const default_platform_volume: f32 = 0.15; // TODO: configureable.
 
 pub const Sample = struct {

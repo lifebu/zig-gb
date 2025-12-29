@@ -16,6 +16,11 @@
 - Write some tests (or atleast todos) for more specific audio behaviour from documentations.
 - Audio cleanup (HPF, etc).
 
+## Audio Sampling:
+- If the application runs with less than 60fps, the audio has more cracks => need to generate more samples.
+- We should never let the audio device starve out of samples (how to detect that?)
+- We also should never waste any samples (i.e, the platform sound buffer is already full).
+
 ## CPU:
 - Interrupt Sources
     - VBlanK: Add tests!

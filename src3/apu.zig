@@ -10,11 +10,18 @@ const apu_channels = 4;
 pub const t_cycles_per_vol_step = 65_536;
 pub const t_cycles_per_freq_step = 32_768;
 pub const t_cycles_per_length_step = 16_384;
+pub const ch1_2_t_cycles_per_period = 4;
 pub const ch3_t_cycles_per_period = 2;
 // TODO: Not sure if this would be correct. This value would generate a permanent -1.0 in the audio output.
 pub const ch3_dac_off_value = 0;
 
 const channel_length_table: [apu_channels]u8 = .{ 63, 63, 255, 63 };
+const wave_duty_table = [4][8]u1 {
+    .{ 1, 1, 1, 1, 1, 1, 1, 0 }, // 12.5%
+    .{ 0, 1, 1, 1, 1, 1, 1, 0 }, // 25%
+    .{ 0, 1, 1, 1, 1, 0, 0, 0 }, // 50%
+    .{ 1, 0, 0, 0, 0, 0, 0, 1 }, // 75%
+};
 
 // general
 pub const Control = packed struct(u8) {
@@ -44,27 +51,66 @@ pub const Panning = packed struct(u8) {
     } 
 };
 
-// TODO: Does splitting these channel registers make memory requests easier?
-pub const Channel1 = packed struct(u40) {
+// channel 1
+pub const Channel1Sweep = packed struct(u8) {
     freq_step: u3, freq_decrease: bool, freq_pace: u3, _: u1 = 0,
-    length_init: u6, duty_cycle: u2,
-    vol_step: u3, vol_increase: bool, vol_initial: u4,
-    period: u11, 
-    __: u3 = 0, length_enable: bool, trigger: bool,  
-    pub fn fromMem(mmu: *MMU.State) Channel1 {
-        return std.mem.bytesToValue(Channel1, mmu.memory[mem_map.ch1_low..mem_map.ch1_high]);
+    pub fn fromMem(mmu: *MMU.State) Channel1Sweep {
+        return @bitCast(mmu.memory[mem_map.ch1_sweep]);
     } 
 };
-pub const Channel2 = packed struct(u32) {
+pub const Channel1Length = packed struct(u8) {
     length_init: u6, duty_cycle: u2,
+    pub fn fromMem(mmu: *MMU.State) Channel1Length {
+        return @bitCast(mmu.memory[mem_map.ch1_length]);
+    } 
+};
+pub const Channel1Volume = packed struct(u8) {
     vol_step: u3, vol_increase: bool, vol_initial: u4,
-    period: u11, 
-    _: u3 = 0, length_enable: bool, trigger: bool,  
-    pub fn fromMem(mmu: *MMU.State) Channel2 {
-        return std.mem.bytesToValue(Channel2, mmu.memory[mem_map.ch2_low..mem_map.ch2_high]);
+    pub fn fromMem(mmu: *MMU.State) Channel1Volume {
+        return @bitCast(mmu.memory[mem_map.ch1_volume]);
+    } 
+};
+pub const Channel1PeriodLow = packed struct(u8) {
+    period: u8,
+    pub fn fromMem(mmu: *MMU.State) Channel1PeriodLow {
+        return @bitCast(mmu.memory[mem_map.ch1_low_period]);
+    } 
+};
+pub const Channel1PeriodHigh = packed struct(u8) {
+    period: u3, _: u3 = 0, length_enable: bool, trigger: bool,  
+    pub fn fromMem(mmu: *MMU.State) Channel1PeriodHigh {
+        return @bitCast(mmu.memory[mem_map.ch1_high_period]);
     } 
 };
 
+// channel 2
+// TODO: Without mmu, I could use the same definition for all channel 1 and channel 2 structs!
+pub const Channel2Length = packed struct(u8) {
+    length_init: u6, duty_cycle: u2,
+    pub fn fromMem(mmu: *MMU.State) Channel2Length {
+        return @bitCast(mmu.memory[mem_map.ch2_length]);
+    } 
+};
+pub const Channel2Volume = packed struct(u8) {
+    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    pub fn fromMem(mmu: *MMU.State) Channel2Volume {
+        return @bitCast(mmu.memory[mem_map.ch2_volume]);
+    } 
+};
+pub const Channel2PeriodLow = packed struct(u8) {
+    period: u8,
+    pub fn fromMem(mmu: *MMU.State) Channel2PeriodLow {
+        return @bitCast(mmu.memory[mem_map.ch2_low_period]);
+    } 
+};
+pub const Channel2PeriodHigh = packed struct(u8) {
+    period: u3, _: u3 = 0, length_enable: bool, trigger: bool,  
+    pub fn fromMem(mmu: *MMU.State) Channel2PeriodHigh {
+        return @bitCast(mmu.memory[mem_map.ch2_high_period]);
+    } 
+};
+
+// channel 3
 pub const Channel3Dac = packed struct(u8) {
     _: u7 = 0, dac_on: bool,
     pub fn fromMem(mmu: *MMU.State) Channel3Dac {
@@ -95,13 +141,30 @@ pub const Channel3PeriodHigh = packed struct(u8) {
         return @bitCast(mmu.memory[mem_map.ch3_high_period]);
     } 
 };
-pub const Channel4 = packed struct(u32) {
+
+// channel 4
+pub const Channel4Length = packed struct(u8) {
     length_init: u6, _: u2 = 0,
+    pub fn fromMem(mmu: *MMU.State) Channel4Length {
+        return @bitCast(mmu.memory[mem_map.ch4_length]);
+    } 
+};
+pub const Channel4Volume = packed struct(u8) {
     vol_step: u3, vol_increase: bool, vol_initial: u4,
+    pub fn fromMem(mmu: *MMU.State) Channel4Volume {
+        return @bitCast(mmu.memory[mem_map.ch4_volume]);
+    } 
+};
+pub const Channel4Freq = packed struct(u8) {
     lfsr_divider: u3, lfsr_width: u1, lfsr_shift: u4,
+    pub fn fromMem(mmu: *MMU.State) Channel4Freq {
+        return @bitCast(mmu.memory[mem_map.ch4_freq]);
+    } 
+};
+pub const Channel4Control = packed struct(u8) {
     __: u6 = 0, length_enable: bool, trigger: bool, 
-    pub fn fromMem(mmu: *MMU.State) Channel4 {
-        return std.mem.bytesToValue(Channel4, mmu.memory[mem_map.ch4_low..mem_map.ch4_high]);
+    pub fn fromMem(mmu: *MMU.State) Channel4Control {
+        return @bitCast(mmu.memory[mem_map.ch4_control]);
     } 
 };
 
@@ -117,10 +180,17 @@ pub const State = struct {
 
     // ch1
     ch1_is_on: bool = false,
+    // TODO: Should I combine period_counter for all channels?
+    ch1_period_counter: u13 = 0,
+    // TODO: Should I combine duty_idx and wave_ram_idx into a table? Does Channel 4 do the same? 
+    // TODO: Good question to ask if I use tables or values for each channel (also see special functions).
+    ch1_duty_idx: u3 = 0,
     ch1_length_on: bool = false,
 
     // ch2
     ch2_is_on: bool = false,
+    ch2_period_counter: u13 = 0,
+    ch2_duty_idx: u3 = 0,
     ch2_length_on: bool = false,
 
     // ch3
@@ -139,50 +209,69 @@ pub fn init(state: *State) void {
 }
 
 pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
+    var control: Control = .fromMem(mmu);
+    // TODO: writes will be applied to mmu by the mmu itself which is getting called after this. This is bad design, but the mmu is getting removed soon anyway.
     if(bus.write) |address| {
         switch(address) {
+            mem_map.ch1_high_period => {
+                const length: Channel1Length = .fromMem(mmu);
+                const period_low: Channel1PeriodLow = .fromMem(mmu);
+                const period_high: Channel1PeriodHigh = @bitCast(bus.data.*);
+                if(period_high.trigger) {
+                    const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+                    state.ch1_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    state.ch1_duty_idx = 0;
+                    state.ch1_is_on = true;
+                    control.ch1_on = true;
+                }
+                state.ch1_length_on = period_high.length_enable;
+                if(state.ch1_is_on and state.ch1_length_on) {
+                    state.length_values[0] = channel_length_table[0] - length.length_init;
+                }
+            },
+            mem_map.ch2_high_period => {
+                const length: Channel2Length = .fromMem(mmu);
+                const period_low: Channel2PeriodLow = .fromMem(mmu);
+                const period_high: Channel2PeriodHigh = @bitCast(bus.data.*);
+                if(period_high.trigger) {
+                    const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+                    state.ch2_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    state.ch2_duty_idx = 0;
+                    state.ch2_is_on = true;
+                    control.ch2_on = true;
+                }
+                state.ch2_length_on = period_high.length_enable;
+                if(state.ch2_is_on and state.ch2_length_on) {
+                    state.length_values[1] = channel_length_table[1] - length.length_init;
+                }
+            },
             mem_map.ch3_dac => {
-                mmu.memory[address] = bus.data.*;
-                bus.write = null;
-            },
-            mem_map.ch3_length => {
-                mmu.memory[address] = bus.data.*;
-                bus.write = null;
-            },
-            mem_map.ch3_volume => {
-                mmu.memory[address] = bus.data.*;
-                bus.write = null;
-            },
-            mem_map.ch3_low_period => {
-                mmu.memory[address] = bus.data.*;
-                bus.write = null;
+                const dac: Channel3Dac = @bitCast(bus.data.*);
+                if(!dac.dac_on and state.ch3_is_on) {
+                    state.ch3_is_on = false;
+                    control.ch2_on = false;
+                }
             },
             mem_map.ch3_high_period => {
-                mmu.memory[address] = bus.data.*;
-                bus.write = null;
-
                 const length: Channel3Length = .fromMem(mmu);
                 const period_low: Channel3PeriodLow = .fromMem(mmu);
-                const period_high: Channel3PeriodHigh = .fromMem(mmu);
+                const period_high: Channel3PeriodHigh = @bitCast(bus.data.*);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
                     state.ch3_wave_ram_idx = 1; // Note: First sample read must be at idx 1.
                     state.ch3_is_on = true;
-
-                    var control: Control = .fromMem(mmu);
                     control.ch3_on = true;
-                    control.toMem(mmu);
                 }
                 state.ch3_length_on = period_high.length_enable;
                 if(state.ch3_is_on and state.ch3_length_on) {
                     state.length_values[2] = channel_length_table[2] - length.length_init;
                 }
-
             },
             else => {},
         }
     }
+    control.toMem(mmu);
 }
 
 // TODO: Remove dependency to the memory array.
@@ -205,15 +294,59 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
             // TODO: Where should we use a table of channel values and where a value for each channel?
             state.length_values[channel_idx], overflow = @subWithOverflow(state.length_values[channel_idx], 1);
             switch (channel_idx) {
-                inline 0 => if(overflow == 1 and state.ch1_is_on and state.ch1_length_on) { state.ch1_is_on = false; control.ch1_on = false; },
-                inline 1 => if(overflow == 1 and state.ch2_is_on and state.ch2_length_on) { state.ch2_is_on = false; control.ch2_on = false; },
-                inline 2 => if(overflow == 1 and state.ch3_is_on and state.ch3_length_on) { state.ch3_is_on = false; control.ch3_on = false; },
-                inline 3 => if(overflow == 1 and state.ch4_is_on and state.ch4_length_on) { state.ch4_is_on = false; control.ch4_on = false; },
+                inline 0 => if(overflow == 1 and state.ch1_is_on and state.ch1_length_on) { 
+                    state.ch1_is_on = false; 
+                    control.ch1_on = false; 
+                },
+                inline 1 => if(overflow == 1 and state.ch2_is_on and state.ch2_length_on) { 
+                    state.ch2_is_on = false; 
+                    control.ch2_on = false; 
+                },
+                inline 2 => if(overflow == 1 and state.ch3_is_on and state.ch3_length_on) { 
+                    state.ch3_is_on = false; 
+                    control.ch3_on = false; 
+                },
+                inline 3 => if(overflow == 1 and state.ch4_is_on and state.ch4_length_on) { 
+                    state.ch4_is_on = false; 
+                    control.ch4_on = false; 
+                },
                 else => unreachable,
             }
         }
     }
     control.toMem(mmu);
+
+    state.ch1_period_counter, overflow = @subWithOverflow(state.ch1_period_counter, 1);
+    if(state.ch1_is_on and overflow == 1) {
+        const length: Channel1Length = .fromMem(mmu);
+        // TODO: Implement volume sweep.
+        // const volume: Channel1Volume = .fromMem(mmu);
+        const period_low: Channel1PeriodLow = .fromMem(mmu);
+        const period_high: Channel1PeriodHigh = .fromMem(mmu);
+
+        const ch1_bit: u4 = wave_duty_table[length.duty_cycle][state.ch1_duty_idx];
+        state.channels[0] = 0xF * ch1_bit;
+
+        const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+        state.ch1_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+        state.ch1_duty_idx +%= 1;
+    }
+
+    state.ch2_period_counter, overflow = @subWithOverflow(state.ch2_period_counter, 1);
+    if(state.ch2_is_on and overflow == 1) {
+        const length: Channel2Length = .fromMem(mmu);
+        // TODO: Implement volume sweep.
+        // const volume: Channel2Volume = .fromMem(mmu);
+        const period_low: Channel2PeriodLow = .fromMem(mmu);
+        const period_high: Channel2PeriodHigh = .fromMem(mmu);
+
+        const ch2_bit: u4 = wave_duty_table[length.duty_cycle][state.ch2_duty_idx];
+        state.channels[1] = 0xF * ch2_bit;
+
+        const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+        state.ch2_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+        state.ch2_duty_idx +%= 1;
+    }
 
     state.ch3_period_counter, overflow = @subWithOverflow(state.ch3_period_counter, 1);
     if(state.ch3_is_on and overflow == 1) {

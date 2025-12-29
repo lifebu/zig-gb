@@ -19,6 +19,7 @@ fn cpuWrite(apu: *APU.State, mmu: *MMU.State, address: u16, value: u8) void {
     var request_value: u8 = value;
     var request: def.Bus = .{ .data = &request_value, .write = address };
     APU.request(apu, mmu, &request);
+    MMU.request(mmu, &request);
 }
 
 pub fn runApuChannelTests() !void {
@@ -44,6 +45,7 @@ pub fn runApuChannelTests() !void {
     initWaveTable(&mmu, wave_pattern);
 
     // CH3: Wave Table is read left-to-right at correct frequency, dac and volume shift is supported.
+    // TODO: Test that you can turn of a ch3 by turning it's dac of by setting it to false after starting ch3.
     const TestCase = struct {
         volume: u2 = 0b01,
         period: u11 = 2000,
