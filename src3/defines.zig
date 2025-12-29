@@ -14,6 +14,8 @@ pub const InputState = packed struct {
     start_pressed: bool = false,
 };
 
+// TODO: The way this is implemented leads to so much boilerplate code in all subsystem that want to react to reads/writes to their registers.
+// Once we switched to the bus model, make this way more ergonomic!
 pub const Bus = struct {
     // TODO: As the bus can be either read or write, not both, could we make this struct smaller by having a tagged union / variant of read/write?
     read: ?u16 = null,

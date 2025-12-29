@@ -6,9 +6,10 @@ const mem_map = @import("mem_map.zig");
 const MMU = @import("mmu.zig");
 
 const apu_channels = 4;
+pub const ch3_t_cycles_per_period = 2;
 
 // general
-const Control = packed struct(u8) {
+pub const Control = packed struct(u8) {
     ch1_on: bool, ch2_on: bool, ch3_on: bool, ch4_on: bool,
     _: u3, enable_apu: bool,
     // TODO: When we remove the mmu like this all subsystems control their own registers and react to read/write request on the bus.
@@ -16,6 +17,9 @@ const Control = packed struct(u8) {
     pub fn fromMem(mmu: *MMU.State) Control {
         return @bitCast(mmu.memory[mem_map.sound_control]);
     } 
+    pub fn toMem(control: Control, mmu: *MMU.State) void {
+        mmu.memory[mem_map.sound_control] = @bitCast(control);
+    }
 };
 pub const Volume = packed struct(u8) {
     right_volume: u3, vin_right: bool,
@@ -56,31 +60,31 @@ pub const Channel2 = packed struct(u32) {
 pub const Channel3Dac = packed struct(u8) {
     _: u7 = 0, dac_on: bool,
     pub fn fromMem(mmu: *MMU.State) Channel3Dac {
-        return std.mem.bytesToValue(Channel3Dac, mmu.memory[mem_map.ch3_dac]);
+        return @bitCast(mmu.memory[mem_map.ch3_dac]);
     } 
 };
 pub const Channel3Length = packed struct(u8) {
     length_init: u8,
     pub fn fromMem(mmu: *MMU.State) Channel3Length {
-        return std.mem.bytesToValue(Channel3Length, mmu.memory[mem_map.ch3_length]);
+        return @bitCast(mmu.memory[mem_map.ch3_length]);
     } 
 };
 pub const Channel3Volume = packed struct(u8) {
     _: u5 = 0, vol_shift: u2, __: u1 = 0, 
     pub fn fromMem(mmu: *MMU.State) Channel3Volume {
-        return std.mem.bytesToValue(Channel3Volume, mmu.memory[mem_map.ch3_volume]);
+        return @bitCast(mmu.memory[mem_map.ch3_volume]);
     } 
 };
 pub const Channel3PeriodLow = packed struct(u8) {
     period: u8,
     pub fn fromMem(mmu: *MMU.State) Channel3PeriodLow {
-        return std.mem.bytesToValue(Channel3PeriodLow, mmu.memory[mem_map.ch3_low_period]);
+        return @bitCast(mmu.memory[mem_map.ch3_low_period]);
     } 
 };
 pub const Channel3PeriodHigh = packed struct(u8) {
     period: u3, _: u3 = 0, length_enable: bool, trigger: bool,
     pub fn fromMem(mmu: *MMU.State) Channel3PeriodHigh {
-        return std.mem.bytesToValue(Channel3PeriodHigh, mmu.memory[mem_map.ch3_high_period]);
+        return @bitCast(mmu.memory[mem_map.ch3_high_period]);
     } 
 };
 pub const Channel4 = packed struct(u32) {
@@ -95,28 +99,98 @@ pub const Channel4 = packed struct(u32) {
 
 pub const State = struct {
     channels: [apu_channels]u4 = [_]u4{0} ** apu_channels,
-    sample_counter: u16 = 0, 
+    sample_counter: u16 = def.t_cycles_per_sample, 
+
+    // ch3
+    ch3_is_on: bool = false,
+    ch3_period_counter: u12 = 0,
+    ch3_wave_ram_idx: u5 = 0,
 };
 
 pub fn init(state: *State) void {
-    state.sample_counter = def.t_cycles_per_sample;
+    state.* = .{};
 }
 
-pub fn request(_: *State, _: *def.Bus) void {
+pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
+    if(bus.write) |address| {
+        switch(address) {
+            mem_map.ch3_dac => {
+                mmu.memory[address] = bus.data.*;
+                bus.write = null;
+            },
+            mem_map.ch3_length => {
+                mmu.memory[address] = bus.data.*;
+                bus.write = null;
+            },
+            mem_map.ch3_volume => {
+                mmu.memory[address] = bus.data.*;
+                bus.write = null;
+            },
+            mem_map.ch3_low_period => {
+                mmu.memory[address] = bus.data.*;
+                bus.write = null;
+            },
+            mem_map.ch3_high_period => {
+                const period_low: Channel3PeriodLow = .fromMem(mmu);
+                const period_high: Channel3PeriodHigh = @bitCast(bus.data.*);
+                if(period_high.trigger) {
+                    const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+                    state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
+                    state.ch3_wave_ram_idx = 1; // Note: First sample read must be at idx 1.
+                    state.ch3_is_on = true;
 
+                    var control: Control = .fromMem(mmu);
+                    control.ch3_on = true;
+                    control.toMem(mmu);
+                }
+                mmu.memory[address] = bus.data.*;
+                bus.write = null;
+            },
+            else => {},
+        }
+    }
 }
 
 // TODO: Remove dependency to the memory array.
 pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
-    state.sample_counter, const overflow = @subWithOverflow(state.sample_counter, 1);
-    if(overflow == 1) {
-        state.sample_counter = def.t_cycles_per_sample;
-        const panning = Panning.fromMem(mmu);
-        const volume = Volume.fromMem(mmu);
-        return mixChannels(state.channels, panning, volume);
+    if(state.ch3_is_on) {
+        state.ch3_period_counter, const overflow = @subWithOverflow(state.ch3_period_counter, 1);
+        if(overflow == 1) {
+            // TODO: Implement dac and volume
+            //const dac: Channel3Dac = .fromMem(mmu);
+            //const volume: Channel3Volume = .fromMem(mmu);
+            
+            const byte_idx: u4 = @intCast(state.ch3_wave_ram_idx / 2);
+            const mem_idx: u16 = mem_map.wave_low + @as(u16, byte_idx);
+            const byte: u8 = mmu.memory[mem_idx];
+
+            const nibble_idx: u3 = @intCast(state.ch3_wave_ram_idx % 2);
+            const shift: u3 = nibble_idx * 4;
+            const mask: u8 = @as(u8, 0xF0) >> shift;
+            const nibble: u4 = @intCast((byte & mask) >> (4 - shift));
+            state.channels[2] = nibble;
+
+            const period_low: Channel3PeriodLow = .fromMem(mmu);
+            const period_high: Channel3PeriodHigh = .fromMem(mmu);
+            const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
+            state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
+            state.ch3_wave_ram_idx +%= 1;
+        }
     }
 
-    return null;
+    return sample(state, mmu);
+}
+
+fn sample(state: *State, mmu: *MMU.State) ?def.Sample {
+    state.sample_counter, const overflow = @subWithOverflow(state.sample_counter, 1);
+    if(overflow == 0) {
+        return null;
+    }
+
+    state.sample_counter = def.t_cycles_per_sample;
+    const panning = Panning.fromMem(mmu);
+    const volume = Volume.fromMem(mmu);
+    return mixChannels(state.channels, panning, volume);
 }
 
 fn mixChannels(channels: [apu_channels]u4, panning: Panning, volume: Volume) def.Sample {

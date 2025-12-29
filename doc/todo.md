@@ -25,9 +25,16 @@
     - VBlanK: Add tests!
     - Stat 
 
+## Memory
 - Split the memory each system manages it's own. systems have a cycle() and memory() function.
     - Both called by main!
     - How do we handle more generic memory? like the Interrupts?
+    - Interrupt Flag:
+        - 1: Each system hast their internal flag (bool). PPU has VBlank and Stat bools.
+        Combine all flags into one struct of bool* that the CPU can r/w.
+        - 2: CPU owns IF. Other systems can push to CPU and CPU can r/w.
+        - 3: External system owns IF.
+            => Not through request system multiple IF writes can happen in a single cycle!
 - Memory:
     - Use:
         - CPU: hram, interrupt_enable (cycle), interrupt_flag (cycle), all memory (cycle)
@@ -139,6 +146,16 @@
 - add define for open bus value as 0xFF!
 - cpu returns memory requests, subsystems react to it.
 - Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
+
+## Next:
+- How to split subsystems:
+    - I currently have a large set of .zig files and "subsystems".
+    - Most of them have very little logic and code.
+    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
+    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
+        => But how should that one be named?
+        - ram, boot and IF are "cold storage"?
+        - IOMMU? just io?
 - Cart: Merge boot rom onto cart?
 
 - Think about having all subsystems be their own micro op machine?
