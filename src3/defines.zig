@@ -62,7 +62,7 @@ pub const FileType = enum{
 // graphics
 pub const resolution_width = 160;
 pub const resolution_height = 144;
-pub const scaling = 5;
+pub const scaling = 3;
 
 pub const window_width = resolution_width * scaling;
 pub const window_height = resolution_height * scaling;

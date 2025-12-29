@@ -7,6 +7,8 @@ const MMU = @import("mmu.zig");
 
 const apu_channels = 4;
 pub const ch3_t_cycles_per_period = 2;
+// TODO: Not sure if this would be correct. This value would generate a permanent -1.0 in the audio output.
+pub const ch3_dac_off_value = 0;
 
 // general
 pub const Control = packed struct(u8) {
@@ -156,22 +158,25 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
     if(state.ch3_is_on) {
         state.ch3_period_counter, const overflow = @subWithOverflow(state.ch3_period_counter, 1);
         if(overflow == 1) {
-            // TODO: Implement dac and volume
-            //const dac: Channel3Dac = .fromMem(mmu);
-            //const volume: Channel3Volume = .fromMem(mmu);
-            
-            const byte_idx: u4 = @intCast(state.ch3_wave_ram_idx / 2);
-            const mem_idx: u16 = mem_map.wave_low + @as(u16, byte_idx);
-            const byte: u8 = mmu.memory[mem_idx];
-
-            const nibble_idx: u3 = @intCast(state.ch3_wave_ram_idx % 2);
-            const shift: u3 = nibble_idx * 4;
-            const mask: u8 = @as(u8, 0xF0) >> shift;
-            const nibble: u4 = @intCast((byte & mask) >> (4 - shift));
-            state.channels[2] = nibble;
-
+            const dac: Channel3Dac = .fromMem(mmu);
             const period_low: Channel3PeriodLow = .fromMem(mmu);
             const period_high: Channel3PeriodHigh = .fromMem(mmu);
+            const volume: Channel3Volume = .fromMem(mmu);
+            
+            var ch3_value: u4 = ch3_dac_off_value;
+            if(dac.dac_on) {
+                const byte_idx: u4 = @intCast(state.ch3_wave_ram_idx / 2);
+                const mem_idx: u16 = mem_map.wave_low + @as(u16, byte_idx);
+                const byte: u8 = mmu.memory[mem_idx];
+
+                const nibble_idx: u3 = @intCast(state.ch3_wave_ram_idx % 2);
+                const shift: u3 = nibble_idx * 4;
+                const mask: u8 = @as(u8, 0xF0) >> shift;
+                ch3_value = @intCast((byte & mask) >> (4 - shift));
+            }
+            ch3_value = if(volume.vol_shift == 0b00) 0 else ch3_value >> (volume.vol_shift - 1);
+            state.channels[2] = ch3_value;
+
             const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
             state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
             state.ch3_wave_ram_idx +%= 1;

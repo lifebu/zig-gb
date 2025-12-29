@@ -1,9 +1,5 @@
 # src3:
 ## APU:
-- CH3: Wave Table is read left-to-right in any frequency
-     - Pattern: 0,1,0,1,1,2,1,2,2,3,2,3,... 
-- CH3: Wave Table is read in correct frequency for different period values.
-- CH3: Volume Shift is implemented.
 - CH3: Length timer + "Frame Sequencer" is working.
      - Test this on CH 1,2,4 later as well.
 - CH2,CH1: Is Square duty pattern correctly read (left-to-right) for any frequency and all duty patterns?
