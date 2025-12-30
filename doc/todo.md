@@ -9,6 +9,7 @@
 - CH1: Is frequency sweep implemented for different step sizes, both directions, different paces?
 - CH4: Is LFSR implemented for: Different shifts + divides and both widths (7 or 15).
 - CH1-4: Does trigger bit and is_channel_on status bit work?
+    - status bits are read only => Not allowed to be written by cpu.
 - Test All channels and their timing va a generated .txt file.
      - Input: CPU writes to APU registers at given cycle count.
      - Output: APU channel state change at given cycle count.

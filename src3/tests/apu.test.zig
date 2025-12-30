@@ -60,6 +60,9 @@ pub fn runApuChannelTests() !void {
     };
     for(test_cases) |test_case| {
         APU.init(&apu);
+        cpuWrite(&apu, &mmu, mem_map.sound_control, @bitCast(APU.Control{
+            .enable_apu = true, .ch1_on = false, .ch2_on = false, .ch3_on = false, .ch4_on = false,
+        }));
         cpuWrite(&apu, &mmu, mem_map.ch3_dac, @bitCast(APU.Channel3Dac{
             .dac_on = test_case.dac,
         }));

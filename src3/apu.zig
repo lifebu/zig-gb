@@ -26,7 +26,7 @@ const wave_duty_table = [4][8]u1 {
 // general
 pub const Control = packed struct(u8) {
     ch1_on: bool, ch2_on: bool, ch3_on: bool, ch4_on: bool,
-    _: u3, enable_apu: bool,
+    _: u3 = 0, enable_apu: bool,
     // TODO: When we remove the mmu like this all subsystems control their own registers and react to read/write request on the bus.
     // Then we don't need "fromMem()" and "toMem()".
     pub fn fromMem(mmu: *MMU.State) Control {
@@ -169,6 +169,7 @@ pub const Channel4Control = packed struct(u8) {
 };
 
 pub const State = struct {
+    apu_is_on: bool = false,
     channels: [apu_channels]u4 = [_]u4{0} ** apu_channels,
     sample_counter: u16 = def.t_cycles_per_sample - 1, 
 
@@ -213,6 +214,10 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
     // TODO: writes will be applied to mmu by the mmu itself which is getting called after this. This is bad design, but the mmu is getting removed soon anyway.
     if(bus.write) |address| {
         switch(address) {
+            mem_map.sound_control => {
+                // TODO: lower nibble is read only (channel status bits).
+                state.apu_is_on = control.enable_apu;
+            },
             mem_map.ch1_high_period => {
                 const length: Channel1Length = .fromMem(mmu);
                 const period_low: Channel1PeriodLow = .fromMem(mmu);
@@ -276,6 +281,11 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
 
 // TODO: Remove dependency to the memory array.
 pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
+    if(!state.apu_is_on) {
+        return sample(state, mmu);
+    }
+
+
     state.freq_sweep_counter, var overflow = @subWithOverflow(state.freq_sweep_counter, 1);
     if(overflow == 1) {
         // TODO: Implement frequency sweep for ch1.
