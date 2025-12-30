@@ -66,7 +66,7 @@ pub const Channel1Length = packed struct(u8) {
     } 
 };
 pub const Channel1Volume = packed struct(u8) {
-    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    vol_pace: u3, vol_increase: bool, vol_initial: u4,
     pub fn fromMem(mmu: *MMU.State) Channel1Volume {
         return @bitCast(mmu.memory[mem_map.ch1_volume]);
     } 
@@ -93,7 +93,7 @@ pub const Channel2Length = packed struct(u8) {
     } 
 };
 pub const Channel2Volume = packed struct(u8) {
-    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    vol_pace: u3, vol_increase: bool, vol_initial: u4,
     pub fn fromMem(mmu: *MMU.State) Channel2Volume {
         return @bitCast(mmu.memory[mem_map.ch2_volume]);
     } 
@@ -151,7 +151,7 @@ pub const Channel4Length = packed struct(u8) {
     } 
 };
 pub const Channel4Volume = packed struct(u8) {
-    vol_step: u3, vol_increase: bool, vol_initial: u4,
+    vol_pace: u3, vol_increase: bool, vol_initial: u4,
     pub fn fromMem(mmu: *MMU.State) Channel4Volume {
         return @bitCast(mmu.memory[mem_map.ch4_volume]);
     } 
@@ -184,6 +184,7 @@ pub const State = struct {
     // functions
     volume_sweep_counter: u16 = t_cycles_per_vol_step - 1,
     volume_sweep_values: [apu_channels]u4 = .{0} ** apu_channels,
+    volume_sweep_pace_counter: [apu_channels]u4 = .{0} ** apu_channels,
     freq_sweep_counter: u15 = t_cycles_per_freq_step - 1,
     length_counter: u14 = t_cycles_per_length_step - 1,
     length_values: [apu_channels]u8 = .{0} ** apu_channels, // [2] is unused. Not supported by ch3.
@@ -238,6 +239,7 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch1_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    state.volume_sweep_pace_counter[0] = volume.vol_pace;
                     state.volume_sweep_values[0] = volume.vol_initial;
                     state.ch1_duty_idx = 0;
                     state.ch1_is_on = true;
@@ -256,6 +258,7 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch2_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    state.volume_sweep_pace_counter[1] = volume.vol_pace;
                     state.volume_sweep_values[1] = volume.vol_initial;
                     state.ch2_duty_idx = 0;
                     state.ch2_is_on = true;
@@ -297,6 +300,7 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(lfsr_control.trigger) {
                     const divisor = lfsr_divisor_table[freq.lfsr_divider];
                     state.ch4_period_counter = divisor << freq.lfsr_shift;
+                    state.volume_sweep_pace_counter[3] = volume.vol_pace;
                     state.volume_sweep_values[3] = volume.vol_initial;
                     state.ch4_lfsr = .{ .value = 0 };
                     state.ch4_is_on = true;
@@ -326,7 +330,23 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
 
     state.volume_sweep_counter, overflow = @subWithOverflow(state.volume_sweep_counter, 1);
     if(overflow == 1) {
-        // TODO: Implement volume sweep for ch1, ch2, ch4.
+        inline for(0..4) |channel_idx| {
+            const channel_pace: u4, const increase: bool = switch(channel_idx) {
+                inline 0 => .{ Channel1Volume.fromMem(mmu).vol_pace, false },
+                inline 1 => .{ Channel2Volume.fromMem(mmu).vol_pace, false },
+                inline 2 => .{ 0, false }, // Unsupported by channel 3.
+                inline 3 => .{ Channel4Volume.fromMem(mmu).vol_pace, false},
+                else => unreachable,
+            };
+            if(channel_pace != 0) {
+                state.volume_sweep_pace_counter[channel_idx], overflow = @subWithOverflow(state.volume_sweep_pace_counter[channel_idx], 1);
+                if(overflow == 1) {
+                    const current: u4 = state.volume_sweep_values[channel_idx];
+                    state.volume_sweep_values[channel_idx] = if(increase) current +| 1 else current -| 1;
+                    state.volume_sweep_pace_counter[channel_idx] = channel_pace;
+                }
+            }
+        }
     }
 
     // TODO: We are duplicating the mmu control with the chx_is_on values (another case for removing mmu!).
