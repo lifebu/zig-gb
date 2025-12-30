@@ -16,12 +16,13 @@ pub const ch3_t_cycles_per_period = 2;
 pub const ch3_dac_off_value = 0;
 
 const channel_length_table: [apu_channels]u8 = .{ 63, 63, 255, 63 };
-const wave_duty_table = [4][8]u1 {
+const wave_duty_table: [4][8]u1 = .{
     .{ 1, 1, 1, 1, 1, 1, 1, 0 }, // 12.5%
     .{ 0, 1, 1, 1, 1, 1, 1, 0 }, // 25%
     .{ 0, 1, 1, 1, 1, 0, 0, 0 }, // 50%
     .{ 1, 0, 0, 0, 0, 0, 0, 1 }, // 75%
 };
+const lfsr_divisor_table: [8]u24 = .{ 8, 16, 32, 48, 64, 80, 16, 112 };
 
 // general
 pub const Control = packed struct(u8) {
@@ -156,7 +157,7 @@ pub const Channel4Volume = packed struct(u8) {
     } 
 };
 pub const Channel4Freq = packed struct(u8) {
-    lfsr_divider: u3, lfsr_width: u1, lfsr_shift: u4,
+    lfsr_divider: u3, lfsr_is_short: bool, lfsr_shift: u4,
     pub fn fromMem(mmu: *MMU.State) Channel4Freq {
         return @bitCast(mmu.memory[mem_map.ch4_freq]);
     } 
@@ -166,6 +167,13 @@ pub const Channel4Control = packed struct(u8) {
     pub fn fromMem(mmu: *MMU.State) Channel4Control {
         return @bitCast(mmu.memory[mem_map.ch4_control]);
     } 
+};
+
+const LFSR = packed union {
+    value: u16,
+    bits: packed struct {
+        b0: u1, b1: u1, _: u5 = 0, b7: u1, __: u7 = 0, b15: u1,
+    },
 };
 
 pub const State = struct {
@@ -178,7 +186,7 @@ pub const State = struct {
     volume_sweep_values: [apu_channels]u4 = .{0} ** apu_channels,
     freq_sweep_counter: u15 = t_cycles_per_freq_step - 1,
     length_counter: u14 = t_cycles_per_length_step - 1,
-    length_values: [apu_channels]u8 = .{0} ** apu_channels, // [2] is unused. Not supported bny ch3.
+    length_values: [apu_channels]u8 = .{0} ** apu_channels, // [2] is unused. Not supported by ch3.
 
     // ch1
     ch1_is_on: bool = false,
@@ -203,6 +211,9 @@ pub const State = struct {
 
     // ch4
     ch4_is_on: bool = false,
+    // TODO: This does not seem to be hardware accurate. Sameboy uses "a counter (8bit) for a counter (16bit)". Which matches the lfsr_shift being a u4.
+    ch4_period_counter: u24 = 0,
+    ch4_lfsr: LFSR = .{ .value = 0 },
     ch4_length_on: bool = false,
 };
 
@@ -278,6 +289,24 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                     state.length_values[2] = channel_length_table[2] - length.length_init;
                 }
             },
+            mem_map.ch4_control => {
+                const freq: Channel4Freq = .fromMem(mmu);
+                const volume: Channel4Volume = .fromMem(mmu);
+                const length: Channel4Length = .fromMem(mmu);
+                const lfsr_control: Channel4Control = @bitCast(bus.data.*);
+                if(lfsr_control.trigger) {
+                    const divisor = lfsr_divisor_table[freq.lfsr_divider];
+                    state.ch4_period_counter = divisor << freq.lfsr_shift;
+                    state.volume_sweep_values[3] = volume.vol_initial;
+                    state.ch4_lfsr = .{ .value = 0 };
+                    state.ch4_is_on = true;
+                    control.ch4_on = true;
+                }
+                state.ch4_length_on = lfsr_control.length_enable;
+                if(state.ch4_is_on and state.ch4_length_on) {
+                    state.length_values[3] = channel_length_table[3] - length.length_init;
+                }
+            },
             else => {},
         }
     }
@@ -308,22 +337,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
             // TODO: Where should we use a table of channel values and where a value for each channel?
             state.length_values[channel_idx], overflow = @subWithOverflow(state.length_values[channel_idx], 1);
             switch (channel_idx) {
-                inline 0 => if(overflow == 1 and state.ch1_is_on and state.ch1_length_on) { 
-                    state.ch1_is_on = false; 
-                    control.ch1_on = false; 
-                },
-                inline 1 => if(overflow == 1 and state.ch2_is_on and state.ch2_length_on) { 
-                    state.ch2_is_on = false; 
-                    control.ch2_on = false; 
-                },
-                inline 2 => if(overflow == 1 and state.ch3_is_on and state.ch3_length_on) { 
-                    state.ch3_is_on = false; 
-                    control.ch3_on = false; 
-                },
-                inline 3 => if(overflow == 1 and state.ch4_is_on and state.ch4_length_on) { 
-                    state.ch4_is_on = false; 
-                    control.ch4_on = false; 
-                },
+                inline 0 => if(overflow == 1 and state.ch1_is_on and state.ch1_length_on) { state.ch1_is_on = false; control.ch1_on = false; },
+                inline 1 => if(overflow == 1 and state.ch2_is_on and state.ch2_length_on) { state.ch2_is_on = false; control.ch2_on = false; },
+                inline 2 => if(overflow == 1 and state.ch3_is_on and state.ch3_length_on) { state.ch3_is_on = false; control.ch3_on = false; },
+                inline 3 => if(overflow == 1 and state.ch4_is_on and state.ch4_length_on) { state.ch4_is_on = false; control.ch4_on = false; },
                 else => unreachable,
             }
         }
@@ -386,6 +403,22 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
         const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
         state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
         state.ch3_wave_ram_idx +%= 1;
+    }
+
+    state.ch4_period_counter, overflow = @subWithOverflow(state.ch4_period_counter, 1);
+    if(state.ch4_is_on and overflow == 1) {
+        const freq: Channel4Freq = .fromMem(mmu);
+
+        const xor: u1 = ~(state.ch4_lfsr.bits.b0 ^ state.ch4_lfsr.bits.b1);
+        state.ch4_lfsr.bits.b15 = xor;
+        state.ch4_lfsr.bits.b7 = if(freq.lfsr_is_short) xor else state.ch4_lfsr.bits.b7;
+        state.ch4_lfsr.value >>= 1;
+
+        const ch4_bit: u1 = state.ch4_lfsr.bits.b0;
+        state.channels[3] = state.volume_sweep_values[3] * ch4_bit;
+
+        const divisor = lfsr_divisor_table[freq.lfsr_divider];
+        state.ch4_period_counter = divisor << freq.lfsr_shift;
     }
 
     return sample(state, mmu);
