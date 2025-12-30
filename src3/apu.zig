@@ -175,9 +175,10 @@ pub const State = struct {
 
     // functions
     volume_sweep_counter: u16 = t_cycles_per_vol_step - 1,
+    volume_sweep_values: [apu_channels]u4 = .{0} ** apu_channels,
     freq_sweep_counter: u15 = t_cycles_per_freq_step - 1,
     length_counter: u14 = t_cycles_per_length_step - 1,
-    length_values: [apu_channels]u8 = .{0} ** apu_channels,
+    length_values: [apu_channels]u8 = .{0} ** apu_channels, // [2] is unused. Not supported bny ch3.
 
     // ch1
     ch1_is_on: bool = false,
@@ -219,12 +220,14 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 state.apu_is_on = control.enable_apu;
             },
             mem_map.ch1_high_period => {
+                const volume: Channel1Volume = .fromMem(mmu);
                 const length: Channel1Length = .fromMem(mmu);
                 const period_low: Channel1PeriodLow = .fromMem(mmu);
                 const period_high: Channel1PeriodHigh = @bitCast(bus.data.*);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch1_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    state.volume_sweep_values[0] = volume.vol_initial;
                     state.ch1_duty_idx = 0;
                     state.ch1_is_on = true;
                     control.ch1_on = true;
@@ -235,12 +238,14 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 }
             },
             mem_map.ch2_high_period => {
+                const volume: Channel1Volume = .fromMem(mmu);
                 const length: Channel2Length = .fromMem(mmu);
                 const period_low: Channel2PeriodLow = .fromMem(mmu);
                 const period_high: Channel2PeriodHigh = @bitCast(bus.data.*);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch2_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    state.volume_sweep_values[1] = volume.vol_initial;
                     state.ch2_duty_idx = 0;
                     state.ch2_is_on = true;
                     control.ch2_on = true;
@@ -284,7 +289,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
     if(!state.apu_is_on) {
         return sample(state, mmu);
     }
-
 
     state.freq_sweep_counter, var overflow = @subWithOverflow(state.freq_sweep_counter, 1);
     if(overflow == 1) {
@@ -335,7 +339,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
         const period_high: Channel1PeriodHigh = .fromMem(mmu);
 
         const ch1_bit: u4 = wave_duty_table[length.duty_cycle][state.ch1_duty_idx];
-        state.channels[0] = 0xF * ch1_bit;
+        state.channels[0] = state.volume_sweep_values[0] * ch1_bit;
 
         const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
         state.ch1_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
@@ -351,7 +355,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
         const period_high: Channel2PeriodHigh = .fromMem(mmu);
 
         const ch2_bit: u4 = wave_duty_table[length.duty_cycle][state.ch2_duty_idx];
-        state.channels[1] = 0xF * ch2_bit;
+        state.channels[1] = state.volume_sweep_values[1] * ch2_bit;
 
         const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
         state.ch2_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
