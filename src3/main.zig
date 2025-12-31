@@ -92,10 +92,10 @@ export fn frame() void {
         PPU.cycle(&state.ppu, &state.mmu);
         MMU.cycle(&state.mmu);
         RAM.cycle(&state.ram);
-        // const sample: ?def.Sample = APU.cycle(&state.apu, &state.mmu);
-        // if(sample) |value| {
-        //     Platform.pushSample(&state.platform, value);
-        // }
+        const sample: ?def.Sample = APU.cycle(&state.apu, &state.mmu);
+        if(sample) |value| {
+            Platform.pushSample(&state.platform, value);
+        }
 
         BUS.request(&state.bus, &single_bus);
     }

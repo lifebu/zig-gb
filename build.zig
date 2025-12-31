@@ -21,8 +21,8 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         }),
+        .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
     });
-    exe.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
 
     b.installArtifact(exe);
 
@@ -71,8 +71,8 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         }),
+        .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
     });
-    exe_unit_tests.use_llvm = if(builtin.os.tag == .windows) true else enable_llvm;
     exe_unit_tests.root_module.addImport("sokol", sokol.module("sokol"));
     exe_unit_tests.root_module.addImport("cimgui", cimgui.module("cimgui"));
     b.installArtifact(exe_unit_tests);

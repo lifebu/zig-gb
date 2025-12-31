@@ -23,6 +23,8 @@ const wave_duty_table: [4][8]u1 = .{
     .{ 1, 0, 0, 0, 0, 0, 0, 1 }, // 75%
 };
 const lfsr_divisor_table: [8]u24 = .{ 8, 16, 32, 48, 64, 80, 16, 112 };
+// TODO: Would be neat to have this debug feature user facing.
+const channel_dbg_enable: [apu_channels]bool = .{ true, true, true, true };
 
 // general
 pub const Control = packed struct(u8) {
@@ -76,12 +78,18 @@ pub const Channel1PeriodLow = packed struct(u8) {
     pub fn fromMem(mmu: *MMU.State) Channel1PeriodLow {
         return @bitCast(mmu.memory[mem_map.ch1_low_period]);
     } 
+    pub fn toMem(period_low: Channel1PeriodLow, mmu: *MMU.State) void {
+        mmu.memory[mem_map.ch1_low_period] = @bitCast(period_low);
+    }
 };
 pub const Channel1PeriodHigh = packed struct(u8) {
     period: u3, _: u3 = 0, length_enable: bool, trigger: bool,  
     pub fn fromMem(mmu: *MMU.State) Channel1PeriodHigh {
         return @bitCast(mmu.memory[mem_map.ch1_high_period]);
     } 
+    pub fn toMem(period_high: Channel1PeriodHigh, mmu: *MMU.State) void {
+        mmu.memory[mem_map.ch1_high_period] = @bitCast(period_high);
+    }
 };
 
 // channel 2
@@ -185,9 +193,12 @@ pub const State = struct {
     volume_sweep_counter: u16 = t_cycles_per_vol_step - 1,
     volume_sweep_values: [apu_channels]u4 = .{0} ** apu_channels,
     volume_sweep_pace_counter: [apu_channels]u4 = .{0} ** apu_channels,
-    freq_sweep_counter: u15 = t_cycles_per_freq_step - 1,
     length_counter: u14 = t_cycles_per_length_step - 1,
     length_values: [apu_channels]u8 = .{0} ** apu_channels, // [2] is unused. Not supported by ch3.
+    freq_sweep_counter: u15 = t_cycles_per_freq_step - 1,
+    freq_sweep_period: u11 = 0,
+    freq_sweep_pace_counter: u4 = 0,
+    freq_sweep_enabled: bool = false,
 
     // ch1
     ch1_is_on: bool = false,
@@ -232,6 +243,7 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 state.apu_is_on = control.enable_apu;
             },
             mem_map.ch1_high_period => {
+                const sweep: Channel1Sweep = .fromMem(mmu);
                 const volume: Channel1Volume = .fromMem(mmu);
                 const length: Channel1Length = .fromMem(mmu);
                 const period_low: Channel1PeriodLow = .fromMem(mmu);
@@ -241,9 +253,16 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                     state.ch1_period_counter = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
                     state.volume_sweep_pace_counter[0] = volume.vol_pace;
                     state.volume_sweep_values[0] = volume.vol_initial;
+                    state.freq_sweep_period = period;
+                    state.freq_sweep_pace_counter = if(sweep.freq_pace == 0) 7 else sweep.freq_pace;
+                    state.freq_sweep_enabled = sweep.freq_pace != 0 or sweep.freq_step != 0;
                     state.ch1_duty_idx = 0;
-                    state.ch1_is_on = true;
-                    control.ch1_on = true;
+
+                    // TODO: Enabling this immediate overflow check leads to channel 1 being muted all the time?
+                    // _, const overflow = freqSweepStep(state, mmu);
+                    const overflow: u1 = 0;
+                    state.ch1_is_on = overflow == 0 and channel_dbg_enable[0];
+                    control.ch1_on = overflow == 0 and channel_dbg_enable[0];
                 }
                 state.ch1_length_on = period_high.length_enable;
                 if(state.ch1_is_on and state.ch1_length_on) {
@@ -261,8 +280,8 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                     state.volume_sweep_pace_counter[1] = volume.vol_pace;
                     state.volume_sweep_values[1] = volume.vol_initial;
                     state.ch2_duty_idx = 0;
-                    state.ch2_is_on = true;
-                    control.ch2_on = true;
+                    state.ch2_is_on = channel_dbg_enable[1];
+                    control.ch2_on = channel_dbg_enable[1];
                 }
                 state.ch2_length_on = period_high.length_enable;
                 if(state.ch2_is_on and state.ch2_length_on) {
@@ -284,8 +303,8 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.ch3_period_counter = ch3_t_cycles_per_period * (2047 - @as(u12, period));
                     state.ch3_wave_ram_idx = 1; // Note: First sample read must be at idx 1.
-                    state.ch3_is_on = true;
-                    control.ch3_on = true;
+                    state.ch3_is_on = channel_dbg_enable[2];
+                    control.ch3_on = channel_dbg_enable[2];
                 }
                 state.ch3_length_on = period_high.length_enable;
                 if(state.ch3_is_on and state.ch3_length_on) {
@@ -303,8 +322,8 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                     state.volume_sweep_pace_counter[3] = volume.vol_pace;
                     state.volume_sweep_values[3] = volume.vol_initial;
                     state.ch4_lfsr = .{ .value = 0 };
-                    state.ch4_is_on = true;
-                    control.ch4_on = true;
+                    state.ch4_is_on = channel_dbg_enable[3];
+                    control.ch4_on = channel_dbg_enable[3];
                 }
                 state.ch4_length_on = lfsr_control.length_enable;
                 if(state.ch4_is_on and state.ch4_length_on) {
@@ -323,9 +342,31 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
         return sample(state, mmu);
     }
 
-    state.freq_sweep_counter, var overflow = @subWithOverflow(state.freq_sweep_counter, 1);
+    var control: Control = .fromMem(mmu);
+    state.freq_sweep_counter, var overflow: u1 = @subWithOverflow(state.freq_sweep_counter, 1);
     if(overflow == 1) {
-        // TODO: Implement frequency sweep for ch1.
+        state.freq_sweep_pace_counter, overflow = @subWithOverflow(state.freq_sweep_pace_counter, 1);
+        if(state.ch1_is_on and overflow == 1 and state.freq_sweep_enabled) {
+            const sweep: Channel1Sweep = .fromMem(mmu);
+            var period_low: Channel1PeriodLow = .fromMem(mmu);
+            var period_high: Channel1PeriodHigh = .fromMem(mmu);
+
+            var overflow_second: u1 = 0;
+            const new_period: u11, overflow = freqSweepStep(state, mmu);
+            if(sweep.freq_step > 0 and overflow == 0) {
+                state.freq_sweep_period = new_period;
+                period_low.period = @truncate(new_period);
+                period_high.period = @truncate(new_period >> 8);
+                period_low.toMem(mmu);
+                period_high.toMem(mmu);
+
+                _, overflow_second = freqSweepStep(state, mmu);
+            }
+
+            const keep_on: bool = overflow == 0 and overflow_second == 0;
+            state.ch1_is_on = keep_on;
+            control.ch1_on = keep_on;
+        }
     }
 
     state.volume_sweep_counter, overflow = @subWithOverflow(state.volume_sweep_counter, 1);
@@ -350,7 +391,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
     }
 
     // TODO: We are duplicating the mmu control with the chx_is_on values (another case for removing mmu!).
-    var control: Control = .fromMem(mmu);
     state.length_counter, overflow = @subWithOverflow(state.length_counter, 1);
     if(overflow == 1) {
         inline for(0..4) |channel_idx| {
@@ -370,8 +410,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
     state.ch1_period_counter, overflow = @subWithOverflow(state.ch1_period_counter, 1);
     if(state.ch1_is_on and overflow == 1) {
         const length: Channel1Length = .fromMem(mmu);
-        // TODO: Implement volume sweep.
-        // const volume: Channel1Volume = .fromMem(mmu);
         const period_low: Channel1PeriodLow = .fromMem(mmu);
         const period_high: Channel1PeriodHigh = .fromMem(mmu);
 
@@ -386,8 +424,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
     state.ch2_period_counter, overflow = @subWithOverflow(state.ch2_period_counter, 1);
     if(state.ch2_is_on and overflow == 1) {
         const length: Channel2Length = .fromMem(mmu);
-        // TODO: Implement volume sweep.
-        // const volume: Channel2Volume = .fromMem(mmu);
         const period_low: Channel2PeriodLow = .fromMem(mmu);
         const period_high: Channel2PeriodHigh = .fromMem(mmu);
 
@@ -481,4 +517,14 @@ fn mixChannels(channels: [apu_channels]u4, panning: Panning, volume: Volume) def
     const state_right: f32 = mix_right * volume_right_normal;
 
     return .{ .left = state_left, .right = state_right };
+}
+
+fn freqSweepStep(state: *State, mmu: *MMU.State) struct{ u11, u1 } {
+    const sweep: Channel1Sweep = .fromMem(mmu);
+    const delta: u11 = state.freq_sweep_period >> sweep.freq_step;
+    if(sweep.freq_decrease) {
+        return @subWithOverflow(state.freq_sweep_period, delta);
+    } else {
+        return @addWithOverflow(state.freq_sweep_period, delta);
+    }
 }
