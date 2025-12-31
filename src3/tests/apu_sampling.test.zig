@@ -10,11 +10,11 @@ const mem_map = @import("../mem_map.zig");
 const sokol = @import("sokol");
 
 fn drawSample(apu: *APU.State, mmu: *MMU.State, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
-    apu.channels[0] = ch1;
-    apu.channels[1] = ch2;
-    apu.channels[2] = ch3;
-    apu.channels[3] = ch4;
-    apu.sample_counter = 0;
+    apu.channel_values[0] = ch1;
+    apu.channel_values[1] = ch2;
+    apu.channel_values[2] = ch3;
+    apu.channel_values[3] = ch4;
+    apu.sample_tick = 0;
     return APU.cycle(apu, mmu).?;
 }
 
@@ -75,9 +75,9 @@ pub fn runApuSamplingTests() !void {
     mmu.memory[mem_map.master_volume] = @bitCast(APU.Volume {
         .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false,
     });
-    for(0..apu.channels.len) |channel_idx| {
-        apu.channels = [_]u4{ 0 } ** apu.channels.len;
-        apu.channels[channel_idx] = 15;
+    for(0..apu.channel_values.len) |channel_idx| {
+        apu.channel_values = .{0} ** apu.channel_values.len;
+        apu.channel_values[channel_idx] = 15;
 
         const lower_nibble_on: u8 = @as(u8, 1) << @intCast(channel_idx);
         const higher_nibble_on: u8 = lower_nibble_on << 4;
@@ -96,7 +96,7 @@ pub fn runApuSamplingTests() !void {
             const high_nibble: u8 = if(test_case.left) higher_nibble_on else 0;
             mmu.memory[mem_map.sound_panning] = lower_nibble | high_nibble;
 
-            apu.sample_counter = 0;
+            apu.sample_tick = 0;
             sample = APU.cycle(&apu, &mmu).?;
 
             const expected_left: f32 = if(test_case.left) 0.25 else 0.0;
@@ -177,7 +177,7 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
             state.curr_cycles += 1;
             const curr_input: Inputs = state.input_states.items[state.curr_input_idx];
             if(state.curr_cycles >= curr_input.cycles) {
-                state.apu.channels[curr_input.channel_idx] = curr_input.value;
+                state.apu.channel_values[curr_input.channel_idx] = curr_input.value;
                 state.curr_input_idx += 1;
                 if(state.curr_input_idx >= state.input_states.items.len) {
                     state.audio_done = true;
@@ -243,7 +243,7 @@ pub fn runApuOutputTest(use_precalc: bool) !void {
                     }
                 }
             }
-            apu.channels[channel_idx] = value;
+            apu.channel_values[channel_idx] = value;
         } else {
             try state.input_states.append(alloc, .{ .cycles = cycles, .channel_idx = channel_idx, .value = value });
         }

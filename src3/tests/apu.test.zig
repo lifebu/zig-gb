@@ -30,7 +30,7 @@ pub fn runApuChannelTests() !void {
     // CH3: Channel status bit is updated.
     APU.init(&apu);
     cpuWrite(&apu, &mmu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
-        .period = 0, .length_enable = false, .trigger = true,
+        .period = 0, .length_on = false, .trigger = true,
     }));
     const control: APU.Control = .fromMem(&mmu);
     std.testing.expectEqual(true, control.ch3_on) catch |err| {
@@ -67,16 +67,16 @@ pub fn runApuChannelTests() !void {
             .dac_on = test_case.dac,
         }));
         cpuWrite(&apu, &mmu, mem_map.ch3_length, @bitCast(APU.Channel3Length{
-            .length_init = 0,
+            .initial = 0,
         }));
         cpuWrite(&apu, &mmu, mem_map.ch3_volume, @bitCast(APU.Channel3Volume{
-            .vol_shift = test_case.volume,
+            .shift = test_case.volume,
         }));
         cpuWrite(&apu, &mmu, mem_map.ch3_low_period, @bitCast(APU.Channel3PeriodLow{
             .period = @truncate(test_case.period),
         }));
         cpuWrite(&apu, &mmu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
-            .period = @truncate(test_case.period >> 8), .length_enable = false, .trigger = true,
+            .period = @truncate(test_case.period >> 8), .length_on = false, .trigger = true,
         }));
 
         var pattern_idx: u5 = 1; 
@@ -89,7 +89,7 @@ pub fn runApuChannelTests() !void {
             var expected = wave_pattern[pattern_idx];
             expected = if(test_case.dac) expected else APU.ch3_dac_off_value;
             expected = if(test_case.volume == 0b00) 0 else expected >> (test_case.volume - 1);
-            std.testing.expectEqual(expected, apu.channels[2]) catch |err| {
+            std.testing.expectEqual(expected, apu.channel_values[2]) catch |err| {
                 std.debug.print("Failed: Ch3: dac: {}, period: {}, vol: {}: sample {} does not match the wave table entry {}.\n", .{ test_case.dac, test_case.period, test_case.volume, sample_idx + 1, pattern_idx });
                 return err;
             };
