@@ -364,12 +364,12 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
 
     state.func_volume_tick, overflow = @subWithOverflow(state.func_volume_tick, 1);
     if(overflow == 1) {
-        inline for(0..4) |channel_idx| {
+        inline for(0..apu_channels) |channel_idx| {
             const channel_pace: u4, const increase: bool = switch(channel_idx) {
-                inline 0 => .{ Channel1Volume.fromMem(mmu).pace, false },
-                inline 1 => .{ Channel2Volume.fromMem(mmu).pace, false },
+                inline 0 => .{ Channel1Volume.fromMem(mmu).pace, Channel1Volume.fromMem(mmu).increase },
+                inline 1 => .{ Channel2Volume.fromMem(mmu).pace, Channel2Volume.fromMem(mmu).increase },
                 inline 2 => .{ 0, false }, // Unsupported by channel 3.
-                inline 3 => .{ Channel4Volume.fromMem(mmu).pace, false},
+                inline 3 => .{ Channel4Volume.fromMem(mmu).pace, Channel4Volume.fromMem(mmu).increase },
                 else => unreachable,
             };
             if(channel_pace != 0) {
@@ -386,7 +386,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) ?def.Sample {
     // TODO: We are duplicating the mmu control with the chx_is_on values (another case for removing mmu!).
     state.func_length_tick, overflow = @subWithOverflow(state.func_length_tick, 1);
     if(overflow == 1) {
-        inline for(0..4) |channel_idx| {
+        inline for(0..apu_channels) |channel_idx| {
             // TODO: Where should we use a table of channel values and where a value for each channel?
             state.func_length_values[channel_idx], overflow = @subWithOverflow(state.func_length_values[channel_idx], 1);
             if(overflow == 1 and state.channels_on[channel_idx] and state.func_length_on[channel_idx]) {
