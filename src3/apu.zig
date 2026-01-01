@@ -34,7 +34,7 @@ const channel_dbg_enable: [apu_channels]bool = .{ true, true, true, true };
 
 // general
 pub const Control = packed struct(u8) {
-    // TODO: array of [apu_channels]bool?
+    // TODO: array of [apu_channels]bool? => Once I have no mmu, I don't require packed structs.
     ch1_on: bool, ch2_on: bool, ch3_on: bool, ch4_on: bool,
     _: u3 = 0, enable_apu: bool,
     // TODO: When we remove the mmu like this all subsystems control their own registers and react to read/write request on the bus.
@@ -53,7 +53,7 @@ pub const Volume = packed struct(u8) {
         return @bitCast(mmu.memory[mem_map.master_volume]);
     } 
 };
-// TODO: Two arrays [apu_channels]bool?
+// TODO: Two arrays [apu_channels]bool? => Once I have no mmu, I don't require packed structs.
 pub const Panning = packed struct(u8) {
     ch1_right: bool, ch2_right: bool, ch3_right: bool, ch4_right: bool,
     ch1_left: bool,  ch2_left: bool,  ch3_left: bool,  ch4_left: bool,
@@ -63,7 +63,6 @@ pub const Panning = packed struct(u8) {
 };
 
 // channel 1
-// TODO: Rename to Channel1Freq? (Period function).
 pub const Channel1Sweep = packed struct(u8) {
     step: u3, decrease: bool, pace: u3, _: u1 = 0,
     pub fn fromMem(mmu: *MMU.State) Channel1Sweep {

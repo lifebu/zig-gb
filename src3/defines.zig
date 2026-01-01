@@ -14,6 +14,26 @@ pub const InputState = packed struct {
     start_pressed: bool = false,
 };
 
+const Request = struct {
+    address: u16,
+    value: union(enum) {
+        read: *u8,
+        write: u8,
+    },
+
+    pub fn apply(self: *Request, value: anytype) void {
+        switch (self.value) {
+            .read => |read| read.* = @bitCast(value.*),
+            .write => |write| value.* = @bitCast(write),
+        }
+        self.address = 0xFEED; // Invalid address :)
+    }
+    pub fn reject(self: *Request) void {
+        var open_bus: u8 = 0xFF;
+        self.apply(&open_bus);
+    }
+};
+
 // TODO: The way this is implemented leads to so much boilerplate code in all subsystem that want to react to reads/writes to their registers.
 // Once we switched to the bus model, make this way more ergonomic!
 pub const Bus = struct {
