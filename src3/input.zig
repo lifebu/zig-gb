@@ -2,8 +2,6 @@ const std = @import("std");
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
-// TODO: Remove that dependency.
-const MMU = @import("mmu.zig");
 
 pub const State = struct {
     joypad: u8 = 0xFF,

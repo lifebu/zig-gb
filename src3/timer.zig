@@ -2,7 +2,14 @@ const std = @import("std");
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
-const MMU = @import("mmu.zig");
+
+const timer_mask_table = [4]u10{ 1024 / 2, 16 / 2, 64 / 2, 256 / 2 };
+
+const TimerControl = packed struct(u8) {
+    clock: u2 = 0,
+    enable: bool = false,
+    _: u5 = 0,
+};
 
 pub const State = struct {
     // last bit we tested for timer (used to detect falling edge).
@@ -10,34 +17,28 @@ pub const State = struct {
     timer_last_bit: bool = false,
     // TODO: Default value is default value after dmg, for other boot roms I need other values.
     system_counter: u16 = 0xAB00,
+
+    divider: u8 = 0,
+    timer: u8 = 0,
+    timer_control: TimerControl = .{},
+    timer_mod: u8 = 0,
 };
 
-const timer_mask_table = [4]u10{ 1024 / 2, 16 / 2, 64 / 2, 256 / 2 };
-// TODO: Maybe just mask of the bits?
-const TimerControl = packed struct(u8) {
-    clock: u2,
-    enable: bool,
-    _: u5,
-};
-
-pub fn init(_: *State) void {
-
+pub fn init(state: *State) void {
+    state.* = .{};
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) bool {
+pub fn cycle(state: *State) bool {
     var irq_timer: bool = false;
-    var timer: u8 = mmu.memory[mem_map.timer];
-    const timer_control: TimerControl = @bitCast(mmu.memory[mem_map.timer_control]);
 
     state.system_counter +%= 1;
-    // GB only sees high 8 bit => divider increments every 256 cycles. 
-    mmu.memory[mem_map.divider] = @intCast(state.system_counter >> 8);
+    state.divider = @truncate(state.system_counter >> 8);
 
-    const mask = timer_mask_table[timer_control.clock];
-    const bit: bool = ((state.system_counter & mask) == mask) and timer_control.enable;
+    const mask = timer_mask_table[state.timer_control.clock];
+    const bit: bool = ((state.system_counter & mask) == mask) and state.timer_control.enable;
     // Can happen when timer_last_bit is true and timer_control.enable was set to false this frame (intended GB behavior). 
     const timer_falling_edge: bool = !bit and state.timer_last_bit;
-    timer, const overflow = @addWithOverflow(timer, @intFromBool(timer_falling_edge));
+    state.timer, const overflow = @addWithOverflow(state.timer, @intFromBool(timer_falling_edge));
     // TODO: Branchless?
     if(overflow == 1) {
         // TODO: After overflowing, it takes 4 cycles before the interrupt flag is set and the value from timer_mod is used.
@@ -46,22 +47,30 @@ pub fn cycle(state: *State, mmu: *MMU.State) bool {
         // If cpu writes to timer on the cycle that timer is set by the overflow, the cpu write will be overwritten.
         // If cpu writes to timer_mod on the cycle that timer is set by the overflow, the overflow uses the new timer_mod.
         irq_timer = true;
-        timer = mmu.memory[mem_map.timer_mod];
+        state.timer = state.timer_mod;
     }
-    mmu.memory[mem_map.timer] = timer;
 
     state.timer_last_bit = bit;
     return irq_timer;
 }
 
-pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
+pub fn request(state: *State, req: *def.Request) void {
     switch (req.address) {
         mem_map.divider => {
-            req.apply(&mmu.memory[mem_map.divider]);
+            req.apply(&state.divider);
             if(req.isWrite()) {
-                mmu.memory[mem_map.divider] = 0;
                 state.system_counter = 0;
+                state.divider = 0;
             }
+        },
+        mem_map.timer => {
+            req.apply(&state.timer);
+        },
+        mem_map.timer_control => {
+            req.apply(&state.timer_control);
+        },
+        mem_map.timer_mod => {
+            req.apply(&state.timer_mod);
         },
         else => {},
     }

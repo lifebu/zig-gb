@@ -74,7 +74,7 @@ export fn frame() void {
         CART.request(&state.cart, &state.mmu, &request);
         DMA.request(&state.dma, &state.mmu, &request);
         INPUT.request(&state.input, &request);
-        TIMER.request(&state.timer, &state.mmu, &request);
+        TIMER.request(&state.timer, &request);
         PPU.request(&state.ppu, &request);
         APU.request(&state.apu, &state.mmu, &request);
         CPU.request(&state.cpu, &request);
@@ -85,7 +85,7 @@ export fn frame() void {
         CART.cycle(&state.cart);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input);
-        const irq_timer = TIMER.cycle(&state.timer, &state.mmu);
+        const irq_timer = TIMER.cycle(&state.timer);
         const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.mmu);
         MMU.cycle(&state.mmu);
         RAM.cycle(&state.ram);
