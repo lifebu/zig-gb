@@ -195,7 +195,7 @@ pub fn init(state: *State) void {
 // TODO: Remove dependency to the memory array.
 pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
     var irq_vblank: bool = false;
-    const irq_stat: bool = false;
+    var irq_stat: bool = false;
 
     const uop: MicroOp = state.uop_fifo.readItem().?;
     switch(uop) {
@@ -217,6 +217,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
+            if (state.lcd_stat.mode != .h_blank) {
+                irq_stat |= state.lcd_stat.mode_0_select;
+            }
             state.lcd_stat.mode = .h_blank;
             // TODO: The actual length of draw_cycles is not what is expected (172 + state.line_penalty)
             // If you add the following line to main, you can see the timing as a line going through (best to use pkmn_silv title screen):
@@ -226,6 +229,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             advanceBlank(state, length);
         },
         .advance_oam_scan => {
+            if (state.lcd_stat.mode != .oam_scan) {
+                irq_stat |= state.lcd_stat.mode_2_select;
+            }
             state.lcd_stat.mode = .oam_scan;
             state.uop_fifo.write(&oam_scan);
             state.oam_line_list.clearRealign(); // required for std.mem.sort
@@ -234,6 +240,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
         .advance_vblank => {
             if (state.lcd_stat.mode != .v_blank) {
                 irq_vblank = true;
+                irq_stat |= state.lcd_stat.mode_1_select;
             }
             state.lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
@@ -343,7 +350,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
 
     state.draw_cycles +%= 1;
     state.lcd_stat.ly_is_lyc = state.lcd_y == state.lcd_y_compare;
-    // TODO: Add support for stat interrupt.
+    irq_stat |= state.lcd_stat.lyc_select and state.lcd_stat.ly_is_lyc;
 
     return .{ irq_vblank, irq_stat };
 }

@@ -14,7 +14,8 @@
 - Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
 - Make all types "classes".
 
-- Test if the cart has issues (reason for most roms not working?)
+- Need to check why most games just dont work at all.
+    - Some of them try to access illegal memory (metroid2) (0xFFEE).
 - Interrupt Sources
     - VBlanK: Add tests!
     - Stat 
