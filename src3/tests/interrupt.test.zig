@@ -4,141 +4,143 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 const mem_map = @import("../mem_map.zig");
-const MMU = @import("../mmu.zig");
 
 const cpu_helper = @import("cpu_helper.zig");
 
 pub fn runInterruptTests() !void {
     const alloc = std.testing.allocator;
 
-    var mmu: MMU.State = .{}; 
+    var memory: std.AutoHashMap(u16, u8) = .init(alloc);
+    defer memory.deinit();
+
     var cpu: CPU.State = .{};
     CPU.init(&cpu, alloc);
     defer CPU.deinit(&cpu, alloc);
 
     // CPU can write to IF.
-    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
-    mmu.memory[mem_map.wram_low] = 0x77; // LD (HL), A
+    // TODO: We need to set the flags on the cpu itself, not in memory!
+    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
+    try memory.put(mem_map.wram_low, 0x77); // LD (HL), A
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.registers.r16.hl = mem_map.interrupt_flag;
     cpu.registers.r8.a = 0xFF;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
-    std.testing.expectEqual(0xFF, mmu.memory[mem_map.interrupt_flag]) catch |err| {
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
+    std.testing.expectEqual(0xFF, memory.get(mem_map.interrupt_flag).?) catch |err| {
         std.debug.print("Failed: CPU can write to IF.\n", .{});
         return err;
     };
 
     // IME is reset by DI.
-    mmu.memory[mem_map.wram_low] = 0xF3; // DI
+    try memory.put(mem_map.wram_low, 0xF3); // DI
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: DI disables IME.\n", .{});
         return err;
     };
 
     // IME is set by RETI
-    mmu.memory[mem_map.wram_low] = 0xD9; // RETI
+    try memory.put(mem_map.wram_low, 0xD9); // RETI
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.registers.r16.sp = mem_map.wram_high;
     cpu.interrupt_master_enable = false;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 4 * def.t_cycles_per_m_cycle);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 4 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: RETI enables IME.\n", .{});
         return err;
     };
 
     // IME is set by EI
-    mmu.memory[mem_map.wram_low] = 0xFB; // EI
+    try memory.put(mem_map.wram_low, 0xFB); // EI
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = false;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: EI enabled IME.\n", .{});
         return err;
     };
 
     // Effect of EI is delayed.
-    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
-    mmu.memory[mem_map.interrupt_enable] = 0xFF;
-    mmu.memory[mem_map.wram_low] = 0xFB; // EI
-    mmu.memory[mem_map.wram_low + 1] = 0x04; // INC B
+    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    try memory.put(mem_map.interrupt_enable, 0xFF);
+    try memory.put(mem_map.wram_low, 0xFB); // EI
+    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = false;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x04)) catch |err| {
         std.debug.print("Failed: Effect of EI is delayed: Interrupt immediately handled.\n", .{});
         return err;
     };
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
         std.debug.print("Failed: Effect of EI is delayed: Interrupt handler not loaded.\n", .{});
         return err;
     };
 
     // IME is reset by the interrupt handler
-    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
-    mmu.memory[mem_map.interrupt_enable] = 0xFF;
+    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    try memory.put(mem_map.interrupt_enable, 0xFF);
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 5 * def.t_cycles_per_m_cycle);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
         std.debug.print("Failed: CPU disables IME during interrupt handling.\n", .{});
         return err;
     };
 
     // Interrupts are executed immediately and not delayed
-    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
-    mmu.memory[mem_map.interrupt_enable] = 0xFF;
-    mmu.memory[mem_map.wram_low] = 0x04; // INC B
+    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
+    try memory.put(mem_map.interrupt_enable, 0xFF);
+    try memory.put(mem_map.wram_low, 0x04); // INC B
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 2);
-    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
-    cpu_helper.executeCPUFor(&cpu, &mmu, 2);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 2);
+    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 2);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
         std.debug.print("Failed: Interrupts are handled immediately and not delayed.\n", .{});
         return err;
     };
 
     // After the instruction handler, the instruction after the target is loaded.
-    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
-    mmu.memory[mem_map.interrupt_enable] = 0xFF;
-    mmu.memory[0x60] = 0x04; // INC B
+    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    try memory.put(mem_map.interrupt_enable, 0xFF);
+    try memory.put(0x60, 0x04); // INC B
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.interrupt_master_enable = true;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 5 * def.t_cycles_per_m_cycle);
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x04)) catch |err| {
         std.debug.print("Failed: After the interrupt hander, the next instruction after the target is loaded.\n", .{});
         return err;
     };
 
     // The pc of the next instruction is saved to the stack by the ISR.
-    mmu.memory[mem_map.interrupt_flag] = 0b0000_0000;
-    mmu.memory[mem_map.interrupt_enable] = 0xFF;
-    mmu.memory[mem_map.wram_low] = 0x04; // INC B
-    mmu.memory[mem_map.wram_low + 1] = 0x04; // INC B
-    mmu.memory[mem_map.wram_low + 2] = 0x04; // INC B
-    mmu.memory[mem_map.wram_low + 3] = 0x04; // INC B
+    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
+    try memory.put(mem_map.interrupt_enable, 0xFF);
+    try memory.put(mem_map.wram_low, 0x04); // INC B
+    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
+    try memory.put(mem_map.wram_low + 2, 0x04); // INC B
+    try memory.put(mem_map.wram_low + 3, 0x04); // INC B
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.registers.r16.sp = mem_map.hram_high;
     cpu.interrupt_master_enable = true;
-    cpu_helper.fetchInstruction(&cpu, &mmu);
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle); // execute: wram_low
-    mmu.memory[mem_map.interrupt_flag] = 0b0001_0000;
-    cpu_helper.executeCPUFor(&cpu, &mmu, 1 * def.t_cycles_per_m_cycle); // execute: wram_low + 1 
-    cpu_helper.executeCPUFor(&cpu, &mmu, 5 * def.t_cycles_per_m_cycle); // execute: ISR
-    const pch: u16 = mmu.memory[mem_map.hram_high - 1]; 
-    const pcl: u16 = mmu.memory[mem_map.hram_high - 2]; 
+    try cpu_helper.fetchInstruction(&cpu, &memory);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle); // execute: wram_low
+    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle); // execute: wram_low + 1 
+    try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle); // execute: ISR
+    const pch: u16 = memory.get(mem_map.hram_high - 1).?; 
+    const pcl: u16 = memory.get(mem_map.hram_high - 2).?; 
     const written_pc: u16 = pch << 8 | pcl;
     const expected_pc: u16 = mem_map.wram_low + 2;
     std.testing.expectEqual(expected_pc, written_pc) catch |err| {
@@ -160,12 +162,12 @@ pub fn runInterruptTests() !void {
         .{ .name = "VBlank interrupt target: 0x40", .interupt_flag = 0b0000_0001, .expected_pc = 0x40 },
     };
     for(interruptTargetTests, 0..) |test_case, i| {
-        mmu.memory[mem_map.interrupt_flag] = test_case.interupt_flag;
-        mmu.memory[mem_map.interrupt_enable] = 0xFF;
+        try memory.put(mem_map.interrupt_flag, test_case.interupt_flag);
+        try memory.put(mem_map.interrupt_enable, 0xFF);
         cpu.registers.r16.pc = mem_map.wram_low;
         cpu.interrupt_master_enable = true;
-        cpu_helper.fetchInstruction(&cpu, &mmu);
-        cpu_helper.executeCPUFor(&cpu, &mmu, 5 * def.t_cycles_per_m_cycle);
+        try cpu_helper.fetchInstruction(&cpu, &memory);
+        try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle);
         std.testing.expectEqual(test_case.expected_pc + 1, cpu.registers.r16.pc) catch |err| {
             std.debug.print("Failed Target Test {d}: {s}\n", .{ i, test_case.name });
             std.debug.print("Expected PC: {X:0>4}\n", .{ test_case.expected_pc });
@@ -175,8 +177,8 @@ pub fn runInterruptTests() !void {
     }
 
     // Interrupt priorities: VBlank > LCD > Timer > Serial > Joypad
-    mmu.memory[mem_map.interrupt_flag] = 0b0001_1111; // All interrupts are pending.
-    mmu.memory[mem_map.interrupt_enable] = 0xFF;
+    try memory.put(mem_map.interrupt_flag, 0b0001_1111); // All interrupts are pending.
+    try memory.put(mem_map.interrupt_enable, 0xFF);
     cpu.interrupt_master_enable = true;
 
     const InterruptPrioTest = struct {
@@ -191,11 +193,11 @@ pub fn runInterruptTests() !void {
         .{ .name = "Joypad handled fifth", .expected_if = 0b0000_0000 },
     };
     for(interruptPrioTests, 0..) |test_case, i| {
-        cpu_helper.fetchInstruction(&cpu, &mmu);
-        std.testing.expectEqual(test_case.expected_if, mmu.memory[mem_map.interrupt_flag]) catch |err| {
+        try cpu_helper.fetchInstruction(&cpu, &memory);
+        std.testing.expectEqual(test_case.expected_if, memory.get(mem_map.interrupt_flag).?) catch |err| {
             std.debug.print("Failed Interrupt Priority Test {d}: {s}\n", .{ i, test_case.name });
             std.debug.print("Expected IF: {b}\n", .{ test_case.expected_if });
-            std.debug.print("Result   IF: {b}\n", .{ mmu.memory[mem_map.interrupt_flag] });
+            std.debug.print("Result   IF: {b}\n", .{ memory.get(mem_map.interrupt_flag).? });
             return err;
         };
     }

@@ -4,24 +4,23 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 const mem_map = @import("../mem_map.zig");
-const MMU = @import("../mmu.zig");
 
-pub fn fetchInstruction(cpu: *CPU.State, mmu: *MMU.State) void {
+pub fn fetchInstruction(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8)) !void {
     cpu.uop_fifo.clear();
     // Load a nop instruction to fetch the required instruction.
     const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
     const uops = opcode_bank[0];
     cpu.uop_fifo.write(uops.items);
-    executeCPUFor(cpu, mmu, 4);
+    try executeCPUFor(cpu, memory, 4);
 }
 
-pub fn executeCPUFor(cpu: *CPU.State, mmu: *MMU.State, t_cycles: usize) void {
+pub fn executeCPUFor(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), t_cycles: usize) !void {
     for(0..t_cycles) |_| {
         var request: def.Request = .{};
         CPU.cycle(cpu, &request);
-        MMU.request(mmu, &request);
 
-        MMU.cycle(mmu);
+        const entry: std.AutoHashMap(u16, u8).GetOrPutResult = try memory.getOrPut(request.address);
+        request.apply(entry.value_ptr);
     }
 }
 

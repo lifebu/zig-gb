@@ -4,7 +4,6 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 const mem_map = @import("../mem_map.zig");
-const MMU = @import("../mmu.zig");
 
 const cpu_helper = @import("cpu_helper.zig");
 
@@ -34,7 +33,7 @@ const TestType = struct {
 
 // TODO: Need to rethink all of the functions and how they are structured. The code is pretty awfull.
 
-fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType) !void {
+fn initializeCpu(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), test_case: *const TestType) !void {
     cpu.interrupt_master_enable = false;
     cpu.registers.r16.pc = test_case.initial.pc;
     cpu.registers.r16.sp = test_case.initial.sp;
@@ -50,7 +49,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
         std.debug.assert(ramPair.len == 2);
         const address: u16 = ramPair[0];
         const value: u8 = @intCast(ramPair[1]);
-        memory[address] = value;
+        try memory.put(address, value);
     }
 
     cpu.uop_fifo.clear();
@@ -60,7 +59,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *[def.addr_space]u8, test_case: *const
     cpu.uop_fifo.write(uops.items);
 }
 
-fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
+fn testOutput(cpu: *const CPU.State, memory: *std.AutoHashMap(u16, u8), test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
     try std.testing.expectEqual(false, not_enough_uops);
     try std.testing.expectEqual(false, m_cycle_failed);
     // Note: pc - 1, because we prefetch, the SingleStepTests don't implement that.
@@ -84,7 +83,7 @@ fn testOutput(cpu: *const CPU.State, memory: *[def.addr_space]u8, test_case: *co
         std.debug.assert(ramPair.len == 2);
         const address: u16 = ramPair[0];
         const value: u8 = @intCast(ramPair[1]);
-        try std.testing.expectEqual(memory[address], value);
+        try std.testing.expectEqual(memory.get(address).?, value);
     }
 
     const opcode_name: []u8 = test_case.name[0..2];
@@ -135,6 +134,9 @@ pub fn runSingleStepTests() !void {
     CPU.init(&cpu, alloc);
     defer CPU.deinit(&cpu, alloc);
 
+    var memory: std.AutoHashMap(u16, u8) = .init(alloc);
+    defer memory.deinit();
+
     var iter: std.fs.Dir.Iterator = test_dir.iterate();
     var idx: u16 = 0;
     while(try iter.next()) |dir_entry| : (idx += 1) {
@@ -150,8 +152,6 @@ pub fn runSingleStepTests() !void {
         const json = try std.json.parseFromSlice([]TestType, alloc, test_file, .{ .ignore_unknown_fields = true });
         defer json.deinit();
 
-        var mmu: MMU.State = .{}; 
-
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
             if(std.mem.eql(u8, test_case.name, "CB 0F 0000")) {
@@ -159,7 +159,8 @@ pub fn runSingleStepTests() !void {
                 if(a == 10) {}
             }
 
-            try initializeCpu(&cpu, &mmu.memory, &test_case);
+            memory.clearRetainingCapacity();
+            try initializeCpu(&cpu, &memory, &test_case);
 
             const num_m_cycles = 1 + test_case.cycles.len;
 
@@ -176,7 +177,7 @@ pub fn runSingleStepTests() !void {
                     break;
                 }
 
-                cpu_helper.executeCPUFor(&cpu, &mmu, 4);
+                try cpu_helper.executeCPUFor(&cpu, &memory, 4);
                 
                 // TODO: Ignore M-Cycle mmmu test for now. This does not work because the cpu is removing the request after it has been handled.
                 // const m_cycle_values = test_case.cycles[m_cycle];
@@ -196,7 +197,7 @@ pub fn runSingleStepTests() !void {
             }
 
             // TODO: Maybe instead of a giant block of text I can just print out the issues that I had?
-            testOutput(&cpu, &mmu.memory, &test_case, not_enough_uops, m_cycle_failed) catch |err| {
+            testOutput(&cpu, &memory, &test_case, not_enough_uops, m_cycle_failed) catch |err| {
                 std.debug.print("Test Failed: {s}\n", .{ test_case.name });
                 std.debug.print("Initial\n", .{});
                 printTestCase(&test_case.initial);
@@ -223,7 +224,7 @@ pub fn runSingleStepTests() !void {
                 for (test_case.final.ram) |ramPair| {
                     std.debug.assert(ramPair.len == 2);
                     const address: u16 = ramPair[0];
-                    const value: u8 = mmu.memory[address];
+                    const value: u8 = memory.get(address).?;
                     std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
                 }
                 std.debug.print("\n", .{});
@@ -240,9 +241,9 @@ pub fn runSingleStepTests() !void {
                     });
 
                     std.debug.print("Got\n", .{});
-                    std.debug.print("addr: {X:0>4}, dbus: {X:0>2}, request: {s}\n", .{ 
-                        mmu.request.getAddress(), mmu.request.data, mmu.request.print() 
-                    });
+                    // std.debug.print("addr: {X:0>4}, dbus: {X:0>2}, request: {s}\n", .{ 
+                    //     mmu.request.getAddress(), mmu.request.data, mmu.request.print() 
+                    // });
                 }
 
                 return err;
