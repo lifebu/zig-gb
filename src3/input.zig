@@ -41,7 +41,7 @@ pub fn request(state: *State, req: *def.Request) void {
     }
 }
 
-pub fn updateInputState(state: *State, mmu: *MMU.State, input_state: *const def.InputState) void {
+pub fn updateInputState(state: *State, input_state: *const def.InputState) bool {
     const last_dpad: u4 = state.dpad;
     const last_buttons: u4 = state.buttons;
 
@@ -61,7 +61,5 @@ pub fn updateInputState(state: *State, mmu: *MMU.State, input_state: *const def.
 
     // Interrupts
     // TODO: Can we do this without an if statement? creating u1 and shifting it up?
-    if (state.dpad < last_dpad or state.buttons < last_buttons) {
-        mmu.memory[mem_map.interrupt_flag] |= mem_map.interrupt_joypad;
-    }
+    return state.dpad < last_dpad or state.buttons < last_buttons;
 }

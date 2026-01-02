@@ -60,16 +60,15 @@ fn imgui_cb(dump_path: []const u8) void {
 }
 
 export fn frame() void {
-    INPUT.updateInputState(&state.input, &state.mmu, &state.platform.input_state);
+    var irq_joypad: bool = INPUT.updateInputState(&state.input, &state.platform.input_state);
     // Note: GB runs at 59.73Hz. This software runs at 60Hz.
     // TODO: It would be better to just let the system run to the end of the next vblank. How to do that when the PPU is disabled?
     const cycles_per_frame = 70224; 
     for(0..cycles_per_frame) |_| {
         // TODO: Consider creating a list of active systems that are ticked every cycle by calling their memory and cycle functions.
         // Deactivating a system means moving it to the inactive set.
-
         var request: def.Request = .{};
-        CPU.cycle(&state.cpu, &state.mmu, &request);
+        CPU.cycle(&state.cpu, &request);
         
         BOOT.request(&state.boot, &request);
         CART.request(&state.cart, &state.mmu, &request);
@@ -78,22 +77,26 @@ export fn frame() void {
         TIMER.request(&state.timer, &state.mmu, &request);
         PPU.request(&state.ppu, &request);
         APU.request(&state.apu, &state.mmu, &request);
+        CPU.request(&state.cpu, &request);
         MMU.request(&state.mmu, &request);
         RAM.request(&state.ram, &request);
-        CPU.request(&state.cpu, &request);
 
         BOOT.cycle(&state.boot);
         CART.cycle(&state.cart);
         DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input);
-        TIMER.cycle(&state.timer, &state.mmu);
-        PPU.cycle(&state.ppu, &state.mmu);
+        const irq_timer = TIMER.cycle(&state.timer, &state.mmu);
+        const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.mmu);
         MMU.cycle(&state.mmu);
         RAM.cycle(&state.ram);
         const sample: ?def.Sample = APU.cycle(&state.apu, &state.mmu);
         if(sample) |value| {
             Platform.pushSample(&state.platform, value);
         }
+
+        const irq_serial: bool = false;
+        CPU.pushInterrupts(&state.cpu, irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad);
+        irq_joypad = false; // TODO: Not the nicest, okay for now.
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds);

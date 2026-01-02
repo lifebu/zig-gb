@@ -4,9 +4,6 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
-// TODO: Try to get rid of mmu dependency. It is currently required to read out IE and IF.
-const MMU = @import("mmu.zig");
-
 
 // TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
 // I can reach this when I changed ei and interrupt decoding!
@@ -716,24 +713,18 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
 }
 pub var opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
 
-// TODO: Do we actually need/want this? Should this be in def?
 // IF and IE flags.
-const InterruptFlags = packed struct(u8) {
-    // priority: highest to lowest.
-    v_blank: bool = false,
-    lcd_stat: bool = false,
-    timer: bool = false,
-    serial: bool = false,
-    joypad: bool = false,
-    _: u3 = 0,
-
-    const Self = @This();
-    pub fn fromMem(memory: *[def.addr_space]u8) Self {
-        return @bitCast(memory[mem_map.interrupt_flag]);
-    } 
-    pub fn toMem(self: Self, memory: *[def.addr_space]u8) void {
-        memory[mem_map.interrupt_flag] = @bitCast(self);
-    }
+const InterruptFlags = packed union {
+    value: u8,
+    bits: packed struct {
+        // priority: highest to lowest.
+        v_blank: bool = false,
+        lcd_stat: bool = false,
+        timer: bool = false,
+        serial: bool = false,
+        joypad: bool = false,
+        _: u3 = 0,
+    },
 };
 
 pub const FlagRegister = packed struct(u8) {
@@ -802,7 +793,8 @@ const RegisterFile = packed union {
 
 pub const State = struct {
     hram: [hram_size]u8 = undefined,
-    interrupt_enable: u8 = 0,
+    interrupt_enable: InterruptFlags = .{ .value = 0 },
+    interrupt_flag: InterruptFlags = .{ .value = 0 },
 
     uop_fifo: MicroOpFifo = .{}, 
 
@@ -823,7 +815,8 @@ pub fn init(state: *State, alloc: std.mem.Allocator) void {
     state.uop_fifo.write(uops.items);
 
     state.hram = [_]u8{ 0 } ** hram_size;
-    state.interrupt_enable = 0;
+    state.interrupt_enable = .{ .value = 0 };
+    state.interrupt_flag = .{ .value = 0 };
 }
 
 pub fn deinit(_: *State, alloc: std.mem.Allocator) void {
@@ -834,7 +827,7 @@ pub fn deinit(_: *State, alloc: std.mem.Allocator) void {
     }
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State, req: *def.Request) void {
+pub fn cycle(state: *State, req: *def.Request) void {
     const flags = state.registers.r8.f;
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
@@ -1035,15 +1028,15 @@ pub fn cycle(state: *State, mmu: *MMU.State, req: *def.Request) void {
             // TODO: Using an external system would also allow me to split this decode function into decode and decode_interrupt
             // When an interrupt is pending or the IE bits are changed, we will inform the cpu about this. if all other conditions are met,
             // the cpu will replace the last instruction (decode) with the decode_interrupt instruction!
-            const interrupt_signal: u8 = mmu.memory[mem_map.interrupt_enable] & mmu.memory[mem_map.interrupt_flag];
+            const interrupt_signal: u8 =  state.interrupt_enable.value & state.interrupt_flag.value;
             if(state.interrupt_master_enable and interrupt_signal != 0) {
                 const interrupt_idx: u3 = getLowestSetBit(interrupt_signal);
                 const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
                 state.uop_fifo.write(interrupt_uops.items);
 
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
-                const result: u8 = mmu.memory[mem_map.interrupt_flag] & ~mask;
-                mmu.memory[mem_map.interrupt_flag] = result;
+                const result: u8 = state.interrupt_flag.value & ~mask;
+                state.interrupt_flag.value = result;
 
                 // TODO: Because we are preparing to load the next instruction but not decoding it we are skipping one byte.
                 // Removing the pc again is more of a hack and it should not happen. 
@@ -1070,7 +1063,7 @@ pub fn cycle(state: *State, mmu: *MMU.State, req: *def.Request) void {
             const pc_curr: u16 = state.registers.r16.pc;
             if(pc_curr == 0) {}
             const halt_uop: u8 = 0x76;
-            const interrupt_signal: u8 = mmu.memory[mem_map.interrupt_enable] & mmu.memory[mem_map.interrupt_flag];
+            const interrupt_signal: u8 =  state.interrupt_enable.value & state.interrupt_flag.value;
             if(interrupt_signal == 0) { // No interrupt pending
                 state.registers.r8.ir = halt_uop;
                 state.halt_again = true;
@@ -1134,6 +1127,9 @@ pub fn request(state: *State, req: *def.Request) void {
         mem_map.interrupt_enable => {
             req.apply(&state.interrupt_enable);
         },
+        mem_map.interrupt_flag => {
+            req.apply(&state.interrupt_flag);
+        },
         else => {},
     }
 }
@@ -1149,6 +1145,14 @@ pub fn loadDump(state: *State, file_type: def.FileType, alloc: std.mem.Allocator
         .unknown => {
         }
     }
+}
+
+pub fn pushInterrupts(state: *State, vblank: bool, stat: bool, timer: bool, serial: bool, joypad: bool) void {
+    state.interrupt_flag.bits.v_blank |= vblank;
+    state.interrupt_flag.bits.lcd_stat |= stat;
+    state.interrupt_flag.bits.timer |= timer;
+    state.interrupt_flag.bits.serial |= serial;
+    state.interrupt_flag.bits.joypad |= joypad;
 }
 
 fn getLowestSetBit(value: u8) u3 {

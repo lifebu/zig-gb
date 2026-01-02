@@ -24,7 +24,8 @@ pub fn init(_: *State) void {
 
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State) bool {
+    var irq_timer: bool = false;
     var timer: u8 = mmu.memory[mem_map.timer];
     const timer_control: TimerControl = @bitCast(mmu.memory[mem_map.timer_control]);
 
@@ -44,12 +45,13 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
         // If the cpu writes to timer during the 4 cycles, these two steps will be skipped. 
         // If cpu writes to timer on the cycle that timer is set by the overflow, the cpu write will be overwritten.
         // If cpu writes to timer_mod on the cycle that timer is set by the overflow, the overflow uses the new timer_mod.
-        mmu.memory[mem_map.interrupt_flag] |= mem_map.interrupt_timer;
+        irq_timer = true;
         timer = mmu.memory[mem_map.timer_mod];
     }
     mmu.memory[mem_map.timer] = timer;
 
     state.timer_last_bit = bit;
+    return irq_timer;
 }
 
 pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {

@@ -189,7 +189,10 @@ pub fn init(state: *State) void {
 }
 
 // TODO: Remove dependency to the memory array.
-pub fn cycle(state: *State, mmu: *MMU.State) void {
+pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
+    var irq_vblank: bool = false;
+    const irq_stat: bool = false;
+
     // TODO: PPU also needs to know the mmu, because the ppu needs to discard/change cpu read/write requests into mmu that the ppu owns.
     var lcd_stat = LcdStat.fromMem(mmu);
     const lcd_control = LcdControl.fromMem(mmu);
@@ -229,7 +232,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
             state.oam_scan_idx = 0;
         },
         .advance_vblank => {
-            mmu.memory[mem_map.interrupt_flag] |= mem_map.interrupt_vblank;
+            irq_vblank = true;
             lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
         },
@@ -343,6 +346,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     lcd_stat.ly_is_lyc = state.lcd_y == mmu.memory[mem_map.lcd_y_compare];
     // TODO: Add support for stat interrupt.
     lcd_stat.toMem(mmu);
+
+    return .{ irq_vblank, irq_stat };
 }
 
 pub fn request(_: *State, _: *def.Request) void {
