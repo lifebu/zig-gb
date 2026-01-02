@@ -232,7 +232,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             state.oam_scan_idx = 0;
         },
         .advance_vblank => {
-            irq_vblank = true;
+            if (state.lcd_stat.mode != .v_blank) {
+                irq_vblank = true;
+            }
             state.lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
         },
