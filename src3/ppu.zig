@@ -18,8 +18,9 @@ const tile_map_size_byte = tile_map_size_x * tile_map_size_y;
 const tile_map_pixel_size_x = tile_map_size_x * tile_size_x;
 const tile_map_pixel_size_y = tile_map_size_y * tile_size_y;
 
-const oam_size = 40;
 const obj_size_byte = 4;
+const oam_size = 40;
+const oam_size_byte = oam_size * obj_size_byte;
 const obj_per_line = 10;
 const obj_double_height = tile_size_y * 2;
 
@@ -52,10 +53,6 @@ const LcdControl = packed struct {
     // When set to true, add .halt uop to uop_fifo. 
     // When set to false, start add initialize ppu (like on start). 
     lcd_enable: bool = false,
-
-    pub fn fromMem(mmu: *MMU.State) LcdControl {
-        return @bitCast(mmu.memory[mem_map.lcd_control]);
-    } 
 };
 
 pub const LcdStat = packed struct {
@@ -64,20 +61,13 @@ pub const LcdStat = packed struct {
         v_blank,
         oam_scan,
         draw,
-    },
+    } = .h_blank,
     ly_is_lyc: bool = false,
     mode_0_select: bool = false,
     mode_1_select: bool = false,
     mode_2_select: bool = false,
     lyc_select: bool = false,
     _: u1 = 0,
-
-    pub fn fromMem(mmu: *MMU.State) LcdStat {
-        return @bitCast(mmu.memory[mem_map.lcd_stat]);
-    } 
-    pub fn toMem(self: LcdStat, mmu: *MMU.State) void {
-        mmu.memory[mem_map.lcd_stat] = @bitCast(self);
-    } 
 };
 
 const ObjectPriority = enum(u1) {
@@ -100,9 +90,9 @@ const Object = packed struct {
         priority: ObjectPriority,
     },
 
-    pub fn fromOAM(mmu: *MMU.State, obj_idx: u6) *align(1) const Object {
-        const address: u16 = mem_map.oam_low + (@as(u16, obj_idx) * obj_size_byte);
-        return @ptrCast(&mmu.memory[address]);
+    pub fn fromOAM(state: *State, obj_idx: u6) *align(1) const Object {
+        const oam_idx: u16 = (@as(u16, obj_idx) * obj_size_byte);
+        return @ptrCast(&state.oam[oam_idx]);
     }
 };
 
@@ -165,11 +155,17 @@ const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop
 const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
 
 pub const State = struct {
+    lcd_control: LcdControl = .{},
+    lcd_stat: LcdStat = .{},
+    lcd_y_compare: u8 = 0,
+    lcd_y: u8 = 0, 
+
     current_bg_window_uops: []const MicroOp = undefined,
     uop_fifo: MicroOpFifo = .{}, 
     draw_cycles: u9 = 0,
     line_penalty: u9 = 0,
 
+    oam: [oam_size_byte]u8 = .{0} ** oam_size_byte,
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineFifo = .{},
 
@@ -177,7 +173,6 @@ pub const State = struct {
     object_fifo: ObjectFiFo = .{},
     // In overscan space: [0, 167]
     lcd_overscan_x: u8 = 0, 
-    lcd_y: u8 = 0, 
     fetcher_data: FetcherData = .{},
 
     colorIds: [def.overscan_resolution]u8 = [_]u8{ 0 } ** def.overscan_resolution,
@@ -193,14 +188,10 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
     var irq_vblank: bool = false;
     const irq_stat: bool = false;
 
-    // TODO: PPU also needs to know the mmu, because the ppu needs to discard/change cpu read/write requests into mmu that the ppu owns.
-    var lcd_stat = LcdStat.fromMem(mmu);
-    const lcd_control = LcdControl.fromMem(mmu);
-
     const uop: MicroOp = state.uop_fifo.readItem().?;
     switch(uop) {
         .advance_draw => {
-            lcd_stat.mode = .draw;
+            state.lcd_stat.mode = .draw;
             state.current_bg_window_uops = &draw_bg_tile;
             state.uop_fifo.write(state.current_bg_window_uops); 
             state.background_fifo.clear();
@@ -217,7 +208,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             assert(state.lcd_overscan_x > (def.overscan_width) - 1); // we drew to few pixels before entering hblank
             assert(state.lcd_overscan_x < (def.overscan_width) + 1); // we drew to many pixels before entering hblank
 
-            lcd_stat.mode = .h_blank;
+            state.lcd_stat.mode = .h_blank;
             // TODO: The actual length of draw_cycles is not what is expected (172 + state.line_penalty)
             // If you add the following line to main, you can see the timing as a line going through (best to use pkmn_silv title screen):
             // state.ppu.colorIds = [_]u8{ 0 } ** def.overscan_resolution;
@@ -226,14 +217,14 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             advanceBlank(state, length);
         },
         .advance_oam_scan => {
-            lcd_stat.mode = .oam_scan;
+            state.lcd_stat.mode = .oam_scan;
             state.uop_fifo.write(&oam_scan);
             state.oam_line_list.clearRealign(); // required for std.mem.sort
             state.oam_scan_idx = 0;
         },
         .advance_vblank => {
             irq_vblank = true;
-            lcd_stat.mode = .v_blank;
+            state.lcd_stat.mode = .v_blank;
             advanceBlank(state, blank.len);
         },
         .fetch_low_bg => {
@@ -273,7 +264,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             fetchPushBg(state, mmu);
         },
         .fetch_tile_bg => {
-            const tilemap_addr_type: TileMapAddress = lcd_control.bg_map_area;
+            const tilemap_addr_type: TileMapAddress = state.lcd_control.bg_map_area;
             const scroll_x: u8 = mmu.memory[mem_map.scroll_x];
             const scroll_y: u8 = mmu.memory[mem_map.scroll_y];
             const overscan_x_tile_offset: u5 = tile_map_size_x - 1;
@@ -287,7 +278,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             state.fetcher_data = current_object;
 
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
-            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(lcd_control.obj_size)) * (current_object.obj_tile_index % 2);
+            const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(state.lcd_control.obj_size)) * (current_object.obj_tile_index % 2);
             const obj_tile_index: u8 = current_object.obj_tile_index - obj_tile_index_offset;
             const obj_height_tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
             const tile_addr_offset: u16 = obj_tile_index + obj_height_tile_offset;
@@ -296,7 +287,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             state.fetcher_data.tile_addr = tile_line_addr;
         },
         .fetch_tile_window => {
-            const tilemap_addr_type: TileMapAddress = lcd_control.window_map_area;
+            const tilemap_addr_type: TileMapAddress = state.lcd_control.window_map_area;
             const win_overscan_x: u16 = mmu.memory[mem_map.window_x] + 1;
             const win_y: u16 = mmu.memory[mem_map.window_y];
             // Note: this works because we use modulo later to get the tile map address and tile line address.
@@ -316,8 +307,8 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             tryPushPixel(state, mmu);
         },
         .oam_check => {
-            const object = Object.fromOAM(mmu, state.oam_scan_idx);
-            const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(lcd_control.obj_size)));
+            const object = Object.fromOAM(state, state.oam_scan_idx);
+            const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(state.lcd_control.obj_size)));
             const obj_pixel_y: i16 = @as(i16, state.lcd_y) + obj_double_height - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
@@ -342,16 +333,37 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
     }
 
     state.draw_cycles +%= 1;
-    mmu.memory[mem_map.lcd_y] = state.lcd_y;
-    lcd_stat.ly_is_lyc = state.lcd_y == mmu.memory[mem_map.lcd_y_compare];
+    state.lcd_stat.ly_is_lyc = state.lcd_y == state.lcd_y_compare;
     // TODO: Add support for stat interrupt.
-    lcd_stat.toMem(mmu);
 
     return .{ irq_vblank, irq_stat };
 }
 
-pub fn request(_: *State, _: *def.Request) void {
-
+pub fn request(state: *State, req: *def.Request) void {
+    // TODO: Disallow writes to VRAM, OAM during certain ppu modes.
+    switch(req.address) {
+        mem_map.lcd_control => {
+            req.apply(&state.lcd_control);
+        },
+        mem_map.lcd_stat => {
+            req.apply(&state.lcd_stat);
+        },
+        mem_map.lcd_y => {
+            if(req.isWrite()) {
+                req.reject();
+            } else {
+                req.apply(&state.lcd_y);
+            }
+        },
+        mem_map.lcd_y_compare => {
+            req.apply(&state.lcd_y_compare);
+        },
+        mem_map.oam_low...mem_map.oam_high => {
+            const oam_idx: u16 = req.address - mem_map.oam_low;
+            req.apply(&state.oam[oam_idx]);
+        },
+        else => {},
+    }
 }
 
 fn advanceBlank(state: *State, length: usize) void {
@@ -362,8 +374,6 @@ fn advanceBlank(state: *State, length: usize) void {
 }
 
 fn checkLcdX(state: *State, mmu: *MMU.State) void {
-    const lcd_control = LcdControl.fromMem(mmu);
-
     const scroll_x: u8 = mmu.memory[mem_map.scroll_x];
     const scroll_overscan_x: u8 = tile_size_x - (scroll_x % tile_size_x);
 
@@ -378,7 +388,7 @@ fn checkLcdX(state: *State, mmu: *MMU.State) void {
         state.uop_fifo.clear();
         state.uop_fifo.writeItem(.advance_hblank);
     // Encountered window
-    } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and lcd_control.window_enable and lcd_control.bg_window_enable) {
+    } else if (state.lcd_y >= win_pos_y and state.lcd_overscan_x == win_overscan_x and state.lcd_control.window_enable and state.lcd_control.bg_window_enable) {
         state.current_bg_window_uops = &draw_window_tile;
         state.uop_fifo.clear();
         state.uop_fifo.write(state.current_bg_window_uops);
@@ -391,7 +401,7 @@ fn checkLcdX(state: *State, mmu: *MMU.State) void {
         state.background_fifo.clear();
         state.line_penalty += scroll_x % 8;
     // Found Object
-    } else if((lcd_control.obj_enable or true) and has_next_object) {
+    } else if((state.lcd_control.obj_enable or true) and has_next_object) {
         state.uop_fifo.clear();
         state.uop_fifo.write(&draw_object_tile);
         const fifo_length: i9 = @intCast(state.background_fifo.length()); 
@@ -439,8 +449,6 @@ fn getPalette(paletteByte: u8) [def.color_depth]u2 {
 }
 
 fn getTileMapTileAddr(state: *State, mmu: *MMU.State, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
-    const lcd_control = LcdControl.fromMem(mmu);
-
     const fifo_pixel_count: u3 = @intCast(state.background_fifo.length());
     const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
     const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y; 
@@ -452,7 +460,7 @@ fn getTileMapTileAddr(state: *State, mmu: *MMU.State, tilemap_addr_type: TileMap
     const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) mem_map.tile_map_9800 else mem_map.tile_map_9C00;
     const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
 
-    const tile_base_addr: u16 = if(lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
+    const tile_base_addr: u16 = if(state.lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
     const tile_y = state.lcd_y +% scroll_y;
 
     const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
