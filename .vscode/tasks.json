@@ -14,7 +14,7 @@
         {
             "label": "build-test",
             "type": "shell",
-            "command": "zig test --test-no-exec -femit-bin=zig-out/bin/${fileBasenameNoExtension}-test ${file}",
+            "command": "zig test -Denable-llvm=true --test-no-exec -femit-bin=zig-out/bin/${fileBasenameNoExtension}-test ${file}",
         },
 
         // Profiling

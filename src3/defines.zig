@@ -15,10 +15,10 @@ pub const InputState = packed struct {
 };
 
 pub const Request = struct {
-    const invalid: u16 = 0xFEED;
+    const invalid_addr: u16 = 0xFEED;
     const open_bus: u8 = 0xFF;
 
-    address: u16 = invalid,
+    address: u16 = invalid_addr,
     // TODO: Some systems want to implement "only some bits are read/write". How could I do that?
     value: union(enum) {
         read: *u8,
@@ -26,21 +26,24 @@ pub const Request = struct {
     } = .{ .write = open_bus },
 
     pub fn apply(self: *Request, value: anytype) void {
-        if(self.address == invalid) {
+        if(!self.isValid()) {
             return; // TODO: Should this be an error?
         }
         switch (self.value) {
             .read => |read| read.* = @bitCast(value.*),
             .write => |write| value.* = @bitCast(write),
         }
-        self.address = invalid;
-    }
-    pub fn isWrite(self: *Request) bool {
-        return self.value == .write;
+        self.address = invalid_addr;
     }
     pub fn reject(self: *Request) void {
         var value: u8 = open_bus;
         self.apply(&value);
+    }
+    pub fn isValid(self: *Request) bool {
+        return self.address != invalid_addr;
+    }
+    pub fn isWrite(self: *Request) bool {
+        return self.value == .write;
     }
 };
 

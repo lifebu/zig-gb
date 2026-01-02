@@ -2,52 +2,64 @@ const std = @import("std");
 
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
-// TODO: Remove that dependency.
-const MMU = @import("mmu.zig");
 
 pub const State = struct {
+    dma: u8 = 0,
+
+    // TODO: Try to simplify all the state of dma. Maybe a microcode machine?
     is_running: bool = false,
     start_addr: u16 = 0x0000,
     offset: u16 = 0,
     counter: u3 = 0,
+
+    byte: u8 = 0,
+    is_read: bool = false,
 };
 
-pub fn init(_: *State) void {
+pub fn init(state: *State) void {
+    state.* = .{};
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) void {
-    // Maybe I can use a small uop machine for the dma so that I don't need so many if conditions everywhere?
-    if(state.is_running) {
-        // first time we overflow after 8 cycles for first write.
-        state.counter, const overflow = @addWithOverflow(state.counter, 1);
-        if(overflow == 0) {
-            return;
-        }
+pub fn cycle(state: *State, req: *def.Request) void {
+    if(!state.is_running) {
+        return;
+    }
 
-        // Setting to 4 means that after the first time, we overflow every 4 cycles.
-        // TODO: Using an actual uop machine means that the overflow timins are implicit.
-        state.counter = 4;
+    // DMA Bus conflict.
+    if(req.address < mem_map.hram_low or req.address > mem_map.hram_high) {
+        req.reject(); // DMA Bus conflict
+    }
+    
+    state.counter, const overflow = @subWithOverflow(state.counter, 1);
+    if(overflow == 0) {
+        return;
+    }
+    // read: 2 cycles, write: 2 cycles => 4 cycles per byte.
+    state.counter = 1;
+
+    if(state.is_read) {
         const source_addr: u16 = state.start_addr + state.offset;
+        req.* = .{ .address = source_addr, .value = .{ .read = &state.byte } };
+    } else {
         const dest_addr: u16 = mem_map.oam_low + state.offset;
-        const data: u8 = mmu.memory[source_addr];
-        mmu.memory[dest_addr] = data;
+        req.* = .{ .address = dest_addr, .value = .{ .write = state.byte } };
 
         state.offset += 1;
         state.is_running = (dest_addr + 1) < mem_map.oam_high;
     }
+    state.is_read = !state.is_read;
 }
 
-pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
+pub fn request(state: *State, req: *def.Request) void {
     switch (req.address) {
         mem_map.dma => {
-            req.apply(&mmu.memory[mem_map.dma]);
+            req.apply(&state.dma);
             if(req.isWrite()) {
-                // TODO: While it is running I need to implement the bus conflict behavior for the cpu, 
-                // the cpu will not be able to write and when it reads it will read the current byte of the dma transfer.
                 state.is_running = true;
-                state.start_addr = @as(u16, mmu.memory[mem_map.dma]) << 8;
+                state.start_addr = @as(u16, state.dma) << 8;
                 state.offset = 0;
-                state.counter = 0;
+                state.counter = 5; // Nothing happens for the first 5 cycles.
+                state.is_read = true;
             }
         },
         else => {},

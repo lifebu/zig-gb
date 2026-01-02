@@ -1,6 +1,23 @@
 # src3:
-## Memory
-- see memory.md
+- Memory: see memory.md
+    => REMOVES MMU!
+- Merge some subsystems.
+    - I currently have a large set of .zig files and "subsystems".
+    - Most of them have very little logic and code.
+    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
+    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
+        => But how should that one be named?
+        - ram, boot and IF are "cold storage"?
+        - IOMMU? just io?
+    - Cart: Merge boot rom onto cart?
+- Remove all request(), cycle(), init(), deinit() functions that do nothing.
+- Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
+- Make all types "classes".
+
+- Test if the cart has issues (reason for most roms not working?)
+- Interrupt Sources
+    - VBlanK: Add tests!
+    - Stat 
 
 ## APU:
 - CH3: Length timer + "Frame Sequencer" is working.
@@ -27,23 +44,7 @@
 - We should never let the audio device starve out of samples (how to detect that?)
 - We also should never waste any samples (i.e, the platform sound buffer is already full).
 
-## CPU:
-- Interrupt Sources
-    - VBlanK: Add tests!
-    - Stat 
-
 ## Next:
-- How to split subsystems:
-    - I currently have a large set of .zig files and "subsystems".
-    - Most of them have very little logic and code.
-    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
-    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
-        => But how should that one be named?
-        - ram, boot and IF are "cold storage"?
-        - IOMMU? just io?
-- Cart: Merge boot rom onto cart?
-- Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
-
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.
         - 1st: Check memory request.

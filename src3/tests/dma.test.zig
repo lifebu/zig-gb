@@ -2,32 +2,27 @@
 const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
-const MMU = @import("../mmu.zig");
 const def = @import("../defines.zig");
 const DMA = @import("../dma.zig");
 const mem_map = @import("../mem_map.zig");
 
 pub fn runDMATest() !void {
     var dma: DMA.State = .{};
-    var mmu: MMU.State = .{}; 
 
-    // Initialize with test memory.
-    for(0x0300..0x039F, 1..) |addr, i| {
-        mmu.memory[@intCast(addr)] = @truncate(i);
-    }
-    for(mem_map.oam_low..mem_map.oam_high + 1) |addr| {
-        mmu.memory[@intCast(addr)] = 0;
+    const start_addr: u16 = 0;
+    var test_mem: [160]u8 = undefined;
+    for(&test_mem, 1..) |*mem, i| {
+        mem.* = @truncate(i);
     }
 
     // correct address calculation.
-    var req: def.Request = .{ .address = mem_map.dma, .value = .{ .write = 0x03 } };
-    DMA.request(&dma, &mmu, &req);
-    DMA.cycle(&dma, &mmu);
+    var req: def.Request = .{ .address = mem_map.dma, .value = .{ .write = 0x00 } };
+    DMA.request(&dma, &req);
     std.testing.expectEqual(true, dma.is_running) catch |err| {
         std.debug.print("Failed: DMA is triggered by a write request.\n", .{});
         return err;
     };
-    std.testing.expectEqual(0x0300, dma.start_addr) catch |err| {
+    std.testing.expectEqual(start_addr, dma.start_addr) catch |err| {
         std.debug.print("Failed: DMA start address is correct.\n", .{});
         return err;
     };
@@ -35,32 +30,53 @@ pub fn runDMATest() !void {
         std.debug.print("Failed: DMA offset is set.\n", .{});
         return err;
     };
-    std.testing.expectEqual(0x03, mmu.memory[mem_map.dma]) catch |err| {
+    std.testing.expectEqual(0x00, dma.dma) catch |err| {
         std.debug.print("Failed: DMA applied the memory request.\n", .{});
         return err;
     };
 
     // first 4 cycles nothing happens.
+    req = .{};
     for(0..4) |_| {
-        DMA.cycle(&dma, &mmu);
+        DMA.cycle(&dma, &req);
     }
-    std.testing.expectEqual(0, mmu.memory[mem_map.oam_low]) catch |err| {
+    std.testing.expectEqual(false, req.isValid()) catch |err| {
         std.debug.print("Failed: For the first 4 cycles, the dma transfer does not start.\n", .{});
         return err;
     };
 
-    // every 4 cycles one byte is copied.
-    //const oam_size = mem_map.oam_high - mem_map.oam_low;
-    for(0..160) |byte_idx| {
-        for(0..def.t_cycles_per_m_cycle) |_| {
-            DMA.cycle(&dma, &mmu);
+    // 2 cycle read, 2 cycle write. Includes DMA Bus conflict.
+    for(0..160) |offset| {
+        for(0..2) |_| {
+            req = .{ .address = 0xFFF, .value = .{ .write = 0x00 } };
+            DMA.cycle(&dma, &req);
         }
-        std.testing.expectEqual(mmu.memory[mem_map.oam_low + byte_idx], mmu.memory[dma.start_addr + byte_idx]) catch |err| {
-            std.debug.print("Failed: DMA copies the correct value to oam.\n", .{});
+        std.testing.expectEqual(start_addr + offset, req.address) catch |err| {
+            std.debug.print("Failed: DMA requests a read for offset {}.\n", .{ offset });
             return err;
         };
-        std.testing.expectEqual(0, mmu.memory[@intCast(mem_map.oam_low + byte_idx + 1)]) catch |err| {
-            std.debug.print("Failed: DMA copies only one byte and not the next one.\n", .{});
+        const is_read = req.value == .read;
+        std.testing.expectEqual(true, is_read) catch |err| {
+            std.debug.print("Failed: DMA requests a read for offset {}.\n", .{ offset });
+            return err;
+        };
+        req.apply(&test_mem[offset]);
+
+        for(0..2) |_| {
+            req = .{ .address = 0xFFF, .value = .{ .write = 0x00 } };
+            DMA.cycle(&dma, &req);
+        }
+        std.testing.expectEqual(mem_map.oam_low + offset, req.address) catch |err| {
+            std.debug.print("Failed: DMA requests a write for offset {}.\n", .{ offset });
+            return err;
+        };
+        const is_write = req.value == .write;
+        std.testing.expectEqual(true, is_write) catch |err| {
+            std.debug.print("Failed: DMA requests a write for offset {}.\n", .{ offset });
+            return err;
+        };
+        std.testing.expectEqual(test_mem[offset], req.value.write) catch |err| {
+            std.debug.print("Failed: DMA requests a write with correct value for offset {}.\n", .{ offset });
             return err;
         };
     }
@@ -70,8 +86,4 @@ pub fn runDMATest() !void {
         std.debug.print("Failed: After transfer the dma must stop.\n", .{});
         return err;
     };
-
-    // TODO: Also test DMA bus conflicts and what the CPU/PPU could access.
-    // https://hacktix.github.io/GBEDG/dma/
-    // https://gbdev.io/pandocs/OAM_DMA_Transfer.html
 }

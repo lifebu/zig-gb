@@ -69,21 +69,21 @@ export fn frame() void {
         // Deactivating a system means moving it to the inactive set.
         var request: def.Request = .{};
         CPU.cycle(&state.cpu, &request);
+        CPU.request(&state.cpu, &request);
+        DMA.cycle(&state.dma, &request);
         
         BOOT.request(&state.boot, &request);
         CART.request(&state.cart, &state.mmu, &request);
-        DMA.request(&state.dma, &state.mmu, &request);
+        DMA.request(&state.dma, &request);
         INPUT.request(&state.input, &request);
         TIMER.request(&state.timer, &request);
         PPU.request(&state.ppu, &request);
         APU.request(&state.apu, &state.mmu, &request);
-        CPU.request(&state.cpu, &request);
         MMU.request(&state.mmu, &request);
         RAM.request(&state.ram, &request);
 
         BOOT.cycle(&state.boot);
         CART.cycle(&state.cart);
-        DMA.cycle(&state.dma, &state.mmu);
         INPUT.cycle(&state.input);
         const irq_timer = TIMER.cycle(&state.timer);
         const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.mmu);
