@@ -6,10 +6,11 @@
 
 # Design:
 - Each Subsystem owns it's own memory and has cycle() and memory() function.
-- memory() is of shape: ?Request memory(request: ?Request)
+- memory() is of shape: memory(request: *Request)
     - Writes: change internal state or ignore, Reads: change data ptr with actual value or open bus value.
-    - Subsystems can return null to signal the request is done.
-    - Subsystems can also output their own requests (Only useful for DMA).
+    - Subsystem can apply or reject the request.
+    - A request that has been applied once can be applied again, but this does nothing.
+    - Subsystems can change the request (Only useful for DMA).
 - CPU.cycle() returns a memory request struct with address, ptr to value and if it is read or write.
     
 # Open Questions:

@@ -1,7 +1,6 @@
 const std = @import("std");
 
 const APU = @import("apu.zig");
-const BUS = @import("bus.zig");
 const BOOT = @import("boot.zig");
 const CART = @import("cart.zig");
 const CLI = @import("cli.zig");
@@ -19,7 +18,6 @@ const TIMER = @import("timer.zig");
 const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var apu: APU.State = .{};
-    var bus: BUS.State = .{};
     var boot: BOOT.State = .{};
     var cart: CART.State = .{};
     var cli: CLI.State = .{};
@@ -36,7 +34,6 @@ const state = struct {
 export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     APU.init(&state.apu);
-    BUS.init(&state.bus);
     BOOT.init(&state.boot);
     CART.init(&state.cart, state.allocator.allocator());
     CLI.init(&state.cli, state.allocator.allocator());
@@ -70,19 +67,20 @@ export fn frame() void {
     for(0..cycles_per_frame) |_| {
         // TODO: Consider creating a list of active systems that are ticked every cycle by calling their memory and cycle functions.
         // Deactivating a system means moving it to the inactive set.
-        var single_bus: def.Bus = CPU.cycle(&state.cpu, &state.mmu);
-        // TODO: Would be nice that to make it clear, that this cycle must come before everything else so that we can split the bus.
-        BUS.cycle(&state.bus, single_bus);
+
+        var request: def.Request = .{};
+        CPU.cycle(&state.cpu, &state.mmu, &request);
         
-        BOOT.request(&state.boot, &single_bus);
-        CART.request(&state.cart, &state.mmu, &single_bus);
-        DMA.request(&state.dma, &state.mmu, &single_bus);
-        INPUT.request(&state.input, &single_bus);
-        TIMER.request(&state.timer, &state.mmu, &single_bus);
-        PPU.request(&state.ppu, &single_bus);
-        APU.request(&state.apu, &state.mmu, &single_bus);
-        MMU.request(&state.mmu, &single_bus);
-        RAM.request(&state.ram, &single_bus);
+        BOOT.request(&state.boot, &request);
+        CART.request(&state.cart, &state.mmu, &request);
+        DMA.request(&state.dma, &state.mmu, &request);
+        INPUT.request(&state.input, &request);
+        TIMER.request(&state.timer, &state.mmu, &request);
+        PPU.request(&state.ppu, &request);
+        APU.request(&state.apu, &state.mmu, &request);
+        MMU.request(&state.mmu, &request);
+        RAM.request(&state.ram, &request);
+        CPU.request(&state.cpu, &request);
 
         BOOT.cycle(&state.boot);
         CART.cycle(&state.cart);
@@ -96,8 +94,6 @@ export fn frame() void {
         if(sample) |value| {
             Platform.pushSample(&state.platform, value);
         }
-
-        BUS.request(&state.bus, &single_bus);
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds);

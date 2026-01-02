@@ -13,15 +13,8 @@ pub fn init(_: *State) void {
 pub fn cycle(_: *State) void {
 }
 
-pub fn request(state: *State, bus: *def.Bus) void {
-    if(bus.read) |address| {
-        bus.data.* = state.memory[address];
-        bus.read = null;
-    }
-    if(bus.write) |address| {
-        state.memory[address] = bus.data.*;
-        bus.write = null;
-    }
+pub fn request(state: *State, req: *def.Request) void {
+    req.apply(&state.memory[req.address]);
 }
 
 pub fn getFileType(path: []const u8) def.FileType {

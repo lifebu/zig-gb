@@ -225,21 +225,25 @@ pub fn init(state: *State) void {
     state.* = .{};
 }
 
-pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
-    var control: Control = .fromMem(mmu);
+pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
     // TODO: writes will be applied to mmu by the mmu itself which is getting called after this. This is bad design, but the mmu is getting removed soon anyway.
-    if(bus.write) |address| {
-        switch(address) {
-            mem_map.sound_control => {
+    var control: Control = .fromMem(mmu);
+    switch(req.address) {
+        mem_map.sound_control => {
+            req.apply(&mmu.memory[req.address]);
+            if(req.isWrite()) {
                 // TODO: lower nibble is read only (channel status bits).
-                state.apu_on = control.enable_apu;
-            },
-            mem_map.ch1_high_period => {
+                state.apu_on = Control.fromMem(mmu).enable_apu;
+            }
+        },
+        mem_map.ch1_high_period => {
+            req.apply(&mmu.memory[req.address]);
+            if(req.isWrite()) {
                 const sweep: Channel1Sweep = .fromMem(mmu);
                 const volume: Channel1Volume = .fromMem(mmu);
                 const length: Channel1Length = .fromMem(mmu);
                 const period_low: Channel1PeriodLow = .fromMem(mmu);
-                const period_high: Channel1PeriodHigh = @bitCast(bus.data.*);
+                const period_high: Channel1PeriodHigh = .fromMem(mmu);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.func_period_values[0] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
@@ -260,12 +264,15 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(state.channels_on[0] and state.func_length_on[0]) {
                     state.func_length_values[0] = channel_length_table[0] - length.length_init;
                 }
-            },
-            mem_map.ch2_high_period => {
+            }
+        },
+        mem_map.ch2_high_period => {
+            req.apply(&mmu.memory[req.address]);
+            if(req.isWrite()) {
                 const volume: Channel2Volume = .fromMem(mmu);
                 const length: Channel2Length = .fromMem(mmu);
                 const period_low: Channel2PeriodLow = .fromMem(mmu);
-                const period_high: Channel2PeriodHigh = @bitCast(bus.data.*);
+                const period_high: Channel2PeriodHigh = .fromMem(mmu);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.func_period_values[1] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
@@ -279,18 +286,24 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(state.channels_on[1] and state.func_length_on[1]) {
                     state.func_length_values[1] = channel_length_table[1] - length.length_init;
                 }
-            },
-            mem_map.ch3_dac => {
-                const dac: Channel3Dac = @bitCast(bus.data.*);
+            }
+        },
+        mem_map.ch3_dac => {
+            req.apply(&mmu.memory[req.address]);
+            if(req.isWrite()) {
+                const dac: Channel3Dac = .fromMem(mmu);
                 if(!dac.dac_on and state.channels_on[2]) {
                     state.channels_on[2] = false;
                     control.ch2_on = false;
                 }
-            },
-            mem_map.ch3_high_period => {
+            }
+        },
+        mem_map.ch3_high_period => {
+            req.apply(&mmu.memory[req.address]);
+            if(req.isWrite()) {
                 const length: Channel3Length = .fromMem(mmu);
                 const period_low: Channel3PeriodLow = .fromMem(mmu);
-                const period_high: Channel3PeriodHigh = @bitCast(bus.data.*);
+                const period_high: Channel3PeriodHigh = .fromMem(mmu);
                 if(period_high.trigger) {
                     const period: u11 = period_low.period | @as(u11, period_high.period) << 8;
                     state.func_period_values[2] = ch3_t_cycles_per_period * (2047 - @as(u12, period));
@@ -302,12 +315,15 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(state.channels_on[2] and state.func_length_on[2]) {
                     state.func_length_values[2] = channel_length_table[2] - length.initial;
                 }
-            },
-            mem_map.ch4_control => {
+            }
+        },
+        mem_map.ch4_control => {
+            req.apply(&mmu.memory[req.address]);
+            if(req.isWrite()) {
                 const freq: Channel4Freq = .fromMem(mmu);
                 const volume: Channel4Volume = .fromMem(mmu);
                 const length: Channel4Length = .fromMem(mmu);
-                const lfsr_control: Channel4Control = @bitCast(bus.data.*);
+                const lfsr_control: Channel4Control = .fromMem(mmu);
                 if(lfsr_control.trigger) {
                     const divisor = lfsr_divisor_table[freq.divider];
                     state.func_period_values[3] = divisor << freq.shift;
@@ -321,9 +337,9 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
                 if(state.channels_on[3] and state.func_length_on[3]) {
                     state.func_length_values[3] = channel_length_table[3] - length.initial;
                 }
-            },
-            else => {},
-        }
+            }
+        },
+        else => {},
     }
     control.toMem(mmu);
 }

@@ -10,8 +10,7 @@ pub fn runDividerTests() !void {
     var timer: TIMER.State = .{};
     var mmu: MMU.State = .{}; 
 
-    var request_data: u8 = 255;
-    var request: def.Bus = .{ .data = &request_data, .write = mem_map.divider };
+    var request: def.Request = .{ .address = mem_map.divider, .value = .{ .write = 255 } };
     TIMER.request(&timer, &mmu, &request);
     TIMER.cycle(&timer, &mmu);
     std.testing.expectEqual(0, mmu.memory[mem_map.divider]) catch |err| {

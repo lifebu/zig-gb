@@ -16,35 +16,16 @@ pub fn init(state: *State) void {
 pub fn cycle(_: *State) void {
 }
 
-pub fn request(state: *State, bus: *def.Bus) void {
-    if (bus.read) |read_addr| {
-        switch (read_addr) {
-            mem_map.wram_low...(mem_map.wram_high - 1) => {
-                const wram_addr = read_addr - mem_map.wram_low;
-                bus.data.* = state.work_ram[wram_addr];
-                bus.read = null;
-            },
-            mem_map.echo_low...mem_map.echo_high => {
-                const echo_addr = read_addr - mem_map.echo_low;
-                bus.data.* = state.work_ram[echo_addr];
-                bus.read = null;
-            },
-            else => {},
-        }
-    } 
-    else if (bus.write) |write_addr| {
-        switch (write_addr) {
-            mem_map.wram_low...(mem_map.wram_high - 1) => {
-                const wram_addr = write_addr - mem_map.wram_low;
-                state.work_ram[wram_addr] = bus.data.*;
-                bus.read = null;
-            },
-            mem_map.echo_low...mem_map.echo_high => {
-                const echo_addr = write_addr - mem_map.echo_low;
-                state.work_ram[echo_addr] = bus.data.*;
-                bus.read = null;
-            },
-            else => {},
-        }
-    } 
+pub fn request(state: *State, req: *def.Request) void {
+    switch (req.address) {
+        mem_map.wram_low...(mem_map.wram_high - 1) => {
+            const wram_idx: u16 = req.address - mem_map.wram_low;
+            req.apply(&state.work_ram[wram_idx]);
+        },
+        mem_map.echo_low...mem_map.echo_high => {
+            const wram_idx: u16 = req.address - mem_map.echo_low;
+            req.apply(&state.work_ram[wram_idx]);
+        },
+        else => {},
+    }
 }

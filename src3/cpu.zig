@@ -834,8 +834,7 @@ pub fn deinit(_: *State, alloc: std.mem.Allocator) void {
     }
 }
 
-pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
-    var bus: def.Bus = .{}; 
+pub fn cycle(state: *State, mmu: *MMU.State, req: *def.Request) void {
     const flags = state.registers.r8.f;
     const uop: MicroOpData = state.uop_fifo.readItem().?;
     switch(uop.operation) {
@@ -1018,13 +1017,11 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
         .dbus => {
             const params: DBusParams = uop.params.dbus;
             if(params.source == .dbus) { // Read
-                bus.read = state.address_bus;
-                bus.write = null;
-                bus.data = state.registers.getU8(params.target);
+                const target: *u8 = state.registers.getU8(params.target);
+                req.* = def.Request{ .address = state.address_bus, .value = .{ .read = target } };
             } else if(params.target == .dbus) { // Write
-                bus.read = null;
-                bus.write = state.address_bus;
-                bus.data = state.registers.getU8(params.source);
+                const source: *u8 = state.registers.getU8(params.source);
+                req.* = def.Request{ .address = state.address_bus, .value = .{ .write = source.* } };
             } else {
                 unreachable;
             }
@@ -1126,40 +1123,19 @@ pub fn cycle(state: *State, mmu: *MMU.State) def.Bus {
             unreachable;
         },
     }
-
-    return bus;
 }
 
-pub fn request(state: *State, bus: def.Bus) void {
-    if (bus.read) |read_addr| {
-        switch (read_addr) {
-            mem_map.hram_low...(mem_map.hram_high - 1) => {
-                const hram_addr = read_addr - mem_map.hram_low;
-                bus.data.* = state.hram[hram_addr];
-                bus.read = null;
-            },
-            mem_map.interrupt_enable => {
-                bus.data.* = state.interrupt_enable;
-                bus.read = null;
-            },
-            else => {},
-        }
-    } 
-
-    if (bus.write) |write_addr| {
-        switch (write_addr) {
-            mem_map.hram_low...(mem_map.hram_high - 1) => {
-                const hram_addr = write_addr - mem_map.hram_low;
-                state.work_ram[hram_addr] = bus.data.*;
-                bus.read = null;
-            },
-            mem_map.interrupt_enable => {
-                state.work_ram[mem_map.interrupt_enable] = bus.data.*;
-                bus.read = null;
-            },
-            else => {},
-        }
-    } 
+pub fn request(state: *State, req: *def.Request) void {
+    switch(req.address) {
+        mem_map.hram_low...(mem_map.hram_high - 1) => {
+            const hram_idx: u16 = req.address - mem_map.hram_low;
+            req.apply(&state.hram[hram_idx]);
+        },
+        mem_map.interrupt_enable => {
+            req.apply(&state.interrupt_enable);
+        },
+        else => {},
+    }
 }
 
 pub fn loadDump(state: *State, file_type: def.FileType, alloc: std.mem.Allocator) void {

@@ -20,12 +20,12 @@ const MBC = enum(u3) {
 };
 //- MBC Register ranges for: RAM Enable, Rom Bank Low, Rom Bank High (1bit), Ram Bank, Bank mode (MBC1).
 const MBCTypeInfo = struct {
-    ram_enable_low: u16 = 0xFFFF, ram_enable_high: u16 = 0xFFFF,
-    rom_bank_low: u16 = 0xFFFF, rom_bank_high: u16 = 0xFFFF,
-    rom_bank_msb_low: u16 = 0xFFFF, rom_bank_msb_high: u16 = 0xFFFF,
-    ram_bank_low: u16 = 0xFFFF, ram_bank_high: u16 = 0xFFFF,
-    bank_mode_low: u16 = 0xFFFF, bank_mode_high: u16 = 0xFFFF,
-    rtc_low: u16 = 0xFFFF, rtc_high: u16 = 0xFFFF,
+    ram_enable_low: u16 = 0xFEED, ram_enable_high: u16 = 0xFEED,
+    rom_bank_low: u16 = 0xFEED, rom_bank_high: u16 = 0xFEED,
+    rom_bank_msb_low: u16 = 0xFEED, rom_bank_msb_high: u16 = 0xFEED,
+    ram_bank_low: u16 = 0xFEED, ram_bank_high: u16 = 0xFEED,
+    bank_mode_low: u16 = 0xFEED, bank_mode_high: u16 = 0xFEED,
+    rtc_low: u16 = 0xFEED, rtc_high: u16 = 0xFEED,
 };
 const mbc_type_table = [_]MBCTypeInfo {
     // unsupported
@@ -108,30 +108,29 @@ pub fn cycle(_: *State) void {
 
 }
 
-pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
-    // TODO: Need a better way to communicate memory ready and requests so that other systems like the dma don't need to know the mmu.
-    // And split the on-write behavior and memory request handling from the cycle function?
-    if (bus.write) |address| {
-        if (address >= mem_map.rom_high ) {
-            return;
-        } 
-
-        const data = bus.data.*;
-        if (address >= state.mbc_type_info.ram_enable_low and address <= state.mbc_type_info.ram_bank_high ) {
+pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
+    if (req.address >= state.mbc_type_info.ram_enable_low and req.address <= state.mbc_type_info.ram_enable_high ) {
+        if(req.isWrite()) {
             // TODO: This also enables access to the RTC registers.
-            state.ram_enable = @as(u4, @truncate(data)) == 0xA;
+            state.ram_enable = @as(u4, @truncate(req.value.write)) == 0xA;
             ramChanged(state, mmu);
-        } else if (address >= state.mbc_type_info.rom_bank_low and address <= state.mbc_type_info.rom_bank_high ) {
+        }
+    } else if (req.address >= state.mbc_type_info.rom_bank_low and req.address <= state.mbc_type_info.rom_bank_high ) {
+        if(req.isWrite()) {
             // TODO: first 8 bits of rom bank.
             const num_banks: u9 = @truncate(state.rom_size_byte / rom_bank_size_byte);
             const mask: u9 = @intCast(num_banks - 1);
-            state.rom_bank = @truncate(@max(1, data) & mask);
+            state.rom_bank = @truncate(@max(1, req.value.write) & mask);
             romChanged(state, mmu);
-        } else if (address >= state.mbc_type_info.rom_bank_msb_low and address <= state.mbc_type_info.rom_bank_msb_high ) {
+        }
+    } else if (req.address >= state.mbc_type_info.rom_bank_msb_low and req.address <= state.mbc_type_info.rom_bank_msb_high ) {
+        if(req.isWrite()) {
             // TODO: highest 1 bit of rom bank.
             std.debug.print("Highest ROM bit not supported! \n", .{});
             unreachable;
-        } else if (address >= state.mbc_type_info.ram_bank_low and address <= state.mbc_type_info.ram_bank_high ) {
+        }
+    } else if (req.address >= state.mbc_type_info.ram_bank_low and req.address <= state.mbc_type_info.ram_bank_high ) {
+        if(req.isWrite()) {
             // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
             // Depending on what you write you can access different registers.
             const num_banks: u6 = @truncate(state.ram_size_byte / ram_bank_size_byte);
@@ -141,15 +140,19 @@ pub fn request(state: *State, mmu: *MMU.State, bus: *def.Bus) void {
             }
 
             const mask: u9 = @intCast(num_banks - 1);
-            state.ram_bank = @truncate(data & mask);
+            state.ram_bank = @truncate(req.value.write & mask);
             ramChanged(state, mmu);
-        } else if (address >= state.mbc_type_info.rtc_low and address <= state.mbc_type_info.rtc_high ) {
+        }
+    } else if (req.address >= state.mbc_type_info.rtc_low and req.address <= state.mbc_type_info.rtc_high ) {
+        if(req.isWrite()) {
             // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
             // That "latched" data will not change until you do it again by repeating this pattern.
             // This way you can read the RTC registers while the clocks keeps ticking.
         }
+    }
 
-        bus.write = null;
+    if(req.isWrite() and req.address >= 0 and req.address <= mem_map.rom_high) {
+        req.reject(); // Reject writes to rom.
     }
 }
 

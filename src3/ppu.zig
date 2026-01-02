@@ -75,7 +75,6 @@ pub const LcdStat = packed struct {
     pub fn fromMem(mmu: *MMU.State) LcdStat {
         return @bitCast(mmu.memory[mem_map.lcd_stat]);
     } 
-
     pub fn toMem(self: LcdStat, mmu: *MMU.State) void {
         mmu.memory[mem_map.lcd_stat] = @bitCast(self);
     } 
@@ -346,7 +345,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) void {
     lcd_stat.toMem(mmu);
 }
 
-pub fn request(_: *State, _: *def.Bus) void {
+pub fn request(_: *State, _: *def.Request) void {
 
 }
 

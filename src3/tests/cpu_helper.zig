@@ -17,8 +17,9 @@ pub fn fetchInstruction(cpu: *CPU.State, mmu: *MMU.State) void {
 
 pub fn executeCPUFor(cpu: *CPU.State, mmu: *MMU.State, t_cycles: usize) void {
     for(0..t_cycles) |_| {
-        var single_bus: def.Bus = CPU.cycle(cpu, mmu);
-        MMU.request(mmu, &single_bus);
+        var request: def.Request = .{};
+        CPU.cycle(cpu, mmu, &request);
+        MMU.request(mmu, &request);
 
         MMU.cycle(mmu);
     }

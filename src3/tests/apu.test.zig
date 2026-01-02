@@ -16,8 +16,7 @@ fn initWaveTable(mmu: *MMU.State, pattern: [32]u4) void {
 }
 
 fn cpuWrite(apu: *APU.State, mmu: *MMU.State, address: u16, value: u8) void {
-    var request_value: u8 = value;
-    var request: def.Bus = .{ .data = &request_value, .write = address };
+    var request: def.Request = .{ .address = address, .value = .{ .write = value } };
     APU.request(apu, mmu, &request);
     MMU.request(mmu, &request);
 }

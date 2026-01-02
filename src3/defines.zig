@@ -14,62 +14,33 @@ pub const InputState = packed struct {
     start_pressed: bool = false,
 };
 
-const Request = struct {
-    address: u16,
+pub const Request = struct {
+    const invalid: u16 = 0xFEED;
+    const open_bus: u8 = 0xFF;
+
+    address: u16 = invalid,
+    // TODO: Some systems want to implement "only some bits are read/write". How could I do that?
     value: union(enum) {
         read: *u8,
         write: u8,
-    },
+    } = .{ .write = open_bus },
 
     pub fn apply(self: *Request, value: anytype) void {
+        if(self.address == invalid) {
+            return; // TODO: Should this be an error?
+        }
         switch (self.value) {
             .read => |read| read.* = @bitCast(value.*),
             .write => |write| value.* = @bitCast(write),
         }
-        self.address = 0xFEED; // Invalid address :)
+        self.address = invalid;
+    }
+    pub fn isWrite(self: *Request) bool {
+        return self.value == .write;
     }
     pub fn reject(self: *Request) void {
-        var open_bus: u8 = 0xFF;
-        self.apply(&open_bus);
-    }
-};
-
-// TODO: The way this is implemented leads to so much boilerplate code in all subsystem that want to react to reads/writes to their registers.
-// Once we switched to the bus model, make this way more ergonomic!
-pub const Bus = struct {
-    // TODO: As the bus can be either read or write, not both, could we make this struct smaller by having a tagged union / variant of read/write?
-    read: ?u16 = null,
-    write: ?u16 = null,
-    data: *u8 = undefined,
-
-    const Self = @This();
-    pub fn print(self: *Self) []u8 {
-        var buf: [3]u8 = undefined;
-        _ = std.fmt.bufPrint(&buf, "{s}{s}{s}", .{ 
-            if(self.read == null) "-" else "R", 
-            if(self.write == null) "-" else "W", 
-            if(self.read == null and self.write == null) "-" else "M" 
-        }) catch unreachable;
-        return &buf;
-    }
-
-    // TODO: Try to implement all reads/writes of the bus and then decide how we can create functions to reduce boilerplate!
-    pub fn address(self: *const Self) ?u16 {
-        return if(self.read != null) self.read.? 
-            else if(self.write != null) self.write.? 
-            else null;
-    }
-    pub fn apply(self: *Self, value: u8) u8 {
-        if(self.read) |_| {
-            self.data.* = value;
-            self.read = null;
-            return value;
-        }
-        if(self.write) |_| {
-            self.write = null;
-            return self.data.*;
-        }
-        unreachable; 
+        var value: u8 = open_bus;
+        self.apply(&value);
     }
 };
 
