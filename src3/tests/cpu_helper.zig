@@ -18,6 +18,7 @@ pub fn executeCPUFor(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), t_cycle
     for(0..t_cycles) |_| {
         var request: def.Request = .{};
         CPU.cycle(cpu, &request);
+        CPU.request(cpu, &request);
 
         const entry: std.AutoHashMap(u16, u8).GetOrPutResult = try memory.getOrPut(request.address);
         request.apply(entry.value_ptr);

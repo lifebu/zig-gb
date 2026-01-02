@@ -143,6 +143,11 @@ pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
             state.ram_bank = @truncate(req.value.write & mask);
             ramChanged(state, mmu);
         }
+    } else if (req.address >= state.mbc_type_info.bank_mode_low and req.address <= state.mbc_type_info.bank_mode_high) {
+        if(req.isWrite()) {
+            // TODO: Implement banking mode for mbc_1.
+            state.bank_mode = @truncate(req.value.write);
+        }
     } else if (req.address >= state.mbc_type_info.rtc_low and req.address <= state.mbc_type_info.rtc_high ) {
         if(req.isWrite()) {
             // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
