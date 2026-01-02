@@ -20,12 +20,12 @@ const MBC = enum(u3) {
 };
 //- MBC Register ranges for: RAM Enable, Rom Bank Low, Rom Bank High (1bit), Ram Bank, Bank mode (MBC1).
 const MBCTypeInfo = struct {
-    ram_enable_low: u16 = 0xFEED, ram_enable_high: u16 = 0xFEED,
-    rom_bank_low: u16 = 0xFEED, rom_bank_high: u16 = 0xFEED,
-    rom_bank_msb_low: u16 = 0xFEED, rom_bank_msb_high: u16 = 0xFEED,
-    ram_bank_low: u16 = 0xFEED, ram_bank_high: u16 = 0xFEED,
-    bank_mode_low: u16 = 0xFEED, bank_mode_high: u16 = 0xFEED,
-    rtc_low: u16 = 0xFEED, rtc_high: u16 = 0xFEED,
+    ram_enable_low: u16 = 0xFEEE, ram_enable_high: u16 = 0xFEEE,
+    rom_bank_low: u16 = 0xFEEE, rom_bank_high: u16 = 0xFEEE,
+    rom_bank_msb_low: u16 = 0xFEEE, rom_bank_msb_high: u16 = 0xFEEE,
+    ram_bank_low: u16 = 0xFEEE, ram_bank_high: u16 = 0xFEEE,
+    bank_mode_low: u16 = 0xFEEE, bank_mode_high: u16 = 0xFEEE,
+    rtc_low: u16 = 0xFEEE, rtc_high: u16 = 0xFEEE,
 };
 const mbc_type_table = [_]MBCTypeInfo {
     // unsupported
