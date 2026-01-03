@@ -7,6 +7,7 @@ const PPU = @import("../ppu.zig");
 const mem_map = @import("../mem_map.zig");
 
 pub fn runInterruptTests() !void {
+    // TODO: just let the ppu run for a frame + buffer and check the order of interrupts we get.
     var ppu: PPU.State = .{};
     var mmu: MMU.State = .{}; 
     PPU.init(&ppu);

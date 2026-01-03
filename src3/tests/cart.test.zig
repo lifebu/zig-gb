@@ -6,6 +6,7 @@ const def = @import("../defines.zig");
 const mem_map = @import("../mem_map.zig");
 
 pub fn runCartTests() !void {
+    // TODO: Create tests by using a trace file with cpu writes to rom/ram and all rom/ram reads.
     // TODO: Missing Tests:
     // Header: Detect MBC Type (None, 1, 3, 5) and Features (ROMSize, RAMSize, RTC, Rumble).
     // No MBC: 32kByte ROM <= 8kByte RAM.

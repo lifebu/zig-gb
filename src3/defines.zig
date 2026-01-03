@@ -50,8 +50,8 @@ pub const Request = struct {
     }
     pub fn format(self: Request, writer: *std.io.Writer) std.io.Writer.Error!void {
         switch (self.value) {
-            .read => |read|   try writer.print("{s}: R({X:0>4}, {any:0>2})", .{ @tagName(self.requestor), self.address, read }),
-            .write => |write| try writer.print("{s}: W({X:0>4}, {any:0>2})", .{ @tagName(self.requestor), self.address, write }),
+            .read => |read|   try writer.print("{s}: {X:0>4} -> {any:0>2}", .{ @tagName(self.requestor), self.address, read }),
+            .write => |write| try writer.print("{s}: {any:0>2} -> {X:0>4}", .{ @tagName(self.requestor), write, self.address }),
         }
     }
 };

@@ -29,8 +29,11 @@ pub fn request(state: *State, req: *def.Request) void {
 
     switch (req.address) {
         0...def.boot_rom_size => {
-            if(state.rom_enabled) {
-                req.apply(&state.rom[req.address]);
+            if(req.isWrite()) {
+                req.reject();
+            } else {
+                const rom_idx: u16 = req.address - 0;
+                req.apply(&state.rom[rom_idx]);
             }
         },
         mem_map.boot_rom => {

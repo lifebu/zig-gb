@@ -122,14 +122,12 @@ pub fn request(state: *State, req: *def.Request) void {
         state.ram_enable = @as(u4, @truncate(req.value.write)) == 0xA;
         ramChanged(state);
     } else if (isInRange(state.type_info.rom_bank, req.address) and req.isWrite()) {
-        // TODO: first 8 bits of rom bank.
         const num_banks: u9 = @truncate(state.rom_size_byte / rom_bank_size_byte);
         const mask: u9 = @intCast(num_banks - 1);
         state.rom_bank = @truncate(@max(1, req.value.write) & mask);
-        state.rom_bank_high = state.ram_bank;
+        state.rom_bank_high = state.rom_bank;
         romChanged(state);
     } else if (isInRange(state.type_info.rom_bank_msb, req.address) and req.isWrite()) {
-        // TODO: highest 1 bit of rom bank.
         std.debug.print("Highest ROM bit not supported!\n", .{});
         unreachable;
     } else if (isInRange(state.type_info.ram_bank, req.address) and req.isWrite()) {
@@ -178,28 +176,18 @@ pub fn request(state: *State, req: *def.Request) void {
 }
 
 fn romChanged(state: *State) void {
-    // TODO: I am assuming that bank switches don't happen all the time.
-    // And that it is cheaper to just copy 16kByte into the memory region then to 
-    // reroute all reads into ROM and Cartridge RAM regions into the seperate piece of memory of the cartridge. 
-    // But this needs to be tested!
     const rom_start: u32 = state.rom_bank * rom_bank_size_byte;
     const rom_end: u32 = rom_start + rom_bank_size_byte;
-    std.mem.copyForwards(u8, &state.rom_visible, state.rom[rom_start..rom_end]);
+    std.mem.copyForwards(u8, state.rom_visible[mem_map.rom_middle..mem_map.rom_high], state.rom[rom_start..rom_end]);
 }
 
 fn ramChanged(state: *State) void {
     const ram = state.ram orelse return;
 
-    // TODO: I am assuming that bank switches don't happen all the time.
-    // And that it is cheaper to just copy 16kByte into the memory region then to 
-    // reroute all reads into ROM and Cartridge RAM regions into the seperate piece of memory of the cartridge. 
-    // But this needs to be tested!
     if(state.ram_enable) {
         const ram_start: u32 = state.ram_bank * ram_bank_size_byte;
         const ram_end: u32 = ram_start + ram_bank_size_byte;
         std.mem.copyForwards(u8, &state.ram_visible, ram[ram_start..ram_end]);
-    } else {
-        // If it is disabled, memory requests will be rejected => no need for a zero ram bank.
     }
 }
 
@@ -212,6 +200,8 @@ pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType, alloc:
 
             // rom
             const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
+            defer file.close();
+
             state.rom = file.readToEndAlloc(alloc, std.math.maxInt(u32)) catch unreachable;
             errdefer alloc.free(state.rom);
 
@@ -222,10 +212,10 @@ pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType, alloc:
             state.rom_bank = 0;
 
             // ram
+            state.ram_bank = 0;
+            state.ram_enable = false;
             const ram_size: u8 = state.rom[header_ram_size];
             state.ram_size_byte = ram_bank_size_byte * ram_bank_amount[ram_size];
-            state.ram_enable = false;
-            state.ram_bank = 0;
             if(state.ram_size_byte != 0) {
                 state.ram = alloc.alloc(u8, state.ram_size_byte) catch unreachable; 
                 @memset(state.ram.?, 0);

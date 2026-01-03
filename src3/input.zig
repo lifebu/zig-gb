@@ -58,6 +58,5 @@ pub fn updateInputState(state: *State, input_state: *const def.InputState) bool 
     state.buttons &= ~(@as(u4, @intFromBool(input_state.start_pressed)) << 3);
 
     // Interrupts
-    // TODO: Can we do this without an if statement? creating u1 and shifting it up?
     return state.dpad < last_dpad or state.buttons < last_buttons;
 }

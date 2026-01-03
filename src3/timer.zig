@@ -15,8 +15,7 @@ pub const State = struct {
     // last bit we tested for timer (used to detect falling edge).
     // TODO: Don't like how this works honestly.
     timer_last_bit: bool = false,
-    // TODO: Default value is default value after dmg, for other boot roms I need other values.
-    system_counter: u16 = 0xAB00,
+    system_counter: u16 = 0,
 
     divider: u8 = 0,
     timer: u8 = 0,

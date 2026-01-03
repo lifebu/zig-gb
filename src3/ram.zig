@@ -22,7 +22,7 @@ pub fn request(state: *State, req: *def.Request) void {
             const wram_idx: u16 = req.address - mem_map.wram_low;
             req.apply(&state.work_ram[wram_idx]);
         },
-        mem_map.echo_low...mem_map.echo_high => {
+        mem_map.echo_low...(mem_map.echo_high - 1) => {
             const wram_idx: u16 = req.address - mem_map.echo_low;
             req.apply(&state.work_ram[wram_idx]);
         },

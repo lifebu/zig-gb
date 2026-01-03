@@ -17,10 +17,21 @@ pub fn cycle(_: *State) void {
 }
 
 pub fn request(state: *State, req: *def.Request) void {
-    if (req.isValid()) {
-        std.log.warn("r/w lost: {f}", .{ req });
+    switch (req.address) {
+        mem_map.serial_control => {
+            req.apply(&state.memory[req.address]);
+        },
+        mem_map.serial_data => {
+            req.apply(&state.memory[req.address]);
+        },
+        mem_map.unused_low...(mem_map.unused_high - 1) => {
+            req.reject();
+        },
+        else => {
+            if (req.isValid()) std.log.warn("r/w lost: {f}", .{ req });
+            req.apply(&state.memory[req.address]);
+        }
     }
-    req.apply(&state.memory[req.address]);
 }
 
 pub fn getFileType(path: []const u8) def.FileType {
