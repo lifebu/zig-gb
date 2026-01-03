@@ -52,8 +52,8 @@ const LcdControl = packed struct {
     window_enable: bool = false,
     window_map_area: TileMapAddress = .map_9800,
     // TODO: Add support for lcd_enable. 
-    // When set to true, add .halt uop to uop_fifo. 
-    // When set to false, start add initialize ppu (like on start). 
+    // When set to false, add .halt uop to uop_fifo. 
+    // When set to true, start add initialize ppu (like on start). 
     lcd_enable: bool = false,
 };
 
@@ -205,7 +205,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             state.uop_fifo.write(state.current_bg_window_uops); 
             state.background_fifo.clear();
             state.object_fifo.clear();
-            assert(state.oam_line_list.isAligned()); // Sort requires contiguous mmu.
+            assert(state.oam_line_list.isAligned()); // Sort requires contiguous memory.
             std.mem.sort(FetcherData, state.oam_line_list.buffer[0..state.oam_line_list.length()], {}, FetcherData.sortObjects);
             state.lcd_overscan_x = 0;
             // Advance is done in the last cycle of oam_scan. We set it to the max value so that it overflows to 0. 

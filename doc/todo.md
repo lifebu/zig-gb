@@ -15,6 +15,11 @@
 - Make all types "classes".
 - Need to check why most games just dont work at all.
     - Some of them try to access illegal memory (metroid2) (0xFFEE).
+- Implement for all subsystems that the cpu cannot access the memory sometimes.
+    - Accessing VRAM and OAM.
+    - Accessing APU when it is off.
+    - Acessing CART RAM.
+- Check Documentation for the state of certain registers when a subsystem is off (apu, ppu).
 - Interrupt Sources Test:
     - VBlanK, Stat 
 

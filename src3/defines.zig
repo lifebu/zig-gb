@@ -14,9 +14,9 @@ pub const InputState = packed struct {
     start_pressed: bool = false,
 };
 
+pub const open_bus: u8 = 0xFF;
 pub const Request = struct {
     const invalid_addr: u16 = 0xFEED;
-    const open_bus: u8 = 0xFF;
 
     address: u16 = invalid_addr,
     // TODO: Some systems want to implement "only some bits are read/write". How could I do that?

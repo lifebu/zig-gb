@@ -7,7 +7,10 @@ pub const State = struct {
     memory: [def.addr_space]u8 = [1]u8{0} ** def.addr_space,
 };
 
-pub fn init(_: *State) void {
+pub fn init(state: *State) void {
+    // TODO: Need to moved somewhere else once mmu is gone.
+    state.memory[mem_map.serial_data] = 0xFF; // Stubbed.
+    state.memory[mem_map.serial_control] = 0x7E; // Stubbed.
 }
 
 pub fn cycle(_: *State) void {
