@@ -355,7 +355,6 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
 }
 
 pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
-    // TODO: Disallow writes to VRAM, OAM during certain ppu modes.
     switch(req.address) {
         mem_map.lcd_control => {
             const lcd_was_off: bool = !state.lcd_control.lcd_enable;
@@ -375,6 +374,10 @@ pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
             }
         },
         mem_map.lcd_stat => {
+            if(req.isWrite()) {
+                // ly_is_lyc and ppu mode are read only.
+                req.value.write = (req.value.write & 0xF8) | (@as(u8, @bitCast(state.lcd_stat)) & 0x07);
+            }
             req.apply(&state.lcd_stat);
         },
         mem_map.lcd_y => {
@@ -400,10 +403,18 @@ pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
             req.apply(&state.window_y);
         },
         mem_map.oam_low...(mem_map.oam_high - 1) => {
+            if (state.lcd_stat.mode == .oam_scan or state.lcd_stat.mode == .draw) {
+                req.reject();
+            }
+
             const oam_idx: u16 = req.address - mem_map.oam_low;
             req.apply(&state.oam[oam_idx]);
         },
         mem_map.vram_low...(mem_map.vram_high - 1) => {
+            if (state.lcd_stat.mode == .draw) {
+                req.reject();
+            }
+
             //const vram_idx: u16 = req.address - mem_map.vram_low;
             req.apply(&mmu.memory[req.address]);
         },

@@ -166,11 +166,14 @@ pub fn request(state: *State, req: *def.Request) void {
         mem_map.sound_panning => { req.apply(&state.panning); },
         mem_map.master_volume => { req.apply(&state.volume); },
         mem_map.sound_control => {
-            req.apply(&state.control);
             if(req.isWrite()) {
-                // TODO: lower nibble is read only (channel status bits).
-                state.apu_on = state.control.enable_apu;
+                req.value.write = (req.value.write & 0xF0) | (@as(u8, @bitCast(state.control)) & 0x0F);
             }
+            req.apply(&state.control);
+            // TODO: Turning of apu leads to:
+            // all APU registers are cleared but read-only, except sound_control.
+            // Wave RAM can still be written to.
+            state.apu_on = state.control.enable_apu;
         },
         mem_map.ch1_sweep => { req.apply(&state.ch1_sweep); },
         mem_map.ch1_length => { req.apply(&state.ch1_length); },
