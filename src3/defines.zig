@@ -14,6 +14,7 @@ pub const InputState = packed struct {
     start_pressed: bool = false,
 };
 
+var void_byte: u8 = 0x00;
 pub const open_bus: u8 = 0xFF;
 pub const Request = struct {
     const invalid_addr: u16 = 0xFEED;
@@ -23,7 +24,7 @@ pub const Request = struct {
     value: union(enum) {
         read: *u8,
         write: u8,
-    } = .{ .write = open_bus },
+    } = .{ .read = &void_byte },
     requestor: enum {
         unknown, cpu, dma
     } = .unknown,
@@ -32,6 +33,7 @@ pub const Request = struct {
         if(!self.isValid()) {
             return; // TODO: Should this be an error?
         }
+
         switch (self.value) {
             .read => |read| read.* = @bitCast(value.*),
             .write => |write| value.* = @bitCast(write),

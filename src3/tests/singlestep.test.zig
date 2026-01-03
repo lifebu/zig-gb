@@ -141,6 +141,13 @@ pub fn runSingleStepTests() !void {
     var idx: u16 = 0;
     while(try iter.next()) |dir_entry| : (idx += 1) {
         std.debug.assert(dir_entry.kind == .file);
+        
+        // Use this to only run a single test.
+        // const only_test = "cb 46.json";
+        // if(!std.mem.eql(u8, dir_entry.name, only_test)) {
+        //     continue;
+        // }
+
         std.debug.print("{d}: Testing: {s}\n", .{idx + 1, dir_entry.name});
         if(std.mem.eql(u8, dir_entry.name, "76.json")) {
             continue; // Skip testing halt. SingleStepTests are inaccurate for halt.
@@ -154,7 +161,7 @@ pub fn runSingleStepTests() !void {
 
         const test_config: []TestType = json.value;
         for(test_config) |test_case| {
-            if(std.mem.eql(u8, test_case.name, "CB 0F 0000")) {
+            if(std.mem.eql(u8, test_case.name, "CB 46 01C0")) {
                 const a: u32 = 10;
                 if(a == 10) {}
             }
