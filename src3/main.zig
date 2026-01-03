@@ -77,7 +77,7 @@ export fn frame() void {
         DMA.request(&state.dma, &request);
         INPUT.request(&state.input, &request);
         TIMER.request(&state.timer, &request);
-        PPU.request(&state.ppu, &request);
+        PPU.request(&state.ppu, &state.mmu, &request);
         APU.request(&state.apu, &request);
         RAM.request(&state.ram, &request);
         MMU.request(&state.mmu, &request);

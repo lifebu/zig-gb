@@ -24,6 +24,9 @@ pub const Request = struct {
         read: *u8,
         write: u8,
     } = .{ .write = open_bus },
+    requestor: enum {
+        unknown, cpu, dma
+    } = .unknown,
 
     pub fn apply(self: *Request, value: anytype) void {
         if(!self.isValid()) {
@@ -44,6 +47,12 @@ pub const Request = struct {
     }
     pub fn isWrite(self: *Request) bool {
         return self.value == .write;
+    }
+    pub fn format(self: Request, writer: *std.io.Writer) std.io.Writer.Error!void {
+        switch (self.value) {
+            .read => |read|   try writer.print("{s}: R({X:0>4}, {any:0>2})", .{ @tagName(self.requestor), self.address, read }),
+            .write => |write| try writer.print("{s}: W({X:0>4}, {any:0>2})", .{ @tagName(self.requestor), self.address, write }),
+        }
     }
 };
 

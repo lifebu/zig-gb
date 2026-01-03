@@ -39,10 +39,10 @@ pub fn cycle(state: *State, req: *def.Request) void {
 
     if(state.is_read) {
         const source_addr: u16 = state.start_addr + state.offset;
-        req.* = .{ .address = source_addr, .value = .{ .read = &state.byte } };
+        req.* = .{ .requestor = .dma, .address = source_addr, .value = .{ .read = &state.byte } };
     } else {
         const dest_addr: u16 = mem_map.oam_low + state.offset;
-        req.* = .{ .address = dest_addr, .value = .{ .write = state.byte } };
+        req.* = .{ .requestor = .dma, .address = dest_addr, .value = .{ .write = state.byte } };
 
         state.offset += 1;
         state.is_running = (dest_addr + 1) < mem_map.oam_high;

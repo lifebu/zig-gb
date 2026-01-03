@@ -355,7 +355,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
     return .{ irq_vblank, irq_stat };
 }
 
-pub fn request(state: *State, req: *def.Request) void {
+pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
     // TODO: Disallow writes to VRAM, OAM during certain ppu modes.
     switch(req.address) {
         mem_map.lcd_control => {
@@ -389,6 +389,19 @@ pub fn request(state: *State, req: *def.Request) void {
         mem_map.oam_low...(mem_map.oam_high - 1) => {
             const oam_idx: u16 = req.address - mem_map.oam_low;
             req.apply(&state.oam[oam_idx]);
+        },
+        mem_map.vram_low...(mem_map.vram_high - 1) => {
+            //const vram_idx: u16 = req.address - mem_map.vram_low;
+            req.apply(&mmu.memory[req.address]);
+        },
+        mem_map.bg_palette => {
+            req.apply(&mmu.memory[req.address]);
+        },
+        mem_map.obj_palette_0 => {
+            req.apply(&mmu.memory[req.address]);
+        },
+        mem_map.obj_palette_1 => {
+            req.apply(&mmu.memory[req.address]);
         },
         else => {},
     }

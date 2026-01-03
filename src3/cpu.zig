@@ -1011,10 +1011,10 @@ pub fn cycle(state: *State, req: *def.Request) void {
             const params: DBusParams = uop.params.dbus;
             if(params.source == .dbus) { // Read
                 const target: *u8 = state.registers.getU8(params.target);
-                req.* = def.Request{ .address = state.address_bus, .value = .{ .read = target } };
+                req.* = def.Request{ .requestor = .cpu, .address = state.address_bus, .value = .{ .read = target } };
             } else if(params.target == .dbus) { // Write
                 const source: *u8 = state.registers.getU8(params.source);
-                req.* = def.Request{ .address = state.address_bus, .value = .{ .write = source.* } };
+                req.* = def.Request{ .requestor = .cpu,.address = state.address_bus, .value = .{ .write = source.* } };
             } else {
                 unreachable;
             }

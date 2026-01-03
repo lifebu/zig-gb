@@ -17,6 +17,9 @@ pub fn cycle(_: *State) void {
 }
 
 pub fn request(state: *State, req: *def.Request) void {
+    if (req.isValid()) {
+        std.log.warn("r/w lost: {f}", .{ req });
+    }
     req.apply(&state.memory[req.address]);
 }
 
