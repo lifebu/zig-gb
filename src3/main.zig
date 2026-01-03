@@ -78,9 +78,9 @@ export fn frame() void {
         INPUT.request(&state.input, &request);
         TIMER.request(&state.timer, &request);
         PPU.request(&state.ppu, &request);
-        APU.request(&state.apu, &state.mmu, &request);
-        MMU.request(&state.mmu, &request);
+        APU.request(&state.apu, &request);
         RAM.request(&state.ram, &request);
+        MMU.request(&state.mmu, &request);
 
         BOOT.cycle(&state.boot);
         CART.cycle(&state.cart);
@@ -89,7 +89,7 @@ export fn frame() void {
         const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.mmu);
         MMU.cycle(&state.mmu);
         RAM.cycle(&state.ram);
-        const sample: ?def.Sample = APU.cycle(&state.apu, &state.mmu);
+        const sample: ?def.Sample = APU.cycle(&state.apu);
         if(sample) |value| {
             Platform.pushSample(&state.platform, value);
         }

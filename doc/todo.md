@@ -13,12 +13,10 @@
 - Remove all request(), cycle(), init(), deinit() functions that do nothing.
 - Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
 - Make all types "classes".
-
 - Need to check why most games just dont work at all.
     - Some of them try to access illegal memory (metroid2) (0xFFEE).
-- Interrupt Sources
-    - VBlanK: Add tests!
-    - Stat 
+- Interrupt Sources Test:
+    - VBlanK, Stat 
 
 ## APU:
 - CH3: Length timer + "Frame Sequencer" is working.

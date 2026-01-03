@@ -1,38 +1,34 @@
 const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
-const MMU = @import("../mmu.zig");
 const def = @import("../defines.zig");
 const APU = @import("../apu.zig");
 const mem_map = @import("../mem_map.zig");
 
-fn initWaveTable(mmu: *MMU.State, pattern: [32]u4) void {
-    for(mem_map.wave_low..mem_map.wave_high, 0..) |mem_idx, idx| {
+fn initWaveTable(apu: *APU.State, pattern: [32]u4) void {
+    for(&apu.ch3_wave_table, 0..) |*wave, idx| {
         const first_idx: usize = idx * 2;
         const low_nibble: u8 = pattern[first_idx + 1];
         const high_nibble: u8 = @as(u8, (pattern[first_idx])) << 4;
-        mmu.memory[mem_idx] = low_nibble | high_nibble;
+        wave.* = low_nibble | high_nibble;
     }
 }
 
-fn cpuWrite(apu: *APU.State, mmu: *MMU.State, address: u16, value: u8) void {
+fn cpuWrite(apu: *APU.State, address: u16, value: u8) void {
     var request: def.Request = .{ .address = address, .value = .{ .write = value } };
-    APU.request(apu, mmu, &request);
-    MMU.request(mmu, &request);
+    APU.request(apu, &request);
 }
 
 pub fn runApuChannelTests() !void {
     var apu: APU.State = .{};
-    var mmu: MMU.State = .{}; 
     APU.init(&apu);
 
     // CH3: Channel status bit is updated.
     APU.init(&apu);
-    cpuWrite(&apu, &mmu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
+    cpuWrite(&apu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
         .period = 0, .length_on = false, .trigger = true,
     }));
-    const control: APU.Control = .fromMem(&mmu);
-    std.testing.expectEqual(true, control.ch3_on) catch |err| {
+    std.testing.expectEqual(true, apu.control.ch3_on) catch |err| {
         std.debug.print("Failed: Ch3 status bit must be updated when we trigger channel 3.\n", .{});
         return err;
     };
@@ -41,7 +37,7 @@ pub fn runApuChannelTests() !void {
     for(&wave_pattern, 0..) |*pattern, idx| {
         pattern.* = @intCast(idx % 16);
     }
-    initWaveTable(&mmu, wave_pattern);
+    initWaveTable(&apu, wave_pattern);
 
     // CH3: Wave Table is read left-to-right at correct frequency, dac and volume shift is supported.
     // TODO: Test that you can turn of a ch3 by turning it's dac of by setting it to false after starting ch3.
@@ -59,22 +55,22 @@ pub fn runApuChannelTests() !void {
     };
     for(test_cases) |test_case| {
         APU.init(&apu);
-        cpuWrite(&apu, &mmu, mem_map.sound_control, @bitCast(APU.Control{
+        cpuWrite(&apu, mem_map.sound_control, @bitCast(APU.Control{
             .enable_apu = true, .ch1_on = false, .ch2_on = false, .ch3_on = false, .ch4_on = false,
         }));
-        cpuWrite(&apu, &mmu, mem_map.ch3_dac, @bitCast(APU.Channel3Dac{
+        cpuWrite(&apu, mem_map.ch3_dac, @bitCast(APU.Channel3Dac{
             .dac_on = test_case.dac,
         }));
-        cpuWrite(&apu, &mmu, mem_map.ch3_length, @bitCast(APU.Channel3Length{
+        cpuWrite(&apu, mem_map.ch3_length, @bitCast(APU.Channel3Length{
             .initial = 0,
         }));
-        cpuWrite(&apu, &mmu, mem_map.ch3_volume, @bitCast(APU.Channel3Volume{
+        cpuWrite(&apu, mem_map.ch3_volume, @bitCast(APU.Channel3Volume{
             .shift = test_case.volume,
         }));
-        cpuWrite(&apu, &mmu, mem_map.ch3_low_period, @bitCast(APU.Channel3PeriodLow{
+        cpuWrite(&apu, mem_map.ch3_low_period, @bitCast(APU.Channel3PeriodLow{
             .period = @truncate(test_case.period),
         }));
-        cpuWrite(&apu, &mmu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
+        cpuWrite(&apu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
             .period = @truncate(test_case.period >> 8), .length_on = false, .trigger = true,
         }));
 
@@ -82,7 +78,7 @@ pub fn runApuChannelTests() !void {
         for(0..32) |sample_idx| {
             const cycles_per_value: u13 = APU.ch3_t_cycles_per_period * (2048 - @as(u13, test_case.period));
             for(0..cycles_per_value) |_| {
-                _ = APU.cycle(&apu, &mmu);
+                _ = APU.cycle(&apu);
             }
 
             var expected = wave_pattern[pattern_idx];
