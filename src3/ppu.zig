@@ -51,9 +51,6 @@ const LcdControl = packed struct {
     } = .tile_8800,
     window_enable: bool = false,
     window_map_area: TileMapAddress = .map_9800,
-    // TODO: Add support for lcd_enable. 
-    // When set to false, add .halt uop to uop_fifo. 
-    // When set to true, start add initialize ppu (like on start). 
     lcd_enable: bool = false,
 };
 
@@ -188,14 +185,18 @@ pub const State = struct {
 };
 
 pub fn init(state: *State) void {
-    // TODO: Once we have an actual system and cpu think about what we need to do to initialize the PPU.
-    state.uop_fifo.write(&oam_scan);
+    state.* = .{};
 }
 
 // TODO: Remove dependency to the memory array.
 pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
-    var irq_vblank: bool = false;
     var irq_stat: bool = false;
+    var irq_vblank: bool = false;
+
+    // TODO: Not so nice to just early return? Maybe load the PPU with nops?
+    if(!state.lcd_control.lcd_enable) {
+        return .{ irq_vblank, irq_stat };
+    }
 
     const uop: MicroOp = state.uop_fifo.readItem().?;
     switch(uop) {
@@ -233,9 +234,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
                 irq_stat |= state.lcd_stat.mode_2_select;
             }
             state.lcd_stat.mode = .oam_scan;
-            state.uop_fifo.write(&oam_scan);
-            state.oam_line_list.clearRealign(); // required for std.mem.sort
-            state.oam_scan_idx = 0;
+            advanceOAMScan(state);
         },
         .advance_vblank => {
             if (state.lcd_stat.mode != .v_blank) {
@@ -359,7 +358,21 @@ pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
     // TODO: Disallow writes to VRAM, OAM during certain ppu modes.
     switch(req.address) {
         mem_map.lcd_control => {
+            const lcd_was_off: bool = !state.lcd_control.lcd_enable;
             req.apply(&state.lcd_control);
+            if(req.isWrite()) {
+                if(!state.lcd_control.lcd_enable) {
+                    state.lcd_stat.mode = .h_blank;
+                    state.colorIds = [_]u8{ 0 } ** def.overscan_resolution;
+                    state.lcd_y = 0;
+
+                    state.uop_fifo.clear();
+                    state.background_fifo.clear();
+                    state.object_fifo.clear();
+                } else if (state.lcd_control.lcd_enable and lcd_was_off) {
+                    advanceOAMScan(state);
+                }
+            }
         },
         mem_map.lcd_stat => {
             req.apply(&state.lcd_stat);
@@ -412,6 +425,12 @@ fn advanceBlank(state: *State, length: usize) void {
     state.uop_fifo.write(blank[0..length]);
     const advance: MicroOp = if(state.lcd_y >= def.resolution_height) .advance_vblank else .advance_oam_scan;
     state.uop_fifo.writeItem(advance);
+}
+
+fn advanceOAMScan(state: *State) void {
+    state.uop_fifo.write(&oam_scan);
+    state.oam_line_list.clearRealign(); // required for std.mem.sort
+    state.oam_scan_idx = 0;
 }
 
 fn checkLcdX(state: *State) void {
