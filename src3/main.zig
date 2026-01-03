@@ -56,7 +56,7 @@ fn imgui_cb(dump_path: []const u8) void {
     const file_type: def.FileType = MMU.getFileType(dump_path);
     MMU.loadDump(&state.mmu, dump_path, file_type);
     CPU.loadDump(&state.cpu, file_type, state.allocator.allocator());
-    CART.loadDump(&state.cart, dump_path, file_type, &state.mmu, state.allocator.allocator());
+    CART.loadDump(&state.cart, dump_path, file_type, state.allocator.allocator());
 }
 
 export fn frame() void {
@@ -73,7 +73,7 @@ export fn frame() void {
         DMA.cycle(&state.dma, &request);
         
         BOOT.request(&state.boot, &request);
-        CART.request(&state.cart, &state.mmu, &request);
+        CART.request(&state.cart, &request);
         DMA.request(&state.dma, &request);
         INPUT.request(&state.input, &request);
         TIMER.request(&state.timer, &request);
@@ -97,6 +97,7 @@ export fn frame() void {
         const irq_serial: bool = false;
         CPU.pushInterrupts(&state.cpu, irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad);
         irq_joypad = false; // TODO: Not the nicest, okay for now.
+        // TODO: I should create an error message, if any request was never answered (i.e. game tried to access invalid memory).
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds);

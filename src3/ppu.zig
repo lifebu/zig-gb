@@ -386,7 +386,7 @@ pub fn request(state: *State, req: *def.Request) void {
         mem_map.window_y => {
             req.apply(&state.window_y);
         },
-        mem_map.oam_low...mem_map.oam_high => {
+        mem_map.oam_low...(mem_map.oam_high - 1) => {
             const oam_idx: u16 = req.address - mem_map.oam_low;
             req.apply(&state.oam[oam_idx]);
         },
