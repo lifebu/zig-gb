@@ -13,9 +13,6 @@ pub fn init(state: *State) void {
     state.memory[mem_map.serial_control] = 0x7E; // Stubbed.
 }
 
-pub fn cycle(_: *State) void {
-}
-
 pub fn request(state: *State, req: *def.Request) void {
     switch (req.address) {
         mem_map.serial_control => {

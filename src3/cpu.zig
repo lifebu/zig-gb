@@ -1047,7 +1047,15 @@ pub fn cycle(state: *State, req: *def.Request) void {
                 const params: DecodeParams = uop.params.decode;
                 const opcode_bank = opcode_banks[params.bank_idx];
                 const opcode: u8 = state.registers.r8.ir;
+                if(opcode == 0x10 and params.bank_idx == opcode_bank_default) {
+                    std.debug.print("STOP_NOT_IMPLEMENTED\n", .{});
+                    unreachable;
+                }
                 const uops: MicroOpArray = opcode_bank[opcode];
+                if(uops.items.len == 0) {
+                    std.debug.print("DECODED INVALID OPCODE: BANK: {}: OPCODE: {X:0>2}\n", .{ params.bank_idx, opcode });
+                    unreachable;
+                }
                 state.uop_fifo.write(uops.items);
             }
         },

@@ -1,5 +1,5 @@
 # src3:
-- Cart: only do request() not cycle(), do not copy to the rom/ram data blocks, just calculate indices! 
+- Cart: do not copy to the rom/ram data blocks, just calculate indices! 
     - Cart: Write tests!
 - Memory: see memory.md
     => REMOVES MMU!
@@ -12,15 +12,9 @@
         - ram, boot and IF are "cold storage"?
         - IOMMU? just io?
     - Cart: Merge boot rom onto cart?
-- Remove all request(), cycle(), init(), deinit() functions that do nothing.
 - Make all types "classes".
 - Need to check why most games just dont work at all.
     - Some of them try to access illegal memory (metroid2) (0xFFEE).
-- Implement for all subsystems that the cpu cannot access the memory sometimes.
-    - Accessing VRAM and OAM.
-    - Accessing APU when it is off.
-    - Acessing CART RAM.
-- Check Documentation for the state of certain registers when a subsystem is off (apu, ppu).
 - PPU also has some not-implemented features.
 - Interrupt Sources Test:
     - VBlanK, Stat 

@@ -74,21 +74,16 @@ export fn frame() void {
         
         BOOT.request(&state.boot, &request);
         CART.request(&state.cart, &request);
+        RAM.request(&state.ram, &request);
         DMA.request(&state.dma, &request);
         INPUT.request(&state.input, &request);
         TIMER.request(&state.timer, &request);
-        PPU.request(&state.ppu, &state.mmu, &request);
         APU.request(&state.apu, &request);
-        RAM.request(&state.ram, &request);
+        PPU.request(&state.ppu, &state.mmu, &request);
         MMU.request(&state.mmu, &request);
 
-        BOOT.cycle(&state.boot);
-        CART.cycle(&state.cart);
-        INPUT.cycle(&state.input);
         const irq_timer = TIMER.cycle(&state.timer);
         const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.mmu);
-        MMU.cycle(&state.mmu);
-        RAM.cycle(&state.ram);
         const sample: ?def.Sample = APU.cycle(&state.apu);
         if(sample) |value| {
             Platform.pushSample(&state.platform, value);
@@ -97,7 +92,6 @@ export fn frame() void {
         const irq_serial: bool = false;
         CPU.pushInterrupts(&state.cpu, irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad);
         irq_joypad = false; // TODO: Not the nicest, okay for now.
-        // TODO: I should create an error message, if any request was never answered (i.e. game tried to access invalid memory).
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds);

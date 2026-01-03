@@ -13,10 +13,6 @@ pub const State = struct {
 pub fn init(_: *State) void {
 }
 
-pub fn cycle(_: *State) void {
-
-}
-
 pub fn request(state: *State, req: *def.Request) void {
     switch (req.address) {
         mem_map.joypad => {

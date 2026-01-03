@@ -141,7 +141,6 @@ pub fn runInputTests() !void {
         var request: def.Request = .{ .address = mem_map.joypad, .value = .{ .write = testCase.write } };
         _ = INPUT.updateInputState(&input, &testCase.input);
         INPUT.request(&input, &request);
-        INPUT.cycle(&input);
         std.testing.expectEqual(testCase.expected, input.joypad) catch |err| {
             std.debug.print("Failed {d}: {s}\n", .{ i, testCase.name });
             return err;
@@ -152,7 +151,6 @@ pub fn runInputTests() !void {
     input.joypad = 0b1111_1111;
     var request: def.Request = .{ .address = mem_map.joypad, .value = .{ .write = 0b1111_0000 } };
     INPUT.request(&input, &request);
-    INPUT.cycle(&input);
     std.testing.expectEqual(0b1111_1111, input.joypad) catch |err| {
         std.debug.print("Failed {d}: {s}\n", .{ testCases.len, "Lower nibble is ready-only to cpu" });
         return err;

@@ -17,9 +17,6 @@ pub fn init(state: *State) void {
     state.rom_enabled = true;
 }
 
-pub fn cycle(_: *State) void {
-}
-
 pub fn request(state: *State, req: *def.Request) void {
     // TODO: Move this logic to the cart.zig?
     // TODO: Can I implement the mapping better, so that I don't have a late check like this?
@@ -28,7 +25,7 @@ pub fn request(state: *State, req: *def.Request) void {
     }
 
     switch (req.address) {
-        0...def.boot_rom_size => {
+        0...(def.boot_rom_size - 1) => {
             if(req.isWrite()) {
                 req.reject();
             } else {

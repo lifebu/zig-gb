@@ -111,10 +111,6 @@ pub fn deinit(state: *State, alloc: std.mem.Allocator) void {
     }
 }
 
-pub fn cycle(_: *State) void {
-
-}
-
 pub fn request(state: *State, req: *def.Request) void {
     // mbc
     if (isInRange(state.type_info.ram_enable, req.address) and req.isWrite()) {

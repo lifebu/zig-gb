@@ -13,9 +13,6 @@ pub fn init(state: *State) void {
     state.work_ram = [_]u8{ 0 } ** work_ram_size;
 }
 
-pub fn cycle(_: *State) void {
-}
-
 pub fn request(state: *State, req: *def.Request) void {
     switch (req.address) {
         mem_map.wram_low...(mem_map.wram_high - 1) => {
