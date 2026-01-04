@@ -728,7 +728,7 @@ const InterruptFlags = packed union {
 };
 
 pub const FlagRegister = packed struct(u8) {
-    _: u4 = 0,
+    _unused: u4 = 0,
     carry: u1 = 0,
     half_bcd: u1 = 0,
     n_bcd: u1 = 0,
@@ -1119,6 +1119,9 @@ pub fn cycle(state: *State, req: *def.Request) void {
             const params: MiscParams = uop.params.misc;
             const target: *u16 = state.registers.getU16(params.write_back);
             target.* = state.registers.r16.wz;
+
+            // NOTE: POP AF can write non-zero to unused, which is not allowed.
+            state.registers.r8.f._unused = 0;
         },
         else => { 
             std.debug.print("CPU_MICRO_OP_NOT_IMPLEMENTED: {any}\n", .{uop});

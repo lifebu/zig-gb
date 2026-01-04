@@ -1,20 +1,12 @@
 # src3:
-- Cart: Write tests!
-- Memory: see memory.md
-    => REMOVES MMU!
-- Merge some subsystems.
-    - I currently have a large set of .zig files and "subsystems".
-    - Most of them have very little logic and code.
-    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
-    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
-        => But how should that one be named?
-        - ram, boot and IF are "cold storage"?
-        - IOMMU? just io?
-    - Cart: Merge boot rom onto cart?
-- Make all types "classes".
+
+## Next:
+- PPU Missing bg_window_enable for backgrounds.
 - Need to check why most games just dont work at all.
     - Some of them try to access illegal memory (metroid2) (0xFFEE).
-- PPU also has some not-implemented features.
+
+## Tests
+- Cart: Different MBC controller.
 - Interrupt Sources Test:
     - VBlanK, Stat 
 
@@ -43,7 +35,19 @@
 - We should never let the audio device starve out of samples (how to detect that?)
 - We also should never waste any samples (i.e, the platform sound buffer is already full).
 
-## Next:
+## Soon:
+- Merge some subsystems.
+    - I currently have a large set of .zig files and "subsystems".
+    - Most of them have very little logic and code.
+    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
+    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
+        => But how should that one be named?
+        - ram, boot and IF are "cold storage"?
+        - IOMMU? just io?
+    - Cart: Merge boot rom onto cart?
+- Make all types "classes".
+- Memory: see memory.md
+    - PPU: Palettes and VRAM.
 - List of GB Test Roms with expected outputs:
     https://github.com/c-sp/game-boy-test-roms
     => This has a list of required outputs and a shell script that uses tgbds to compile them.
