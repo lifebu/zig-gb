@@ -26,7 +26,7 @@ pub fn request(state: *State, req: *def.Request) void {
         },
         else => {
             if (req.isValid()) std.log.warn("r/w lost: {f}", .{ req });
-            req.apply(&state.memory[req.address]);
+            req.reject();
         }
     }
 }
