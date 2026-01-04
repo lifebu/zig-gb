@@ -35,25 +35,22 @@ pub fn runTimerTest() !void {
     var timer: TIMER.State = .{};
     var irq_timer: bool = false;
 
-    timer.timer_mod = 0x05;
-
     const CycleTestCase = struct {
         cycles: u16,
-        timer_control: u8,
+        timer_control: TIMER.TimerControl,
     };
     const cycleCases = [_]CycleTestCase {
-        .{ .cycles = 1024, .timer_control = 0b0000_0100 }, 
-        .{ .cycles = 16,   .timer_control = 0b0000_0101 }, 
-        .{ .cycles = 64,   .timer_control = 0b0000_0110 }, 
-        .{ .cycles = 256,  .timer_control = 0b0000_0111 },
+        .{ .cycles = 1024, .timer_control = .{ .enable = true, .clock = 0 } }, 
+        .{ .cycles = 16,   .timer_control = .{ .enable = true, .clock = 1 } }, 
+        .{ .cycles = 64,   .timer_control = .{ .enable = true, .clock = 2 } }, 
+        .{ .cycles = 256,  .timer_control = .{ .enable = true, .clock = 3 } },
     };
     for(cycleCases, 0..) |cycleCase, i| {
         if(i == 0) { // Change value to attach debugger.
             var val: u32 = 0; val += 1;
         }
 
-        timer.system_counter = 0;
-        timer.timer = 0x00;
+        timer = .{};
         timer.timer_control = @bitCast(cycleCase.timer_control);
         for(0..cycleCase.cycles) |_| {
             irq_timer = TIMER.cycle(&timer);
@@ -65,9 +62,10 @@ pub fn runTimerTest() !void {
     }
 
     // overflow
-    timer.system_counter = 0;
-    timer.timer_mod = 0x05;
+    timer = .{};
     timer.timer = 0xFF;
+    timer.timer_mod = 0x05;
+    timer.timer_control = .{ .enable = true, .clock = 3 };
     for(0..256) |_| {
         irq_timer = TIMER.cycle(&timer);
     }
@@ -93,10 +91,12 @@ pub fn runTimerTest() !void {
     };
 
     // disable can increment timer.
-    timer.system_counter = 0xFFFD;
+    timer = .{};
     timer.timer = 0x05;
+    timer.system_counter = 0xFFFD;
+    timer.timer_control = .{ .enable = true, .clock = 3 };
     irq_timer = TIMER.cycle(&timer);
-    timer.timer_control = @bitCast(@as(u8, 0b0000_0011));
+    timer.timer_control = .{ .enable = false, .clock = 3 };
     irq_timer = TIMER.cycle(&timer);
     std.testing.expectEqual(0x06, timer.timer) catch |err| {
         std.debug.print("Failed: Disabling timer can increment it.\n", .{});
@@ -104,13 +104,15 @@ pub fn runTimerTest() !void {
     };
 
     // overflow: cpu writes abort timer_mod
-    timer.system_counter = 0;
-    timer.timer_mod = 0x05;
+    timer = .{};
     timer.timer = 0xFF;
+    timer.timer_mod = 0x05;
+    timer.timer_control = .{ .enable = true, .clock = 3 };
     for(0..256) |_| {
         irq_timer = TIMER.cycle(&timer);
     }
-    timer.timer = 0x10;
+    var request: def.Request = .{ .address = mem_map.timer, .value = .{ .write = 0x10 } };
+    TIMER.request(&timer, &request);
     for(0..4) |_| {
         irq_timer = TIMER.cycle(&timer);
     }
@@ -124,13 +126,15 @@ pub fn runTimerTest() !void {
     };
 
     // overflow: cpu write TIMA on 4th cycle => write is ignored
-    timer.system_counter = 0;
-    timer.timer_mod = 0x05;
+    timer = .{};
     timer.timer = 0xFF;
+    timer.timer_mod = 0x05;
+    timer.timer_control = .{ .enable = true, .clock = 3 };
     for(0..(256 + 3)) |_| {
         irq_timer = TIMER.cycle(&timer);
     }
-    timer.timer = 0x33;
+    request = .{ .address = mem_map.timer, .value = .{ .write = 0x33 } };
+    TIMER.request(&timer, &request);
     irq_timer = TIMER.cycle(&timer);
     std.testing.expectEqual(0x05, timer.timer) catch |err| {
         std.debug.print("Failed: Writing to tima on 4th cycle leads to the write being ignored.\n", .{});
@@ -138,13 +142,15 @@ pub fn runTimerTest() !void {
     };
 
     // overflow: cpu write TMA on 4th cycle => new TMA value is used.
-    timer.system_counter = 0;
-    timer.timer_mod = 0x05;
+    timer = .{};
     timer.timer = 0xFF;
+    timer.timer_mod = 0x05;
+    timer.timer_control = .{ .enable = true, .clock = 3 };
     for(0..(256 + 3)) |_| {
         irq_timer = TIMER.cycle(&timer);
     }
-    timer.timer_mod = 0x22;
+    request = .{ .address = mem_map.timer_mod, .value = .{ .write = 0x22 } };
+    TIMER.request(&timer, &request);
     irq_timer = TIMER.cycle(&timer);
     std.testing.expectEqual(0x22, timer.timer) catch |err| {
         std.debug.print("Failed: Writing to timer mod on 4th cycle leads to the new value used for the modulo.\n", .{});

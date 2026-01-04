@@ -45,6 +45,10 @@
 - We also should never waste any samples (i.e, the platform sound buffer is already full).
 
 ## Next:
+- List of GB Test Roms with expected outputs:
+    https://github.com/c-sp/game-boy-test-roms
+    => This has a list of required outputs and a shell script that uses tgbds to compile them.
+    => Also has release verions you can download.
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.
         - 1st: Check memory request.
