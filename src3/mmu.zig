@@ -4,7 +4,7 @@ const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
 pub const State = struct {
-    memory: [def.addr_space]u8 = [1]u8{0} ** def.addr_space,
+    memory: [def.addr_space]u8 = .{0} ** def.addr_space,
 };
 
 pub fn init(state: *State) void {

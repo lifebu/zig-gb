@@ -1,6 +1,5 @@
 # src3:
-- Cart: do not copy to the rom/ram data blocks, just calculate indices! 
-    - Cart: Write tests!
+- Cart: Write tests!
 - Memory: see memory.md
     => REMOVES MMU!
 - Merge some subsystems.
