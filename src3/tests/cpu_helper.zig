@@ -24,6 +24,9 @@ pub fn executeCPUFor(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), t_cycle
             .read => |read| read.* = @bitCast(entry.value_ptr.*),
             .write => |write| entry.value_ptr.* = @bitCast(write),
         }
+        if(request.isWrite()) {
+            CPU.request(cpu, &request);
+        }
     }
 }
 

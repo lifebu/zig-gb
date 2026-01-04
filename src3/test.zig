@@ -26,40 +26,39 @@ const timer_test = @import("tests/timer.test.zig");
 // test "APU_Sampler" {
 //     try apu_sampling_test.runApuSamplingTests();
 // }
-//
-// test "CPU_Halt" {
-//     try halt_test.runHaltTests();
-// }
-//
-//
+
 test "Cart" {
     try cart_test.runCartTests();
 }
-//
-// test "CPU_InterruptTest" {
-//     try interrupt_test.runInterruptTests();
-// }
-//
+
+test "CPU_Halt" {
+    try halt_test.runHaltTests();
+}
+
+test "CPU_InterruptTest" {
+    try interrupt_test.runInterruptTests();
+}
+
 // test "CPU_SingleStepTest" {
 //     try singlestep_test.runSingleStepTests();
 // }
-//
-// test "DividerTest" {
-//     try timer_test.runDividerTests();
-// }
-//
-// test "DMA" {
-//     try dma_test.runDMATest();
-// }
-//
-// test "InputTest" {
-//     try input_test.runInputTests();
-// }
-//
+
+test "DividerTest" {
+    try timer_test.runDividerTests();
+}
+
+test "DMA" {
+    try dma_test.runDMATest();
+}
+
+test "InputTest" {
+    try input_test.runInputTests();
+}
+
 // test "PPU_InterruptTest" {
 //     try ppu_test.runInterruptTests();
 // }
-//
-// test "TimerTest" {
-//     try timer_test.runTimerTest();
-// }
+
+test "TimerTest" {
+    try timer_test.runTimerTest();
+}

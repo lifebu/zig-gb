@@ -7,6 +7,15 @@ const mem_map = @import("../mem_map.zig");
 
 const cpu_helper = @import("cpu_helper.zig");
 
+pub fn init(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), wram: []const u8) !void {
+    memory.clearRetainingCapacity();
+    for (wram, 0..) |value, idx| {
+        try memory.put(@intCast(mem_map.wram_low + idx), value);
+    }
+    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.halt_again = false;
+}
+
 pub fn runHaltTests() !void {
     const alloc = std.testing.allocator;
 
@@ -20,13 +29,10 @@ pub fn runHaltTests() !void {
     // TODO: Can we combine the code from all of the cases?
 
     // Halt, IME set, No Interrupt => CPU is halted
-    try memory.put(mem_map.wram_low, 0x76); // HALT
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
-    try memory.put(mem_map.interrupt_enable, 0xFF);
-    cpu.registers.r16.pc = mem_map.wram_low;
+    try init(&cpu, &memory, &.{ 0x76, 0x04 }); // HALT -> INC B
     cpu.interrupt_master_enable = true;
-    cpu.halt_again = false;
+    cpu.interrupt_flag = .{ .bits = .{ .timer = false, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
+    cpu.interrupt_enable = .{ .bits = .{ .timer = true, .joypad = true, .lcd_stat = true, .serial = true, .v_blank = true } };
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x76)) catch |err| {
@@ -35,17 +41,13 @@ pub fn runHaltTests() !void {
     };
 
     // CPU is halted, IME set => Interrupt => ISR loaded.
-    try memory.put(mem_map.wram_low, 0x76); // HALT
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
-    try memory.put(mem_map.interrupt_enable, 0xFF);
-    cpu.registers.r16.pc = mem_map.wram_low;
+    try init(&cpu, &memory, &.{ 0x76, 0x04 }); // HALT -> INC B
     cpu.interrupt_master_enable = true;
-    cpu.halt_again = false;
+    cpu.interrupt_flag = .{ .bits = .{ .timer = false, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
+    cpu.interrupt_enable = .{ .bits = .{ .timer = true, .joypad = true, .lcd_stat = true, .serial = true, .v_blank = true } };
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
-    // CPU is now halted (as per above test).
-    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    cpu.interrupt_flag = .{ .bits = .{ .timer = true, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
         std.debug.print("Failed: CPU is halted, IME set => Interrupt => ISR loaded\n", .{});
@@ -53,15 +55,12 @@ pub fn runHaltTests() !void {
     };
 
     // Halt, IME set, Interrupt => ISR loaded immediately.
-    try memory.put(mem_map.wram_low, 0x76); // HALT
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
-    try memory.put(mem_map.interrupt_enable, 0xFF);
-    cpu.registers.r16.pc = mem_map.wram_low;
+    try init(&cpu, &memory, &.{ 0x76, 0x04 }); // HALT -> INC B
     cpu.interrupt_master_enable = true;
-    cpu.halt_again = false;
+    cpu.interrupt_flag = .{ .bits = .{ .timer = false, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
+    cpu.interrupt_enable = .{ .bits = .{ .timer = true, .joypad = true, .lcd_stat = true, .serial = true, .v_blank = true } };
     try cpu_helper.fetchInstruction(&cpu, &memory);
-    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    cpu.interrupt_flag = .{ .bits = .{ .timer = true, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_pseudo, 0x04)) catch |err| {
         std.debug.print("Failed: Halt, IME set, Interrupt => ISR loaded immediately.\n", .{});
@@ -69,13 +68,10 @@ pub fn runHaltTests() !void {
     };   
 
     // Halt, IME unset, No Interrupt => CPU is halted.
-    try memory.put(mem_map.wram_low, 0x76); // HALT
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
-    try memory.put(mem_map.interrupt_enable, 0xFF);
-    cpu.registers.r16.pc = mem_map.wram_low;
+    try init(&cpu, &memory, &.{ 0x76, 0x04 }); // HALT -> INC B
     cpu.interrupt_master_enable = false;
-    cpu.halt_again = false;
+    cpu.interrupt_flag = .{ .bits = .{ .timer = false, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
+    cpu.interrupt_enable = .{ .bits = .{ .timer = true, .joypad = true, .lcd_stat = true, .serial = true, .v_blank = true } };
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x76)) catch |err| {
@@ -84,17 +80,13 @@ pub fn runHaltTests() !void {
     };
 
     // CPU is halted, IME unset => Interrupt => CPU resumes (no ISR).
-    try memory.put(mem_map.wram_low, 0x76); // HALT
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.interrupt_flag, 0b0000_0000);
-    try memory.put(mem_map.interrupt_enable, 0xFF);
-    cpu.registers.r16.pc = mem_map.wram_low;
+    try init(&cpu, &memory, &.{ 0x76, 0x04 }); // HALT -> INC B
     cpu.interrupt_master_enable = false;
-    cpu.halt_again = false;
+    cpu.interrupt_flag = .{ .bits = .{ .timer = false, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
+    cpu.interrupt_enable = .{ .bits = .{ .timer = true, .joypad = true, .lcd_stat = true, .serial = true, .v_blank = true } };
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
-    // CPU is now halted (as per above test).
-    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
+    cpu.interrupt_flag = .{ .bits = .{ .timer = true, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = false } };
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x04)) catch |err| {
         std.debug.print("Failed: CPU is halted, IME unset => Interrupt => CPU resumes (no ISR).\n", .{});
@@ -104,14 +96,10 @@ pub fn runHaltTests() !void {
     // https://github.com/nitro2k01/little-things-gb/tree/main/double-halt-cancel
     // Halt, IME unset, Interrupt => Halt Bug
     // halt -> inc B => halt -> inc B, inc B
-    try memory.put(mem_map.wram_low, 0x76); // HALT
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.wram_low + 2, 0x05); // DEC B
-    try memory.put(mem_map.interrupt_flag, 0b0001_0000);
-    try memory.put(mem_map.interrupt_enable, 0xFF);
-    cpu.registers.r16.pc = mem_map.wram_low;
+    try init(&cpu, &memory, &.{ 0x76, 0x04, 0x05 }); // HALT -> INC B -> DEC B
     cpu.interrupt_master_enable = false;
-    cpu.halt_again = false;
+    cpu.interrupt_flag = .{ .bits = .{ .timer = false, .joypad = false, .lcd_stat = false, .serial = false, .v_blank = true } };
+    cpu.interrupt_enable = .{ .bits = .{ .timer = true, .joypad = true, .lcd_stat = true, .serial = true, .v_blank = true } };
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x04)) catch |err| {
