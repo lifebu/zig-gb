@@ -15,41 +15,62 @@ const ram_bank_size_byte: u32 = 8 * 1024;
 const ram_size_visible: u32 = ram_bank_size_byte;
 const ram_bank_amount = [_]u10 { 0, 0, 1, 4, 16, 8, };
 
-// TODO: Maybe we need more information about the supported features, like an mbc3 that supports timer or not?
-const Type = enum(u3) {
+const MapperType = enum(u3) {
     unsupported = 0, no_mbc, mbc_1, mbc_3, mbc_5,
 };
-const type_table: [28]Type = .{
-    .no_mbc,
-    .mbc_1, .mbc_1, .mbc_1,
-    .unsupported, .unsupported, // mbc_2
-    .unsupported, .unsupported, // unused
-    .unsupported, .unsupported, .unsupported, // mmm
-    .mbc_3, .mbc_3, .mbc_3, .mbc_3, .mbc_3,
-    .mbc_5, .mbc_5, .mbc_5, .mbc_5, .mbc_5, .mbc_5,
-    .unsupported, // mbc_6
-    .unsupported, // mbc_7
-    .unsupported, // pocket_camera
-    .unsupported, // bandai_tama_5
-    .unsupported, // huc_3
-    .unsupported, // huc_1
+const CartFeatures = struct {
+    mapper: MapperType = .unsupported,
+    has_ram: bool = false,
+    has_timer: bool = false,
+    has_rumble: bool = false,
+    has_accelerometer: bool = false,
+};
+const type_table: [256]CartFeatures = blk: {
+    var result: [256]CartFeatures = [_]CartFeatures{.{}} ** 256;
+    result[0x00] = .{ .mapper = .no_mbc };
+    result[0x01] = .{ .mapper = .mbc_1 };
+    result[0x02] = .{ .mapper = .mbc_1, .has_ram = true };
+    result[0x03] = .{ .mapper = .mbc_1, .has_ram = true };
+    result[0x05] = .{ .mapper = .mbc_3 };
+    result[0x06] = .{ .mapper = .mbc_3 };
+    result[0x0B] = .{ .mapper = .unsupported }; // MMM01
+    result[0x0C] = .{ .mapper = .unsupported, .has_ram = true }; // MMM01
+    result[0x0D] = .{ .mapper = .unsupported, .has_ram = true }; // MMM01
+    result[0x0F] = .{ .mapper = .mbc_3, .has_timer = true };
+    result[0x10] = .{ .mapper = .mbc_3, .has_ram = true, .has_timer = true };
+    result[0x11] = .{ .mapper = .mbc_3 };
+    result[0x12] = .{ .mapper = .mbc_3, .has_ram = true };
+    result[0x13] = .{ .mapper = .mbc_3, .has_ram = true };
+    result[0x19] = .{ .mapper = .mbc_5 };
+    result[0x1A] = .{ .mapper = .mbc_5, .has_ram = true };
+    result[0x1B] = .{ .mapper = .mbc_5, .has_ram = true };
+    result[0x1C] = .{ .mapper = .mbc_5, .has_rumble = true };
+    result[0x1D] = .{ .mapper = .mbc_5, .has_ram = true, .has_rumble = true };
+    result[0x1E] = .{ .mapper = .mbc_5, .has_ram = true, .has_rumble = true };
+    result[0x20] = .{ .mapper = .unsupported }; // MBC6
+    result[0x22] = .{ .mapper = .unsupported, .has_ram = true, .has_rumble = true, .has_accelerometer = true }; // MBC7
+    result[0xFC] = .{ .mapper = .unsupported }; // Pocket Camera
+    result[0xFD] = .{ .mapper = .unsupported }; // Bandai Tama5
+    result[0xFE] = .{ .mapper = .unsupported }; // HuC3
+    result[0xFF] = .{ .mapper = .unsupported, .has_ram = true }; // HuC1
+    break :blk result;
 };
 
-const TypeRange = struct {
+const MapperRange = struct {
     low: u16, high: u16,
 };
-pub fn isInRange(range: ?TypeRange, value: u16) bool {
+pub fn isInRange(range: ?MapperRange, value: u16) bool {
     return range != null and value >= range.?.low and value <= range.?.high; 
 }
-const TypeInfo = struct {
-    ram_enable: ?TypeRange = null,
-    rom_bank: ?TypeRange = null,
-    rom_bank_msb: ?TypeRange = null,
-    ram_bank: ?TypeRange = null,
-    bank_mode: ?TypeRange = null,
-    rtc: ?TypeRange = null,
+const MapperRanges = struct {
+    ram_enable: ?MapperRange = null,
+    rom_bank: ?MapperRange = null,
+    rom_bank_msb: ?MapperRange = null,
+    ram_bank: ?MapperRange = null,
+    bank_mode: ?MapperRange = null,
+    rtc: ?MapperRange = null,
 };
-const info_table: std.EnumArray(Type, TypeInfo) = .{ .values = .{
+const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
     // unsupported
     .{},
     // no_mbc
@@ -89,8 +110,8 @@ pub const State = struct {
     ram_bank: u4 = 0,
 
     // mbc
-    type: Type = .no_mbc,
-    type_info: TypeInfo = undefined,
+    features: CartFeatures = .{},
+    ranges: MapperRanges = .{},
     bank_mode: u1 = 0,
 };
 
@@ -105,19 +126,19 @@ pub fn deinit(state: *State, alloc: std.mem.Allocator) void {
 
 pub fn request(state: *State, req: *def.Request) void {
     // mbc
-    if (isInRange(state.type_info.ram_enable, req.address) and req.isWrite()) {
+    if (isInRange(state.ranges.ram_enable, req.address) and req.isWrite()) {
         // TODO: This also enables access to the RTC registers.
         state.ram_enable = @as(u4, @truncate(req.value.write)) == 0xA;
 
-    } else if (isInRange(state.type_info.rom_bank, req.address) and req.isWrite()) {
+    } else if (isInRange(state.ranges.rom_bank, req.address) and req.isWrite()) {
         const mask: u9 = @intCast(state.rom_banks.len - 1);
         state.rom_bank_high = @truncate(@max(1, req.value.write) & mask);
 
-    } else if (isInRange(state.type_info.rom_bank_msb, req.address) and req.isWrite()) {
+    } else if (isInRange(state.ranges.rom_bank_msb, req.address) and req.isWrite()) {
         std.debug.print("Highest ROM bit not supported!\n", .{});
         unreachable;
 
-    } else if (isInRange(state.type_info.ram_bank, req.address) and req.isWrite()) {
+    } else if (isInRange(state.ranges.ram_bank, req.address) and req.isWrite()) {
         // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
         // Depending on what you write you can access different registers.
         if(state.ram_banks.len == 0 or state.ram_banks.len == 1) {
@@ -126,13 +147,13 @@ pub fn request(state: *State, req: *def.Request) void {
         const mask: u9 = @intCast(state.ram_banks.len - 1);
         state.ram_bank = @truncate(req.value.write & mask);
 
-    } else if (isInRange(state.type_info.bank_mode, req.address) and req.isWrite()) {
+    } else if (isInRange(state.ranges.bank_mode, req.address) and req.isWrite()) {
         // TODO: Implement banking mode for mbc_1.
         state.bank_mode = @truncate(req.value.write);
         std.debug.print("MBC1 Bankmode not supported!\n", .{});
         unreachable;
 
-    } else if (isInRange(state.type_info.rtc, req.address) and req.isWrite()) {
+    } else if (isInRange(state.ranges.rtc, req.address) and req.isWrite()) {
         // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
         // That "latched" data will not change until you do it again by repeating this pattern.
         // This way you can read the RTC registers while the clocks keeps ticking.
@@ -173,9 +194,6 @@ pub fn request(state: *State, req: *def.Request) void {
 pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType, alloc: std.mem.Allocator) void {
     switch(file_type) {
         .gameboy => {
-            // TODO: Check if the cart_features even support ram and don't just use the ram size.
-            // TODO: Also check that the RAM size as the MBC would be able to support it.
-
             // file
             const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
             defer file.close();
@@ -217,9 +235,11 @@ pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType, alloc:
 
             // mbc
             const cart_type: u8 = rom[header_cart_type];
-            state.type = type_table[cart_type];
-            state.type_info = info_table.get(state.type);
+            state.features = type_table[cart_type];
+            state.ranges = info_table.get(state.features.mapper);
             state.bank_mode = 0;
+
+            assert(state.features.mapper != .unsupported);
         },
         .dump => {},
         .unknown => {},

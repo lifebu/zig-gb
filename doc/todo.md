@@ -1,16 +1,37 @@
-# src3:
+# Next:
+- PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
-## Next:
-- PPU Missing bg_window_enable for backgrounds.
-- Need to check why most games just dont work at all.
-    - Some of them try to access illegal memory (metroid2) (0xFFEE).
+- Merge some subsystems.
+    - I currently have a large set of .zig files and "subsystems".
+    - Most of them have very little logic and code.
+    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
+    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
+        => But how should that one be named?
+        - ram, boot and IF are "cold storage"?
+        - IOMMU? just io?
+    - Cart: Merge boot rom onto cart?
+- Make all types "classes".
+- Check and compare src1 implementation with src3. Is there some things I missed?
 
-## Tests
-- Cart: Different MBC controller.
+# Tests
 - Interrupt Sources Test:
     - VBlanK, Stat 
+- Use GB Test suites and run them. Create all the harness to run and test their outputs (different approaches).
+    - List of GB Test Roms with expected outputs:
+    https://github.com/c-sp/game-boy-test-roms
+    => This has a list of required outputs and a shell script that uses tgbds to compile them.
+    => Also has release verions you can download.
 
-## APU:
+# Config file and "modular" subsystems
+- Config file based on zig zon.
+- Use this to allow settings for the user.
+- Have multiple subsystems the user can choose.
+- PPU:
+    - PPU_Void: only reports hardcoded timings to the rest of the system.
+    - PPU_Frame: renders the entire scene once per frame (ported from src1).
+    - PPU_Cycle: PPU that updates every cycle (src3 version).
+
+# APU:
 - CH3: Length timer + "Frame Sequencer" is working.
      - Test this on CH 1,2,4 later as well.
 - CH2,CH1: Is Square duty pattern correctly read (left-to-right) for any frequency and all duty patterns?
@@ -30,28 +51,17 @@
 - Write some tests (or atleast todos) for more specific audio behaviour from documentations.
 - Audio cleanup (HPF, etc).
 
-## Audio Sampling:
+# Audio Sampling:
 - If the application runs with less than 60fps, the audio has more cracks => need to generate more samples.
 - We should never let the audio device starve out of samples (how to detect that?)
 - We also should never waste any samples (i.e, the platform sound buffer is already full).
 
-## Soon:
-- Merge some subsystems.
-    - I currently have a large set of .zig files and "subsystems".
-    - Most of them have very little logic and code.
-    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
-    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
-        => But how should that one be named?
-        - ram, boot and IF are "cold storage"?
-        - IOMMU? just io?
-    - Cart: Merge boot rom onto cart?
-- Make all types "classes".
+# Soon:
+- PPU Missing bg_window_enable for backgrounds.
+- Need to check why most games just dont work at all.
+    - Some of them try to access illegal memory (metroid2) (0xFFEE).
 - Memory: see memory.md
     - PPU: Palettes and VRAM.
-- List of GB Test Roms with expected outputs:
-    https://github.com/c-sp/game-boy-test-roms
-    => This has a list of required outputs and a shell script that uses tgbds to compile them.
-    => Also has release verions you can download.
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.
         - 1st: Check memory request.
@@ -81,23 +91,11 @@
 - Really standardize the order of declarations and definitions (constants, functions, etc).
 - Cart:
     - Add tests for different mbc!
-- Add CPU memory access rights (writing to vram), onwrite behaviour, memory requests.
 - Think about how the code for loading and initializing the emulator should work.
     - Loading from command line and using the imgui ui.
     - Initialization and Deinitialization logic for all subsystems.
     - MBC for example can write the content of CartRAM to disk when you unload a rom or close the program.
 - Add support for savegames.
-- Refactor how the access rights system should work.
-    - CPU returns it's pin state every cycle.
-    - All systems will only get the cpu pins as input in their cycle function.
-    - Consider splitting the memory block into the subsystems?
-        - example: div, timer, timer_mod exists as 3 registers in the state of timer.zig.
-        - So the timer no longer has to know the mmu memory block (better for cache?).
-        - When cpu requests a write or read only the timer reacts to it.
-        - This means there is no longer a race that the correct subsystem reacts before the mmu as their are disjoint.
-        - Splitting memory means we waste loss on unused memory?
-        - How are requests then applied fast? subsystem has to do more tests? With the address we already know which subsystem will do this (can we dispatch?)
-- How should bus conflicts work? especially with the DMA?
 - Change support for loading memory dumps.
     - As we don't save some state of the system (like cpu registers) with the dump. Running a dump would create false positive bugs.
     - I can still support this for testing subsystems like the ppu (draw a specific scene for a test).
@@ -122,7 +120,7 @@
         - Combine RETI, RET and RET cond
     - replace ConditionalCheck with FlagFileID?
 
-## Other:
+# Other:
 - Compile the sdhc (sokol shader compiler) myself instead of having binaries here.
     => Has build.zig: https://github.com/floooh/sokol-tools/blob/master/build.zig
 - Run emulator itself in thread. Use double-buffer to communicate audio and video data to platform.
@@ -135,13 +133,6 @@
 - Once we have cgb support, it can just switch out a different cpu-core for the emulator!
 - Add .dll hot-reloading of emulator code.
 - Some of the data that I need to create with the uOps i could do with a memory arena scratch space (like the fetcher_data_low, fetcher_data_high).
-
-# Runtime Library.
-- Test out the sokol: https://github.com/floooh/sokol
-- It has ImGUI, OpenGL, Window Framework, args passing and audio subsystem.
-- And official and automatically generated zig binding!
-- especially the audio system seems way nicer, because I can decide if I want a callback system or a push system (the latter sounds easier for my purposes).
-
 
 # Version 1.0:
 ## Define 1.0:

@@ -25,7 +25,6 @@ pub fn cycle(state: *State, req: *def.Request) void {
         return;
     }
 
-    // DMA Bus conflict.
     if(req.address < mem_map.hram_low or req.address > mem_map.hram_high) {
         req.reject(); // DMA Bus conflict
     }
