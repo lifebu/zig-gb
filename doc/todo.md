@@ -13,23 +13,37 @@
 - Make all types "classes".
 - Check and compare src1 implementation with src3. Is there some things I missed?
 
-# Tests
-- Interrupt Sources Test:
-    - VBlanK, Stat 
-- Use GB Test suites and run them. Create all the harness to run and test their outputs (different approaches).
-    - List of GB Test Roms with expected outputs:
-    https://github.com/c-sp/game-boy-test-roms
-    => This has a list of required outputs and a shell script that uses tgbds to compile them.
-    => Also has release verions you can download.
-
-# Config file and "modular" subsystems
+# Config file
 - Config file based on zig zon.
 - Use this to allow settings for the user.
-- Have multiple subsystems the user can choose.
+
+# Define Emulator Lifetime.
+- So that you can run a game and load a new one from the ImGui menu.
+- We have a "core" that contains what is currently in the frame() function in main.
+- It runs the subsystems.
+- It is initialized with the config file.
+- When we change roms I could just unload the entire state of the core and the subsystems.
+- Then load a new core => No cleanup code needed?
+
+# Modular subsystems
+- Have multiple subsystems the user can choose (from the config file).
+- Really good for tests. There you could use PPU_Void to increase test performance if you don't test the ppu.
 - PPU:
     - PPU_Void: only reports hardcoded timings to the rest of the system.
     - PPU_Frame: renders the entire scene once per frame (ported from src1).
     - PPU_Cycle: PPU that updates every cycle (src3 version).
+- APU:
+    - APU_Void: Only reports very basic states (if at all). 
+    - APU_Cycle: Updated every cycle.
+
+# Tests
+- Use GB Test suites and run them. Create all the harness to run and test their outputs (different approaches).
+    - List of GB Test Roms with expected outputs:
+    https://github.com/c-sp/game-boy-test-roms
+    => This has a list of required outputs and a shell script that uses rgbds to compile them.
+    => Also has release verions you can download.
+- Interrupt Sources Test:
+    - VBlanK, Stat 
 
 # APU:
 - CH3: Length timer + "Frame Sequencer" is working.

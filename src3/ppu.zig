@@ -405,18 +405,18 @@ pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
         mem_map.oam_low...(mem_map.oam_high - 1) => {
             if (state.lcd_stat.mode == .oam_scan or state.lcd_stat.mode == .draw) {
                 req.reject();
+            } else {
+                const oam_idx: u16 = req.address - mem_map.oam_low;
+                req.apply(&state.oam[oam_idx]);
             }
-
-            const oam_idx: u16 = req.address - mem_map.oam_low;
-            req.apply(&state.oam[oam_idx]);
         },
         mem_map.vram_low...(mem_map.vram_high - 1) => {
             if (state.lcd_stat.mode == .draw) {
                 req.reject();
+            } else {
+                //const vram_idx: u16 = req.address - mem_map.vram_low;
+                req.apply(&mmu.memory[req.address]);
             }
-
-            //const vram_idx: u16 = req.address - mem_map.vram_low;
-            req.apply(&mmu.memory[req.address]);
         },
         mem_map.bg_palette => {
             req.apply(&mmu.memory[req.address]);
