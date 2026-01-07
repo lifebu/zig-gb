@@ -2,14 +2,25 @@
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
 - Merge some subsystems.
-    - I currently have a large set of .zig files and "subsystems".
-    - Most of them have very little logic and code.
-    - Combine them (ram.zig, input.zig, dma.zig, timer.zig, cart.zig, boot.zig, etc.).
-    - Maybe I have a more generic "SoC" Class that houses simple subsystems that are to small to fit into their own thing.
-        => But how should that one be named?
-        - ram, boot and IF are "cold storage"?
-        - IOMMU? just io?
-    - Cart: Merge boot rom onto cart?
+    - apu: 375+
+    - ppu: 498
+    - cpu: 955
+
+    - cart: 196+
+
+    - memory.zig: 137
+        - boot: 35
+        - dma: 53
+        - mmu: 56 
+        - ram: 23
+        - "unused" memory: ?
+
+    - mmio.zig: 113
+        - input: 45
+        - timer: 68
+        - serial: ??
+        - ir: ??
+
 - Make all types "classes".
 - Check and compare src1 implementation with src3. Is there some things I missed?
 

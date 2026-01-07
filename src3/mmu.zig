@@ -7,20 +7,11 @@ pub const State = struct {
     memory: [def.addr_space]u8 = .{0} ** def.addr_space,
 };
 
-pub fn init(state: *State) void {
-    // TODO: Need to moved somewhere else once mmu is gone.
-    state.memory[mem_map.serial_data] = 0xFF; // Stubbed.
-    state.memory[mem_map.serial_control] = 0x7E; // Stubbed.
+pub fn init(_: *State) void {
 }
 
-pub fn request(state: *State, req: *def.Request) void {
+pub fn request(_: *State, req: *def.Request) void {
     switch (req.address) {
-        mem_map.serial_control => {
-            req.apply(&state.memory[req.address]);
-        },
-        mem_map.serial_data => {
-            req.apply(&state.memory[req.address]);
-        },
         mem_map.unused_low...(mem_map.unused_high - 1) => {
             req.reject();
         },

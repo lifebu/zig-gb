@@ -8,3 +8,6 @@ playground/*
 
 # vim
 Session.vim
+
+# temp data
+.VSCodeCounter/

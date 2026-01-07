@@ -1,15 +1,14 @@
 const std = @import("std");
 
-const apu_test = @import("tests/apu.test.zig");
 const apu_sampling_test = @import("tests/apu_sampling.test.zig");
+const apu_test = @import("tests/apu.test.zig");
 const cart_test = @import("tests/cart.test.zig");
 const dma_test = @import("tests/dma.test.zig");
 const halt_test = @import("tests/halt.test.zig");
 const interrupt_test = @import("tests/interrupt.test.zig");
-const input_test = @import("tests/input.test.zig");
+const mmio_test = @import("tests/mmio.test.zig");
 const ppu_test = @import("tests/ppu.test.zig");
 const singlestep_test = @import("tests/singlestep.test.zig");
-const timer_test = @import("tests/timer.test.zig");
 
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 // TODO: Move tests into it's own module so that we don't have it loitering in the src folder!
@@ -44,7 +43,7 @@ test "CPU_InterruptTest" {
 // }
 
 test "DividerTest" {
-    try timer_test.runDividerTests();
+    try mmio_test.runDividerTests();
 }
 
 test "DMA" {
@@ -52,7 +51,7 @@ test "DMA" {
 }
 
 test "InputTest" {
-    try input_test.runInputTests();
+    try mmio_test.runInputTests();
 }
 
 // test "PPU_InterruptTest" {
@@ -60,5 +59,5 @@ test "InputTest" {
 // }
 
 test "TimerTest" {
-    try timer_test.runTimerTest();
+    try mmio_test.runTimerTest();
 }
