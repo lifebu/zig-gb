@@ -1,26 +1,6 @@
 # Next:
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
-- Merge some subsystems.
-    - apu: 375+
-    - ppu: 498
-    - cpu: 955
-
-    - cart: 196+
-
-    - memory.zig: 137
-        - boot: 35
-        - dma: 53
-        - mmu: 56 
-        - ram: 23
-        - "unused" memory: ?
-
-    - mmio.zig: 113
-        - input: 45
-        - timer: 68
-        - serial: ??
-        - ir: ??
-
 - Make all types "classes".
 - Check and compare src1 implementation with src3. Is there some things I missed?
 

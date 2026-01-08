@@ -145,11 +145,12 @@ const MicroOp = enum {
 };
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOp, cycles_per_line);
 
+// TODO: How to do that without array multiplication?
 const oam_scan = [_]MicroOp{ .oam_check, .nop } ** (oam_size - 1) ++ [_]MicroOp{ .oam_check, .advance_draw };
-const draw_bg_tile = [_]MicroOp{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, };
-const draw_window_tile = [_]MicroOp{ .fetch_tile_window, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg };
-const draw_object_tile = [_]MicroOp{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, };
-const blank = [_]MicroOp{ .nop } ** (cycles_per_line - 1);
+const draw_bg_tile: [5]MicroOp = .{ .fetch_tile_bg, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg, };
+const draw_window_tile: [5]MicroOp = .{ .fetch_tile_window, .nop_draw, .fetch_low_bg, .nop_draw, .fetch_high_bg };
+const draw_object_tile: [5]MicroOp = .{ .fetch_tile_obj, .nop, .fetch_low_obj, .nop, .fetch_high_obj, };
+const blank: [cycles_per_line - 1]MicroOp = @splat(.nop);
 
 pub const State = struct {
     lcd_control: LcdControl = .{},
@@ -162,14 +163,14 @@ pub const State = struct {
     window_x: u8 = 0,
     window_y: u8 = 0,
 
-    vram: [vram_size]u8 = .{0} ** vram_size,
+    vram: [vram_size]u8 = @splat(0),
 
     current_bg_window_uops: []const MicroOp = undefined,
     uop_fifo: MicroOpFifo = .{}, 
     draw_cycles: u9 = 0,
     line_penalty: u9 = 0,
 
-    oam: [oam_size_byte]u8 = .{0} ** oam_size_byte,
+    oam: [oam_size_byte]u8 = @splat(0),
     oam_scan_idx: u6 = 0,
     oam_line_list: ObjectLineFifo = .{},
 
@@ -179,7 +180,7 @@ pub const State = struct {
     lcd_overscan_x: u8 = 0, 
     fetcher_data: FetcherData = .{},
 
-    colorIds: [def.overscan_resolution]u8 = [_]u8{ 0 } ** def.overscan_resolution,
+    colorIds: [def.overscan_resolution]u8 = @splat(0),
 };
 
 pub fn init(state: *State) void {
@@ -222,7 +223,7 @@ pub fn cycle(state: *State, memory: *[def.addr_space]u8) struct{ bool, bool } {
             state.lcd_stat.mode = .h_blank;
             // TODO: The actual length of draw_cycles is not what is expected (172 + state.line_penalty)
             // If you add the following line to main, you can see the timing as a line going through (best to use pkmn_silv title screen):
-            // state.ppu.colorIds = [_]u8{ 0 } ** def.overscan_resolution;
+            // state.ppu.colorIds = @splat(0);
             // In practice the error is between 76-135 dots (0,1-0,2% error).
             const length = cycles_per_line - 1 - state.draw_cycles - cycles_oam_scan;
             advanceBlank(state, length);
@@ -360,7 +361,7 @@ pub fn request(state: *State, memory: *[def.addr_space]u8, req: *def.Request) vo
             if(req.isWrite()) {
                 if(!state.lcd_control.lcd_enable) {
                     state.lcd_stat.mode = .h_blank;
-                    state.colorIds = [_]u8{ 0 } ** def.overscan_resolution;
+                    state.colorIds = @splat(0);
                     state.lcd_y = 0;
 
                     state.uop_fifo.clear();

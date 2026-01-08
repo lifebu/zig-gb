@@ -74,7 +74,7 @@ pub fn runApuSamplingTests() !void {
         .left_volume = 7, .right_volume = 7, .vin_left = false, .vin_right = false,
     };
     for(0..apu.channel_values.len) |channel_idx| {
-        apu.channel_values = .{0} ** apu.channel_values.len;
+        apu.channel_values = @splat(0);
         apu.channel_values[channel_idx] = 15;
 
         const PanningCase = struct {

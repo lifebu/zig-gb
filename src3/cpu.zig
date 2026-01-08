@@ -195,8 +195,7 @@ pub const opcode_bank_pseudo = 2;
 pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
 fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]MicroOpArray {
-    var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
-    @memset(&returnVal, [_]MicroOpArray{.{}} ** num_opcodes);
+    var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = @splat(@splat(MicroOpArray{}));
 
     const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .dbus, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
@@ -792,7 +791,7 @@ const RegisterFile = packed union {
 };
 
 pub const State = struct {
-    hram: [hram_size]u8 = undefined,
+    hram: [hram_size]u8 = @splat(0),
     interrupt_enable: InterruptFlags = .{ .value = 0 },
     interrupt_flag: InterruptFlags = .{ .value = 0 },
 
@@ -814,7 +813,7 @@ pub fn init(state: *State, alloc: std.mem.Allocator) void {
     const uops: MicroOpArray = opcode_bank[state.registers.r8.ir];
     state.uop_fifo.write(uops.items);
 
-    state.hram = [_]u8{ 0 } ** hram_size;
+    state.hram = @splat(0);
     state.interrupt_enable = .{ .value = 0 };
     state.interrupt_flag = .{ .value = 0 };
 }

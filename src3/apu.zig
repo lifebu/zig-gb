@@ -120,7 +120,7 @@ pub const State = struct {
     ch3_volume: Channel3Volume = .{},
     ch3_period_low: Channel3PeriodLow = .{},
     ch3_period_high: Channel3PeriodHigh = .{},
-    ch3_wave_table: [ch3_wave_table_size]u8 = .{0} ** ch3_wave_table_size,
+    ch3_wave_table: [ch3_wave_table_size]u8 = @splat(0),
 
     ch4_length: Channel4Length = .{},
     ch4_volume: Channel4Volume = .{},
@@ -130,23 +130,23 @@ pub const State = struct {
     apu_on: bool = false,
 
     sample_tick: u16 = def.t_cycles_per_sample - 1, 
-    channel_values: [apu_channels]u4 = [_]u4{0} ** apu_channels,
+    channel_values: [apu_channels]u4 = @splat(0),
     // TODO: duplicated with control register above.
-    channels_on: [apu_channels]bool = .{false} ** apu_channels,
+    channels_on: [apu_channels]bool = @splat(false),
 
     func_volume_tick: u16 = t_cycles_per_volume_step - 1,
-    func_volume_paces: [apu_channels]u4 = .{0} ** apu_channels,
-    func_volume_values: [apu_channels]u4 = .{0} ** apu_channels,
+    func_volume_paces: [apu_channels]u4 = @splat(0),
+    func_volume_values: [apu_channels]u4 = @splat(0),
     
     func_length_tick: u14 = t_cycles_per_length_step - 1,
     // Note: [2] is unused. Not support by ch3.
-    func_length_values: [apu_channels]u8 = .{0} ** apu_channels,
-    func_length_on: [apu_channels]bool = .{false} ** apu_channels,
+    func_length_values: [apu_channels]u8 = @splat(0),
+    func_length_on: [apu_channels]bool = @splat(false),
 
     func_period_tick: u15 = t_cycles_per_period_step - 1,
     // Note: Each channel requires at least: [u13, u13, u12, u24]
     // TODO: u24 does not seem to be hardware accurate. Sameboy uses "a counter (8bit) for a counter (16bit)". Which matches the lfsr_shift being a u4.
-    func_period_values: [apu_channels]u24 = .{0} ** apu_channels,
+    func_period_values: [apu_channels]u24 = @splat(0),
     func_period_shadow: u11 = 0,
     func_period_pace: u4 = 0,
     func_period_on: bool = false,

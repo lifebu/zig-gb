@@ -9,7 +9,7 @@ pub fn runDMATest() !void {
     var memory: MEMORY.State = .{};
 
     const start_addr: u16 = mem_map.wram_low;
-    var memory_block: [def.addr_space]u8 = [1]u8{0} ** def.addr_space;
+    var memory_block: [def.addr_space]u8 = @splat(0);
     for(start_addr..(start_addr + 160), 0..) |addr, i| {
         memory_block[addr] = @truncate(i);
     }

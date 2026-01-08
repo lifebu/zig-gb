@@ -26,7 +26,7 @@ const CartFeatures = struct {
     has_accelerometer: bool = false,
 };
 const type_table: [256]CartFeatures = blk: {
-    var result: [256]CartFeatures = [_]CartFeatures{.{}} ** 256;
+    var result: [256]CartFeatures = @splat(.{});
     result[0x00] = .{ .mapper = .no_mbc };
     result[0x01] = .{ .mapper = .mbc_1 };
     result[0x02] = .{ .mapper = .mbc_1, .has_ram = true };

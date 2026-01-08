@@ -9,7 +9,7 @@ pub const State = struct {
     // boot
     rom_enabled: bool = false,
 
-    rom: [def.boot_rom_size]u8 = [1]u8{0} ** def.boot_rom_size,
+    rom: [def.boot_rom_size]u8 = @splat(0),
 
     // dma
     // TODO: Try to simplify all the state of dma. Maybe a microcode machine?
@@ -24,10 +24,10 @@ pub const State = struct {
 
     // mmu
     // TODO: remove this giant memory block.
-    memory: [def.addr_space]u8 = .{0} ** def.addr_space,
+    memory: [def.addr_space]u8 = @splat(0),
 
     // wram
-    work_ram: [work_ram_size]u8 = .{0} ** work_ram_size,
+    work_ram: [work_ram_size]u8 = @splat(0),
 };
 
 pub fn init(state: *State) void {
