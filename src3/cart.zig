@@ -100,13 +100,13 @@ const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
 
 pub const State = struct {
     // rom
-    rom_banks: [][rom_bank_size_byte]u8 = undefined,
+    rom_banks: [][rom_bank_size_byte]u8 = &.{},
     rom_bank_low: u9 = 0,
     rom_bank_high: u9 = 1,
 
     // ram
     ram_enable: bool = false,
-    ram_banks: [][ram_bank_size_byte]u8 = undefined,
+    ram_banks: [][ram_bank_size_byte]u8 = &.{},
     ram_bank: u4 = 0,
 
     // mbc
@@ -163,7 +163,7 @@ pub fn request(state: *State, req: *def.Request) void {
     // memory
     switch(req.address) {
         mem_map.rom_low...(mem_map.rom_middle - 1) => {
-            if(req.isWrite()) {
+            if(req.isWrite() or state.rom_banks.len == 0) {
                 req.reject();
             } else {
                 const rom_idx: u16 = req.address - mem_map.rom_low;
@@ -171,7 +171,7 @@ pub fn request(state: *State, req: *def.Request) void {
             }
         },
         mem_map.rom_middle...(mem_map.rom_high - 1) => {
-            if(req.isWrite()) {
+            if(req.isWrite() or state.rom_banks.len == 0) {
                 req.reject();
             } else {
                 const rom_idx: u16 = req.address - mem_map.rom_middle;
@@ -191,57 +191,48 @@ pub fn request(state: *State, req: *def.Request) void {
 }
 
 // TODO: not a great solution to handle the loading and initializing of the emulator, okay for now.
-pub fn loadDump(state: *State, path: []const u8, file_type: def.FileType, alloc: std.mem.Allocator) void {
-    switch(file_type) {
-        .gameboy => {
-            // file
-            const file = std.fs.openFileAbsolute(path, .{}) catch unreachable;
-            defer file.close();
+pub fn loadFile(state: *State, path: []const u8, alloc: std.mem.Allocator) void {
+    // file
+    const rom: []u8 = std.fs.cwd().readFileAlloc(alloc, path, std.math.maxInt(u32)) catch unreachable;
+    defer alloc.free(rom);
 
-            const rom: []u8 = file.readToEndAlloc(alloc, std.math.maxInt(u32)) catch unreachable;
-            defer alloc.free(rom);
+    const rom_size: u8 = rom[header_rom_size];
+    const header_rom_size_byte: u32 = rom_bank_size_byte * rom_bank_amount[rom_size];
+    assert(header_rom_size_byte == rom.len);
 
-            const rom_size: u8 = rom[header_rom_size];
-            const header_rom_size_byte: u32 = rom_bank_size_byte * rom_bank_amount[rom_size];
-            assert(header_rom_size_byte == rom.len);
+    // rom
+    const num_rom_banks: usize = rom.len / rom_bank_size_byte;
+    state.rom_banks = alloc.alloc([rom_bank_size_byte]u8, num_rom_banks) catch unreachable;
+    errdefer alloc.free(state.rom_banks);
 
-            // rom
-            const num_rom_banks: usize = rom.len / rom_bank_size_byte;
-            state.rom_banks = alloc.alloc([rom_bank_size_byte]u8, num_rom_banks) catch unreachable;
-            errdefer alloc.free(state.rom_banks);
-
-            for(0..num_rom_banks) |bank_idx| {
-                const start: u32 = @intCast(bank_idx * rom_bank_size_byte);
-                const end: u32 = start + rom_bank_size_byte;
-                @memcpy(&state.rom_banks[bank_idx], rom[start..end]);
-            }
-
-            state.rom_bank_low = 0;
-            state.rom_bank_high = 1;
-
-            // ram
-            const ram_size: u8 = rom[header_ram_size];
-            const ram_size_byte: u32 = ram_bank_size_byte * ram_bank_amount[ram_size];
-            const num_ram_banks: usize = ram_size_byte / ram_bank_size_byte;
-            state.ram_banks = alloc.alloc([ram_bank_size_byte]u8, num_ram_banks) catch unreachable;
-            errdefer alloc.free(state.ram_banks);
-
-            for(0..num_ram_banks) |bank_idx| {
-                @memset(&state.ram_banks[bank_idx], 0);
-            }
-
-            state.ram_bank = 0;
-            state.ram_enable = false;
-
-            // mbc
-            const cart_type: u8 = rom[header_cart_type];
-            state.features = type_table[cart_type];
-            state.ranges = info_table.get(state.features.mapper);
-            state.bank_mode = 0;
-
-            assert(state.features.mapper != .unsupported);
-        },
-        .dump => {},
-        .unknown => {},
+    for(0..num_rom_banks) |bank_idx| {
+        const start: u32 = @intCast(bank_idx * rom_bank_size_byte);
+        const end: u32 = start + rom_bank_size_byte;
+        @memcpy(&state.rom_banks[bank_idx], rom[start..end]);
     }
+
+    state.rom_bank_low = 0;
+    state.rom_bank_high = 1;
+
+    // ram
+    const ram_size: u8 = rom[header_ram_size];
+    const ram_size_byte: u32 = ram_bank_size_byte * ram_bank_amount[ram_size];
+    const num_ram_banks: usize = ram_size_byte / ram_bank_size_byte;
+    state.ram_banks = alloc.alloc([ram_bank_size_byte]u8, num_ram_banks) catch unreachable;
+    errdefer alloc.free(state.ram_banks);
+
+    for(0..num_ram_banks) |bank_idx| {
+        @memset(&state.ram_banks[bank_idx], 0);
+    }
+
+    state.ram_bank = 0;
+    state.ram_enable = false;
+
+    // mbc
+    const cart_type: u8 = rom[header_cart_type];
+    state.features = type_table[cart_type];
+    state.ranges = info_table.get(state.features.mapper);
+    state.bank_mode = 0;
+
+    assert(state.features.mapper != .unsupported);
 }

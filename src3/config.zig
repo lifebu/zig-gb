@@ -3,9 +3,9 @@ const sokol = @import("sokol");
 
 const Self = @This();
 
-const Rom = struct {
-    rom: []const u8 = undefined,
-    boot_rom: []const u8 = undefined,
+const Files = struct {
+    rom: ?[]const u8 = null,
+    boot_rom: ?[]const u8 = null,
 };
 const Audio = struct {
     stereo_audio: bool = true,
@@ -48,7 +48,7 @@ const Debug = struct {
     enable_gb_breakpoint: bool = false,
 };
 
-rom: Rom = .{},
+files: Files = .{},
 audio: Audio = .{},
 keybinds: Keybinds = .{},
 graphics: Graphics = .{},
@@ -56,13 +56,25 @@ emulation: Emulation = .{},
 debug: Debug = .{},
 
 pub const default: Self = .{};
+pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+    if(self.files.rom) |data| alloc.free(data);
+    if(self.files.boot_rom) |data| alloc.free(data);
+}
 
 pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {
-    const content: []const u8 = try std.fs.cwd().readFileAlloc(alloc, path, std.math.maxInt(u32));
-    defer alloc.free(content);
+    const content0 = try std.fs.cwd().readFileAllocOptions(alloc, path, std.math.maxInt(u32), null, .of(u8), 0);
+    defer alloc.free(content0);
 
-    const content0 = content[0..content.len :0];
-    self.* = try std.zon.parse.fromSlice(Self, alloc, content0, null, .{});
+    var diagnostics: std.zon.parse.Diagnostics = .{};
+    defer diagnostics.deinit(alloc);
+    self.* = std.zon.parse.fromSlice(Self, alloc, content0, &diagnostics, .{ .free_on_error = true }) catch |err| {
+        std.log.err("Failed to parse config file, will use default: {f}.\n", .{diagnostics});
+        return err;
+    };
+
+    if(self.files.boot_rom == null) {
+        self.files.boot_rom = try std.fmt.allocPrint(alloc, "data/bootroms/dmg_boot.bin", .{});
+    }
 }
 
 pub fn save(self: Self, alloc: std.mem.Allocator, path: []const u8) !void {
@@ -74,4 +86,19 @@ pub fn save(self: Self, alloc: std.mem.Allocator, path: []const u8) !void {
     defer result.deinit(alloc);
 
     std.fs.cwd().writeFile(.{ .data = result.items, .sub_path = path }) catch unreachable;
+}
+
+pub fn parseArgs(state: *Self, alloc: std.mem.Allocator) !void {
+    var args = try std.process.argsWithAllocator(alloc);
+    defer args.deinit();
+
+    _ = args.next(); // File itself
+    const file_arg: ?[]const u8 = args.next(); 
+    const file_path: []const u8 = file_arg orelse return;
+    const file_extension: []const u8 = std.fs.path.extension(file_path);
+    if (std.mem.eql(u8, file_extension, ".gb")) {
+        state.files.rom = try alloc.dupe(u8, file_path);
+    } else {
+        std.log.err("unknown type of file: {s}\n", .{ file_path });
+    }
 }

@@ -7,6 +7,8 @@
 # Config file
 - Config file based on zig zon.
 - Use this to allow settings for the user.
+- Use CLI.zig for this.
+    => Rename this to Options.zig
 
 # Define Emulator Lifetime.
 - So that you can run a game and load a new one from the ImGui menu.

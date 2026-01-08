@@ -1145,19 +1145,6 @@ pub fn request(state: *State, req: *def.Request) void {
     }
 }
 
-pub fn loadDump(state: *State, file_type: def.FileType, alloc: std.mem.Allocator) void {
-    // TODO: I would need a more stabile and better thought out initialization system when you load files.
-    switch(file_type) {
-        .gameboy => {
-        },
-        .dump => {
-            init(state, alloc);
-        },
-        .unknown => {
-        }
-    }
-}
-
 pub fn pushInterrupts(state: *State, vblank: bool, stat: bool, timer: bool, serial: bool, joypad: bool) void {
     state.interrupt_flag.bits.v_blank |= vblank;
     state.interrupt_flag.bits.lcd_stat |= stat;

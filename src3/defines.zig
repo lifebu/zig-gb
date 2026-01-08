@@ -88,6 +88,7 @@ pub const byte_per_line = 2;
 pub const system_freq = 4 * 1_024 * 1_024;
 pub const t_cycles_in_60fps = system_freq / 60;
 pub const t_cycles_per_m_cycle = 4;
+pub const config_path = "config.zon";
 
 // audio
 pub const is_stereo = true; // TODO: configureable.

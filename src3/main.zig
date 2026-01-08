@@ -4,7 +4,6 @@ const sokol = @import("sokol");
 const APU = @import("apu.zig");
 const Config = @import("config.zig");
 const CART = @import("cart.zig");
-const CLI = @import("cli.zig");
 const CPU = @import("cpu.zig");
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
@@ -17,7 +16,7 @@ const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var apu: APU.State = .{};
     var cart: CART.State = .{};
-    var cli: CLI.State = .{};
+    var config: Config = .default;
     var cpu: CPU.State = .{};
     var memory: MEMORY.State = .{};
     var platform: Platform.State = .{};
@@ -29,34 +28,29 @@ export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = state.allocator.allocator();
 
-    var config: Config = .default;
-    // TODO: Why do I get runtime issues with loading?
-    // config.load(alloc, "playground/config.zon") catch {
-    //     config.save(alloc, "playground/config.zon") catch unreachable;
-    // };
-    config.save(alloc, "playground/config.zon") catch unreachable;
-
-
+    state.config.load(alloc, def.config_path) catch {
+        state.config.save(alloc, def.config_path) catch unreachable;
+    };
+    errdefer state.config.deinit(alloc);
+    state.config.parseArgs(alloc) catch unreachable;
 
     APU.init(&state.apu);
     CART.init(&state.cart);
-    CLI.init(&state.cli, state.allocator.allocator());
-    CPU.init(&state.cpu, state.allocator.allocator());
+    CPU.init(&state.cpu, alloc);
     MEMORY.init(&state.memory);
     PPU.init(&state.ppu);
     Platform.init(&state.platform, imgui_cb);
     MMIO.init(&state.mmio);
 
     // TODO: Better way to do this? Not in main function!
-    if(state.cli.dumpFile) |dumpFile| {
-        imgui_cb(dumpFile);
+    if(state.config.files.rom) |rom_file| {
+        imgui_cb(rom_file);
     }
 }
 
-fn imgui_cb(dump_path: []const u8) void {
-    const file_type: def.FileType = CLI.getFileType(dump_path);
-    CPU.loadDump(&state.cpu, file_type, state.allocator.allocator());
-    CART.loadDump(&state.cart, dump_path, file_type, state.allocator.allocator());
+fn imgui_cb(file_path: []const u8) void {
+    state.config.files.rom = file_path;
+    CART.loadFile(&state.cart, file_path, state.allocator.allocator());
 }
 
 export fn frame() void {
@@ -95,9 +89,10 @@ export fn frame() void {
 }
 
 export fn deinit() void {
-    CPU.deinit(&state.cpu, state.allocator.allocator());
-    CART.deinit(&state.cart, state.allocator.allocator());
-    CLI.deinit(&state.cli, state.allocator.allocator());
+    const alloc = state.allocator.allocator();
+    CPU.deinit(&state.cpu, alloc);
+    CART.deinit(&state.cart, alloc);
+    state.config.deinit(alloc);
     Platform.deinit();
     _ = state.allocator.deinit();
 }

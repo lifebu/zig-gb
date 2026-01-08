@@ -6,7 +6,6 @@ const def = @import("defines.zig");
 pub const State = struct {
     imgui_visible: bool = false,
     str_buff: [256]u8 = undefined,
-    dump_dialog_open: bool = false,
     gb_dialog_open: bool = false,
     current_dir: std.fs.Dir = undefined,
     // TODO: Need to find a good way for imgui (ui) to tell the system that the user did something.
@@ -27,11 +26,6 @@ pub fn render(state: *State) void {
         if(imgui.igBeginMenu("File")) {
             if(imgui.igMenuItem("Load GB")) {
                 state.gb_dialog_open = !state.gb_dialog_open;
-                state.dump_dialog_open = false;
-            }
-            if(imgui.igMenuItem("Load Dump")) {
-                state.dump_dialog_open = !state.dump_dialog_open;
-                state.gb_dialog_open = false;
             }
             imgui.igEndMenu();
         }
@@ -41,9 +35,6 @@ pub fn render(state: *State) void {
         }
 
         // TODO: Once we have a config file I can save the last folder that was opened and open the file dialog there.
-        if(state.dump_dialog_open) {
-            ShowFileDialogue(state, "dump");
-        }
         if(state.gb_dialog_open) {
             ShowFileDialogue(state, "gb");
         }
