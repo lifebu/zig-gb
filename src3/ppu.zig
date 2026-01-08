@@ -4,8 +4,6 @@ const assert = std.debug.assert;
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
-// TODO: Try to get rid of mmu dependency. It is currently required to read out IE and IF.
-const MMU = @import("mmu.zig");
 
 const vram_size = mem_map.vram_high - mem_map.vram_low;
 
@@ -189,7 +187,7 @@ pub fn init(state: *State) void {
 }
 
 // TODO: Remove dependency to the memory array.
-pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
+pub fn cycle(state: *State, memory: *[def.addr_space]u8) struct{ bool, bool } {
     var irq_stat: bool = false;
     var irq_vblank: bool = false;
 
@@ -245,20 +243,20 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             advanceBlank(state, blank.len);
         },
         .fetch_low_bg => {
-            state.fetcher_data.first_bitplane = mmu.memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
-            tryPushPixel(state, mmu);
+            tryPushPixel(state, memory);
         },
         .fetch_low_obj => {
-            state.fetcher_data.first_bitplane = mmu.memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.first_bitplane = memory[state.fetcher_data.tile_addr];
             state.fetcher_data.tile_addr += 1;
         },
         .fetch_high_bg => {
-            state.fetcher_data.second_bitplane = mmu.memory[state.fetcher_data.tile_addr];
-            fetchPushBg(state, mmu);
+            state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
+            fetchPushBg(state, memory);
         },
         .fetch_high_obj => {
-            state.fetcher_data.second_bitplane = mmu.memory[state.fetcher_data.tile_addr];
+            state.fetcher_data.second_bitplane = memory[state.fetcher_data.tile_addr];
 
             var pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.obj_palettes_dmg);
             inline for(0..pixels.len) |i| {
@@ -274,19 +272,19 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
                 checkLcdX(state);
             } else {
                 state.uop_fifo.write(state.current_bg_window_uops);
-                tryPushPixel(state, mmu);
+                tryPushPixel(state, memory);
             }
         },
         .fetch_push_bg => {
-            fetchPushBg(state, mmu);
+            fetchPushBg(state, memory);
         },
         .fetch_tile_bg => {
             const tilemap_addr_type: TileMapAddress = state.lcd_control.bg_map_area;
             const overscan_x_tile_offset: u5 = tile_map_size_x - 1;
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileMapTileAddr(state, mmu, tilemap_addr_type, overscan_x_tile_offset, state.scroll_x, state.scroll_y),
+                .tile_addr = getTileMapTileAddr(state, memory, tilemap_addr_type, overscan_x_tile_offset, state.scroll_x, state.scroll_y),
             };
-            tryPushPixel(state, mmu);
+            tryPushPixel(state, memory);
         },
         .fetch_tile_obj => {
             const current_object: FetcherData = state.oam_line_list.readItem() orelse unreachable;
@@ -309,9 +307,9 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
             const scroll_x: u16 = tile_map_pixel_size_x - win_overscan_x; 
             const scroll_y: u16 = tile_map_pixel_size_y - win_y;
             state.fetcher_data = FetcherData{ 
-                .tile_addr = getTileMapTileAddr(state, mmu, tilemap_addr_type, 0, scroll_x, scroll_y),
+                .tile_addr = getTileMapTileAddr(state, memory, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
-            tryPushPixel(state, mmu);
+            tryPushPixel(state, memory);
         },
         .halt => {
             state.uop_fifo.writeItem(.halt);
@@ -319,7 +317,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
         .nop => {
         },
         .nop_draw => {
-            tryPushPixel(state, mmu);
+            tryPushPixel(state, memory);
         },
         .oam_check => {
             const object = Object.fromOAM(state, state.oam_scan_idx);
@@ -354,7 +352,7 @@ pub fn cycle(state: *State, mmu: *MMU.State) struct{ bool, bool } {
     return .{ irq_vblank, irq_stat };
 }
 
-pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
+pub fn request(state: *State, memory: *[def.addr_space]u8, req: *def.Request) void {
     switch(req.address) {
         mem_map.lcd_control => {
             const lcd_was_off: bool = !state.lcd_control.lcd_enable;
@@ -415,17 +413,17 @@ pub fn request(state: *State, mmu: *MMU.State, req: *def.Request) void {
                 req.reject();
             } else {
                 //const vram_idx: u16 = req.address - mem_map.vram_low;
-                req.apply(&mmu.memory[req.address]);
+                req.apply(&memory[req.address]);
             }
         },
         mem_map.bg_palette => {
-            req.apply(&mmu.memory[req.address]);
+            req.apply(&memory[req.address]);
         },
         mem_map.obj_palette_0 => {
-            req.apply(&mmu.memory[req.address]);
+            req.apply(&memory[req.address]);
         },
         mem_map.obj_palette_1 => {
-            req.apply(&mmu.memory[req.address]);
+            req.apply(&memory[req.address]);
         },
         else => {},
     }
@@ -497,7 +495,7 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoDa
     return result;
 }
 
-fn fetchPushBg(state: *State, mmu: *MMU.State) void {
+fn fetchPushBg(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.isEmpty()) { // push succeeded
         const pixels: [tile_size_x]FifoData = convert2bpp(state.fetcher_data, mem_map.bg_palette);
         state.background_fifo.write(&pixels);
@@ -505,7 +503,7 @@ fn fetchPushBg(state: *State, mmu: *MMU.State) void {
     } else { // push failed 
         state.uop_fifo.writeItem(.fetch_push_bg);
     }
-    tryPushPixel(state, mmu);
+    tryPushPixel(state, memory);
 }
 
 fn getPalette(paletteByte: u8) [def.color_depth]u2 {
@@ -517,7 +515,7 @@ fn getPalette(paletteByte: u8) [def.color_depth]u2 {
     return [def.color_depth]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
-fn getTileMapTileAddr(state: *State, mmu: *MMU.State, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
+fn getTileMapTileAddr(state: *State, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
     const fifo_pixel_count: u3 = @intCast(state.background_fifo.length());
     const pixel_x: u16 = @as(u16, state.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
     const pixel_y: u16 = @as(u16, state.lcd_y) + scroll_y; 
@@ -533,7 +531,7 @@ fn getTileMapTileAddr(state: *State, mmu: *MMU.State, tilemap_addr_type: TileMap
     const tile_y = state.lcd_y +% scroll_y;
 
     const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
-    const tile_index: u16 = mmu.memory[tilemap_addr];
+    const tile_index: u16 = memory[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
 
     const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
@@ -559,7 +557,7 @@ fn nextObjectIsAtLcdX(state: *State) bool {
     return object.obj_pos_x == state.lcd_overscan_x;
 }
 
-fn tryPushPixel(state: *State, mmu: *MMU.State) void {
+fn tryPushPixel(state: *State, memory: *[def.addr_space]u8) void {
     if(state.background_fifo.isEmpty()) {
         return;
     }
@@ -571,7 +569,7 @@ fn tryPushPixel(state: *State, mmu: *MMU.State) void {
 
     const used_pixel: FifoData = mixBackgroundAndObject(bg_pixel, obj_pixel);
     const palette_addr: u16 = used_pixel.palette_addr + used_pixel.palette_index;
-    const palette: [def.color_depth]u2 = getPalette(mmu.memory[palette_addr]);
+    const palette: [def.color_depth]u2 = getPalette(memory[palette_addr]);
     const color_id: u2 = palette[used_pixel.color_id];
 
     const color_index: u16 = state.lcd_overscan_x + @as(u16, def.overscan_width) * state.lcd_y;

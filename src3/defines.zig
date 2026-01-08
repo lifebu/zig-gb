@@ -56,10 +56,15 @@ pub const Request = struct {
             .write => |write| try writer.print("{s}: {X:0>2} -> {X:0>4}", .{ @tagName(self.requestor), write, self.address }),
         }
     }
+    pub fn logAndReject(self: *Request) void {
+        if (self.isValid()) std.log.warn("r/w lost: {f}", .{ self });
+        self.reject();
+    }
 };
 
 pub const FileType = enum{
     gameboy,
+    // TODO: remove dump file type for now.
     dump,
     unknown
 };

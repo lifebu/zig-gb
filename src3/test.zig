@@ -3,9 +3,9 @@ const std = @import("std");
 const apu_sampling_test = @import("tests/apu_sampling.test.zig");
 const apu_test = @import("tests/apu.test.zig");
 const cart_test = @import("tests/cart.test.zig");
-const dma_test = @import("tests/dma.test.zig");
 const halt_test = @import("tests/halt.test.zig");
 const interrupt_test = @import("tests/interrupt.test.zig");
+const memory_test = @import("tests/memory.test.zig");
 const mmio_test = @import("tests/mmio.test.zig");
 const ppu_test = @import("tests/ppu.test.zig");
 const singlestep_test = @import("tests/singlestep.test.zig");
@@ -47,7 +47,7 @@ test "DividerTest" {
 }
 
 test "DMA" {
-    try dma_test.runDMATest();
+    try memory_test.runDMATest();
 }
 
 test "InputTest" {

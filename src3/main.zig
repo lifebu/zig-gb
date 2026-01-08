@@ -1,46 +1,37 @@
 const std = @import("std");
 
 const APU = @import("apu.zig");
-const BOOT = @import("boot.zig");
 const CART = @import("cart.zig");
 const CLI = @import("cli.zig");
 const CPU = @import("cpu.zig");
 const def = @import("defines.zig");
-const DMA = @import("dma.zig");
 const mem_map = @import("mem_map.zig");
-const MMU = @import("mmu.zig");
+const MEMORY = @import("memory.zig");
 const MMIO = @import("mmio.zig");
 const PPU = @import("ppu.zig");
-const RAM = @import("ram.zig");
 const Platform = @import("platform.zig");
 
 const state = struct {
     var allocator: std.heap.GeneralPurposeAllocator(.{}) = undefined;
     var apu: APU.State = .{};
-    var boot: BOOT.State = .{};
     var cart: CART.State = .{};
     var cli: CLI.State = .{};
     var cpu: CPU.State = .{};
-    var dma: DMA.State = .{};
-    var mmu: MMU.State = .{};
+    var memory: MEMORY.State = .{};
     var platform: Platform.State = .{};
     var ppu: PPU.State = .{};
-    var ram: RAM.State = .{};
     var mmio: MMIO.State = .{};
 };
 
 export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
     APU.init(&state.apu);
-    BOOT.init(&state.boot);
     CART.init(&state.cart);
     CLI.init(&state.cli, state.allocator.allocator());
     CPU.init(&state.cpu, state.allocator.allocator());
-    DMA.init(&state.dma);
-    MMU.init(&state.mmu);
+    MEMORY.init(&state.memory);
     PPU.init(&state.ppu);
     Platform.init(&state.platform, imgui_cb);
-    RAM.init(&state.ram);
     MMIO.init(&state.mmio);
 
     // TODO: Better way to do this? Not in main function!
@@ -50,8 +41,7 @@ export fn init() void {
 }
 
 fn imgui_cb(dump_path: []const u8) void {
-    const file_type: def.FileType = MMU.getFileType(dump_path);
-    MMU.loadDump(&state.mmu, dump_path, file_type);
+    const file_type: def.FileType = CLI.getFileType(dump_path);
     CPU.loadDump(&state.cpu, file_type, state.allocator.allocator());
     CART.loadDump(&state.cart, dump_path, file_type, state.allocator.allocator());
 }
@@ -68,19 +58,16 @@ export fn frame() void {
         var request: def.Request = .{};
         CPU.cycle(&state.cpu, &request);
         CPU.request(&state.cpu, &request);
-        DMA.cycle(&state.dma, &request);
+        MEMORY.cycle(&state.memory, &request);
         
-        BOOT.request(&state.boot, &request);
+        MEMORY.request(&state.memory, &request);
         CART.request(&state.cart, &request);
-        RAM.request(&state.ram, &request);
-        DMA.request(&state.dma, &request);
         MMIO.request(&state.mmio, &request);
         APU.request(&state.apu, &request);
-        PPU.request(&state.ppu, &state.mmu, &request);
-        MMU.request(&state.mmu, &request);
+        PPU.request(&state.ppu, &state.memory.memory, &request);
 
         const irq_serial, const irq_timer = MMIO.cycle(&state.mmio);
-        const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.mmu);
+        const irq_vblank, const irq_stat = PPU.cycle(&state.ppu, &state.memory.memory);
         const sample: ?def.Sample = APU.cycle(&state.apu);
         if(sample) |value| {
             Platform.pushSample(&state.platform, value);
@@ -88,6 +75,7 @@ export fn frame() void {
 
         CPU.pushInterrupts(&state.cpu, irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad);
         irq_joypad = false; // TODO: Not the nicest, okay for now.
+        request.logAndReject();
     }
 
     Platform.frame(&state.platform, state.ppu.colorIds);
