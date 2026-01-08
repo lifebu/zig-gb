@@ -3,11 +3,16 @@ const assert = std.debug.assert;
 const sokol = @import("sokol");
 
 const def = @import("defines.zig");
+const Config = @import("config.zig");
 const Imgui = @import("imgui.zig");
 const shader = @import("shaders/gb.glsl.zig");
 const shaderTypes = @import("shaders/shader_types.zig");
 
 pub const State = struct {
+    // ui
+    imgui_state: Imgui.State = .{},
+
+    // gfx
     bind: sokol.gfx.Bindings = .{},
     pip: sokol.gfx.Pipeline = .{},
     pass_action: sokol.gfx.PassAction = .{},
@@ -15,15 +20,21 @@ pub const State = struct {
     palette: sokol.gfx.Image = .{},
     sampler: sokol.gfx.Sampler = .{},
 
-    imgui_state: Imgui.State = .{},
+    // audio
+    volume: f32 = 0.15,
+    is_stereo: bool = true,
 
+    // input
     input_state: def.InputState = .{},
+    keybinds: def.Keybinds = .{},
 };
 
-pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
+pub fn init(state: *State, config: Config, imgui_cb: *const fn ([]u8) void) void {
+    // ui
     Imgui.init(&state.imgui_state, imgui_cb);
 
     // gfx
+    const gfx_config = config.graphics;
     sokol.gfx.setup(.{
         .environment = sokol.glue.environment(),
         .logger = .{ .func = sokol.log.func },
@@ -53,10 +64,10 @@ pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
         .data =   init: {
             var data: sokol.gfx.ImageData = .{};
             data.mip_levels[0] = sokol.gfx.asRange(&[_]u32{
-                shaderTypes.shaderRgbaU32(224, 248, 208, 255),
-                shaderTypes.shaderRgbaU32(136, 192, 112, 255),
-                shaderTypes.shaderRgbaU32(52,  104,  86,  255),
-                shaderTypes.shaderRgbaU32(8,  24,  32,  255),
+                shaderTypes.shaderRgbaU32(gfx_config.palette.color_0[0], gfx_config.palette.color_0[1], gfx_config.palette.color_0[2], 255),
+                shaderTypes.shaderRgbaU32(gfx_config.palette.color_1[0], gfx_config.palette.color_1[1], gfx_config.palette.color_1[2], 255),
+                shaderTypes.shaderRgbaU32(gfx_config.palette.color_2[0], gfx_config.palette.color_2[1], gfx_config.palette.color_2[2], 255),
+                shaderTypes.shaderRgbaU32(gfx_config.palette.color_3[0], gfx_config.palette.color_3[1], gfx_config.palette.color_3[2], 255),
             });
             break :init data;
         },
@@ -102,11 +113,16 @@ pub fn init(state: *State, imgui_cb: *const fn ([]u8) void) void {
     };
 
     // audio
+    state.volume = config.audio.volume;
+    state.is_stereo = config.audio.stereo_audio;
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = def.samples_per_frame,
+        .num_channels = if(state.is_stereo) 2 else 1,
         .sample_rate = def.sample_rate,
     });
+
+    // input
+    state.keybinds = config.keybinds;
 }
 
 pub fn deinit() void {
@@ -145,11 +161,11 @@ pub fn frame(state: *State, colorids: [def.overscan_resolution]u8) void {
     sokol.gfx.commit();
 }
 
-pub fn pushSample(_: *State, sample: def.Sample) void {
+pub fn pushSample(state: *State, sample: def.Sample) void {
     // TODO: use sokol.audio.expect() to know if we starved and if we will waste samples here.
-    const sample_left: f32 = sample.left * def.default_platform_volume;
-    const sample_right: f32 = sample.right * def.default_platform_volume;
-    if(def.is_stereo) {
+    const sample_left: f32 = sample.left * state.volume;
+    const sample_right: f32 = sample.right * state.volume;
+    if(state.is_stereo) {
         const sample_arr: [2]f32 = .{ sample_left, sample_right };
         const samples_used: i32 = sokol.audio.push(&sample_arr[0], 1);
         if(samples_used == 0) {} // TODO: Samples wasted? Error?
@@ -161,47 +177,41 @@ pub fn pushSample(_: *State, sample: def.Sample) void {
     }
 }
 
-pub export fn event(ev: ?*const sokol.app.Event, state_opaque: ?*anyopaque) void {
-    const state: ?*State = @alignCast(@ptrCast(state_opaque));
-    assert(state != null);
-    if(ev) |e| {
-        _ = sokol.imgui.handleEvent(e.*);
-        switch(e.key_code) {
-            // TODO: Rebindindable keys
-            .LEFT => {
-                state.?.input_state.left_pressed = e.type == .KEY_DOWN;
-            },
-            .RIGHT => {
-                state.?.input_state.right_pressed = e.type == .KEY_DOWN;
-            },
-            .UP => {
-                state.?.input_state.up_pressed = e.type == .KEY_DOWN;
-            },
-            .DOWN => {
-                state.?.input_state.down_pressed = e.type == .KEY_DOWN;
-            },
-            .W => {
-                state.?.input_state.start_pressed = e.type == .KEY_DOWN;
-            },
-            .A => {
-                state.?.input_state.a_pressed = e.type == .KEY_DOWN;
-            },
-            .S => {
-                state.?.input_state.select_pressed = e.type == .KEY_DOWN;
-            },
-            .D => {
-                state.?.input_state.b_pressed = e.type == .KEY_DOWN;
-            },
-            .Q => {
-                if(e.modifiers & sokol.app.modifier_ctrl != 0) {
-                    sokol.app.requestQuit();
-                }
-            },
-            .GRAVE_ACCENT => {
-                state.?.imgui_state.imgui_visible = !state.?.imgui_state.imgui_visible;
-            },
-            else => {},
-        }
+pub export fn event(ev_opt: ?*const sokol.app.Event, state_opaque: ?*anyopaque) void {
+    const state_opt: ?*State = @alignCast(@ptrCast(state_opaque));
+    const state: *State = state_opt orelse return;
+    const ev: *const sokol.app.Event = ev_opt orelse return;
+    _ = sokol.imgui.handleEvent(ev.*);
+
+    if(ev.key_code == state.keybinds.key_up) {
+        state.input_state.up_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_down) {
+        state.input_state.down_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_left) {
+        state.input_state.left_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_right) {
+        state.input_state.right_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_start) {
+        state.input_state.start_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_select) {
+        state.input_state.select_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_a) {
+        state.input_state.a_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == state.keybinds.key_b) {
+        state.input_state.b_pressed = ev.type == .KEY_DOWN;
+    }
+    else if(ev.key_code == .Q and (ev.modifiers & sokol.app.modifier_ctrl != 0)) {
+        sokol.app.requestQuit();
+    }
+    else if(ev.key_code == .GRAVE_ACCENT) {
+        state.imgui_state.imgui_visible = !state.imgui_state.imgui_visible;
     }
 }
 

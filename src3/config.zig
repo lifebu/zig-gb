@@ -1,6 +1,8 @@
 const std = @import("std");
 const sokol = @import("sokol");
 
+const def = @import("defines.zig");
+
 const Self = @This();
 
 const Files = struct {
@@ -8,27 +10,14 @@ const Files = struct {
     boot_rom: ?[]const u8 = null,
 };
 const Audio = struct {
+    // TODO: Sample rate would be harder to do as apu needs that info as well.
     stereo_audio: bool = true,
-    sample_rate: u17 = 44_100,
     volume: f32 = 0.15,
 };
-const Keybinds = struct {
-    key_up: sokol.app.Keycode = .UP,
-    key_down: sokol.app.Keycode = .DOWN,
-    key_left: sokol.app.Keycode = .LEFT,
-    key_right: sokol.app.Keycode = .RIGHT,
-    key_start: sokol.app.Keycode = .W,
-    key_select: sokol.app.Keycode = .S,
-    key_a: sokol.app.Keycode = .A,
-    key_b: sokol.app.Keycode = .D,
-};
-const Color = struct { r: u8, g: u8, b: u8 };
 const Graphics = struct {
-    resolution_scale: u4 = 3, 
-    palette_0: Color = .{ .r = 224, .g = 248, .b = 208 },
-    palette_1: Color = .{ .r = 136, .g = 192, .b = 112 },
-    palette_2: Color = .{ .r = 52, .g = 104, .b = 86 },
-    palette_3: Color = .{ .r = 8, .g = 24, .b = 32 },
+    // TODO: This does not work right now. Need a way to change the resolution later in sokol.
+    //resolution_scale: u4 = 3, 
+    palette: def.Palette = .{},
 };
 const Emulation = struct {
     model: enum {
@@ -50,7 +39,7 @@ const Debug = struct {
 
 files: Files = .{},
 audio: Audio = .{},
-keybinds: Keybinds = .{},
+keybinds: def.Keybinds = .{},
 graphics: Graphics = .{},
 emulation: Emulation = .{},
 debug: Debug = .{},
@@ -68,10 +57,11 @@ pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {
     var diagnostics: std.zon.parse.Diagnostics = .{};
     defer diagnostics.deinit(alloc);
     self.* = std.zon.parse.fromSlice(Self, alloc, content0, &diagnostics, .{ .free_on_error = true }) catch |err| {
-        std.log.err("Failed to parse config file, will use default: {f}.\n", .{diagnostics});
+        std.log.warn("Failed to parse config file, will use default: {f}.\n", .{diagnostics});
         return err;
     };
 
+    // TODO: This is super hacky and leads to a crashes for the first 2 starts without a config file.
     if(self.files.boot_rom == null) {
         self.files.boot_rom = try std.fmt.allocPrint(alloc, "data/bootroms/dmg_boot.bin", .{});
     }

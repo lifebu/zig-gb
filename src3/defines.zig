@@ -1,4 +1,5 @@
 const std = @import("std");
+const Keycode = @import("sokol").app.Keycode;
 
 // input
 // TODO: Is this optimal? Can we make it easier to calculate the dpad and button bytes?
@@ -14,6 +15,18 @@ pub const InputState = packed struct {
     start_pressed: bool = false,
 };
 
+pub const Keybinds = struct {
+    key_up: Keycode = .UP,
+    key_down: Keycode = .DOWN,
+    key_left: Keycode = .LEFT,
+    key_right: Keycode = .RIGHT,
+    key_start: Keycode = .W,
+    key_select: Keycode = .S,
+    key_a: Keycode = .A,
+    key_b: Keycode = .D,
+};
+
+// memory
 var void_byte: u8 = 0x00;
 pub const open_bus: u8 = 0xFF;
 pub const Request = struct {
@@ -62,14 +75,14 @@ pub const Request = struct {
     }
 };
 
-pub const FileType = enum{
-    gameboy,
-    // TODO: remove dump file type for now.
-    dump,
-    unknown
+// graphics
+pub const Palette = struct {
+    color_0: [3]u8 = .{ 224, 248, 208 },
+    color_1: [3]u8 = .{ 136, 192, 112 },
+    color_2: [3]u8 = .{ 52, 104, 86 },
+    color_3: [3]u8 = .{ 8, 24, 32 },
 };
 
-// graphics
 pub const resolution_width = 160;
 pub const resolution_height = 144;
 pub const scaling = 3;
@@ -91,11 +104,8 @@ pub const t_cycles_per_m_cycle = 4;
 pub const config_path = "config.zon";
 
 // audio
-pub const is_stereo = true; // TODO: configureable.
-pub const samples_per_frame: i32 = if(is_stereo) 2 else 1;
 pub const sample_rate = 44_100;
 pub const t_cycles_per_sample = (system_freq / sample_rate);
-pub const default_platform_volume: f32 = 0.15; // TODO: configureable.
 
 pub const Sample = struct {
     left: f32 = 0.0, right: f32 = 0.0,

@@ -37,9 +37,9 @@ export fn init() void {
     APU.init(&state.apu);
     CART.init(&state.cart);
     CPU.init(&state.cpu, alloc);
-    MEMORY.init(&state.memory);
+    MEMORY.init(&state.memory, state.config.files.boot_rom.?);
     PPU.init(&state.ppu);
-    Platform.init(&state.platform, imgui_cb);
+    Platform.init(&state.platform, state.config, imgui_cb);
     MMIO.init(&state.mmio);
 
     // TODO: Better way to do this? Not in main function!

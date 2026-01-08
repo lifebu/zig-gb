@@ -15,7 +15,7 @@ const dma_step: [4]DmaMicroOp = .{ .nop, .read, .nop, .write };
 
 pub const State = struct {
     // boot
-    rom_enabled: bool = false,
+    rom_enabled: bool = true,
 
     rom: [def.boot_rom_size]u8 = @splat(0),
 
@@ -36,15 +36,12 @@ pub const State = struct {
     work_ram: [work_ram_size]u8 = @splat(0),
 };
 
-pub fn init(state: *State) void {
+pub fn init(state: *State, path: []const u8) void {
     state.* = .{};
 
-    // TODO: Which boot rom to use should be an option.
-    // TODO: Not hard-coded relative paths like this?
-    const file = std.fs.cwd().openFile("data/bootroms/dmg_boot.bin", .{}) catch unreachable;
+    const file = std.fs.cwd().openFile(path, .{}) catch unreachable;
     const len = file.readAll(&state.rom) catch unreachable;
     std.debug.assert(len == state.rom.len);
-    state.rom_enabled = true;
 }
 
 pub fn cycle(state: *State, req: *def.Request) void {
