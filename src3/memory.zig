@@ -1,9 +1,17 @@
 const std = @import("std");
+const assert = std.debug.assert;
 
 const def = @import("defines.zig");
+const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
 
+const oam_size = mem_map.oam_high - mem_map.oam_low;
 const work_ram_size = mem_map.wram_high - mem_map.wram_low;
+
+const DmaMicroOp = enum { nop, read, write };
+const DmaFifo = Fifo.RingbufferFifo(DmaMicroOp, 8);
+const dma_start: [4]DmaMicroOp = .{ .nop, .nop, .nop, .nop };
+const dma_step: [4]DmaMicroOp = .{ .nop, .read, .nop, .write };
 
 pub const State = struct {
     // boot
@@ -12,13 +20,11 @@ pub const State = struct {
     rom: [def.boot_rom_size]u8 = @splat(0),
 
     // dma
-    // TODO: Try to simplify all the state of dma. Maybe a microcode machine?
-    is_running: bool = false,
-    start_addr: u16 = 0x0000,
-    offset: u16 = 0,
-    counter: u3 = 0,
+    dma_fifo: DmaFifo = .{}, 
+    src_addr: u16 = 0x000,
+    dest_addr: u16 = 0x000,
+    dest_limit: u16 = 0x000,
     byte: u8 = 0,
-    is_read: bool = false,
 
     dma: u8 = 0,
 
@@ -46,33 +52,27 @@ pub fn cycle(state: *State, req: *def.Request) void {
 }
 
 fn cycleDMA(state: *State, req: *def.Request) void {
-    // TODO: Clean this code up.
-    if(!state.is_running) {
-        return;
-    }
-
-    if(req.address < mem_map.hram_low or req.address > mem_map.hram_high) {
+    const uop = state.dma_fifo.readItem() orelse return;
+    if(req.address < mem_map.hram_low or req.address > (mem_map.hram_high) - 1) {
         req.reject(); // DMA Bus conflict
     }
-    
-    state.counter, const overflow = @subWithOverflow(state.counter, 1);
-    if(overflow == 0) {
-        return;
-    }
-    // read: 2 cycles, write: 2 cycles => 4 cycles per byte.
-    state.counter = 1;
 
-    if(state.is_read) {
-        const source_addr: u16 = state.start_addr + state.offset;
-        req.* = .{ .requestor = .dma, .address = source_addr, .value = .{ .read = &state.byte } };
-    } else {
-        const dest_addr: u16 = mem_map.oam_low + state.offset;
-        req.* = .{ .requestor = .dma, .address = dest_addr, .value = .{ .write = state.byte } };
+    switch(uop) {
+        .nop => {},
+        .read => {
+            req.* = .{ .requestor = .dma, .address = state.src_addr, .value = .{ .read = &state.byte } };
+            state.src_addr += 1;
+        },
+        .write => {
+            req.* = .{ .requestor = .dma, .address = state.dest_addr, .value = .{ .write = state.byte } };
+            state.dest_addr += 1;
 
-        state.offset += 1;
-        state.is_running = (dest_addr + 1) < mem_map.oam_high;
+            assert(state.dma_fifo.isEmpty());
+            if(state.dest_addr <= state.dest_limit) {
+                state.dma_fifo.write(&dma_step);
+            }
+        },
     }
-    state.is_read = !state.is_read;
 }
 
 pub fn request(state: *State, req: *def.Request) void {
@@ -99,11 +99,11 @@ pub fn request(state: *State, req: *def.Request) void {
         mem_map.dma => {
             req.apply(&state.dma);
             if(req.isWrite()) {
-                state.is_running = true;
-                state.start_addr = @as(u16, state.dma) << 8;
-                state.offset = 0;
-                state.counter = 5; // Nothing happens for the first 5 cycles.
-                state.is_read = true;
+                state.src_addr = @as(u16, state.dma) << 8;
+                state.dest_addr = mem_map.oam_low;
+                state.dest_limit = mem_map.oam_high - 1;
+                state.dma_fifo.write(&dma_start);
+                state.dma_fifo.write(&dma_step);
             }
         },
         mem_map.boot_rom => {
@@ -118,10 +118,6 @@ pub fn request(state: *State, req: *def.Request) void {
         mem_map.unused_low...(mem_map.unused_high - 1) => {
             req.reject();
         },
-        else => {
-            // TODO: Move that to def.Request.
-            // if (req.isValid()) std.log.warn("r/w lost: {f}", .{ req });
-            // req.reject();
-        },
+        else => {},
     }
 }
