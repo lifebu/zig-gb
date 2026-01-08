@@ -1,6 +1,8 @@
 const std = @import("std");
+const sokol = @import("sokol");
 
 const APU = @import("apu.zig");
+const Config = @import("config.zig");
 const CART = @import("cart.zig");
 const CLI = @import("cli.zig");
 const CPU = @import("cpu.zig");
@@ -25,6 +27,17 @@ const state = struct {
 
 export fn init() void {
     state.allocator = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = state.allocator.allocator();
+
+    var config: Config = .default;
+    // TODO: Why do I get runtime issues with loading?
+    // config.load(alloc, "playground/config.zon") catch {
+    //     config.save(alloc, "playground/config.zon") catch unreachable;
+    // };
+    config.save(alloc, "playground/config.zon") catch unreachable;
+
+
+
     APU.init(&state.apu);
     CART.init(&state.cart);
     CLI.init(&state.cli, state.allocator.allocator());
