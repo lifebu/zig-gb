@@ -13,9 +13,9 @@ pub fn runInterruptTests() !void {
     var memory: std.AutoHashMap(u16, u8) = .init(alloc);
     defer memory.deinit();
 
-    var cpu: CPU.State = .{};
-    CPU.init(&cpu, alloc);
-    defer CPU.deinit(&cpu, alloc);
+    var cpu: CPU = .{};
+    cpu.init(alloc);
+    defer cpu.deinit(alloc);
 
     // CPU can write to IF.
     try memory.put(mem_map.wram_low, 0x77); // LD (HL), A

@@ -5,6 +5,8 @@ const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
 
+const Self = @This();
+
 // TODO: Try to implement interrupt handling differently so that I don't have to pay the size of the largest instruction and the interrupt handler.
 // I can reach this when I changed ei and interrupt decoding!
 // TODO: This wastes a lost of memory, as the pseudo bank all have to pay the size of the largest.
@@ -766,20 +768,19 @@ const RegisterFile = packed union {
         p: PseudoFlagRegister = .{}, u: u8 = 0,
     },
 
-    const Self = @This();
-    pub fn getU8(self: *Self, rfid: RegisterFileID) *u8 {
+    pub fn getU8(self: *RegisterFile, rfid: RegisterFileID) *u8 {
         const index: u4 = @intFromEnum(rfid); 
         const base: [*]u8 = @alignCast(@ptrCast(self));
         return @ptrCast(base + index);
     } 
-    pub fn getU16(self: *Self, rfid: RegisterFileID) *u16 {
+    pub fn getU16(self: *RegisterFile, rfid: RegisterFileID) *u16 {
         const index: u4 = @intFromEnum(rfid); 
         assert(index % 2 == 0); // requires aligned rfid.
         const index_u16: u4 = index / 2;
         const base: [*]u16 = @alignCast(@ptrCast(self));
         return @ptrCast(base + index_u16);
     } 
-    pub fn getFlag(self: *Self, ffid: FlagFileID) u1 {
+    pub fn getFlag(self: *RegisterFile, ffid: FlagFileID) u1 {
         // Note: This only works for the specific memory layout above (bytes and bits).
         // Flag followed by A followed by Pseudoflag. And the specific order of the bits.
         const ffid_idx: u5 = @intFromEnum(ffid);
@@ -790,35 +791,35 @@ const RegisterFile = packed union {
     }
 };
 
-pub const State = struct {
-    hram: [hram_size]u8 = @splat(0),
-    interrupt_enable: InterruptFlags = .{ .value = 0 },
-    interrupt_flag: InterruptFlags = .{ .value = 0 },
 
-    uop_fifo: MicroOpFifo = .{}, 
+hram: [hram_size]u8 = @splat(0),
+interrupt_enable: InterruptFlags = .{ .value = 0 },
+interrupt_flag: InterruptFlags = .{ .value = 0 },
 
-    registers: RegisterFile = .{ .r8 = .{} },
-    address_bus: u16 = 0,
+uop_fifo: MicroOpFifo = .{}, 
 
-    interrupt_master_enable: bool = false,
+registers: RegisterFile = .{ .r8 = .{} },
+address_bus: u16 = 0,
 
-    // Differentiate the behaviour of halt when it is first encountered vs repeated hits (cpu is halted).
-    halt_again: bool = false,
-};
+interrupt_master_enable: bool = false,
 
-pub fn init(state: *State, alloc: std.mem.Allocator) void {
+// Differentiate the behaviour of halt when it is first encountered vs repeated hits (cpu is halted).
+halt_again: bool = false,
+
+
+pub fn init(self: *Self, alloc: std.mem.Allocator) void {
     opcode_banks = genOpcodeBanks(alloc);
 
     const opcode_bank = opcode_banks[opcode_bank_default];
-    const uops: MicroOpArray = opcode_bank[state.registers.r8.ir];
-    state.uop_fifo.write(uops.items);
+    const uops: MicroOpArray = opcode_bank[self.registers.r8.ir];
+    self.uop_fifo.write(uops.items);
 
-    state.hram = @splat(0);
-    state.interrupt_enable = .{ .value = 0 };
-    state.interrupt_flag = .{ .value = 0 };
+    self.hram = @splat(0);
+    self.interrupt_enable = .{ .value = 0 };
+    self.interrupt_flag = .{ .value = 0 };
 }
 
-pub fn deinit(_: *State, alloc: std.mem.Allocator) void {
+pub fn deinit(_: *Self, alloc: std.mem.Allocator) void {
     for(&opcode_banks) |*bank| {
         for(bank) |*instruction| {
             instruction.deinit(alloc);
@@ -826,31 +827,31 @@ pub fn deinit(_: *State, alloc: std.mem.Allocator) void {
     }
 }
 
-pub fn cycle(state: *State, req: *def.Request) void {
-    const flags = state.registers.r8.f;
-    const uop: MicroOpData = state.uop_fifo.readItem().?;
+pub fn cycle(self: *Self, req: *def.Request) void {
+    const flags = self.registers.r8.f;
+    const uop: MicroOpData = self.uop_fifo.readItem().?;
     switch(uop.operation) {
         .addr_idu => {
             const params: AddrIduParams = uop.params.addr_idu;
-            const addr: u16 = state.registers.getU16(params.addr).*;
-            state.address_bus = addr;
-            const output: *u16 = state.registers.getU16(params.idu_out);
+            const addr: u16 = self.registers.getU16(params.addr).*;
+            self.address_bus = addr;
+            const output: *u16 = self.registers.getU16(params.idu_out);
             // +% -1 <=> +% 65535
             const idu_factor: u16 = @bitCast(@as(i16, params.idu));
             output.* = addr +% idu_factor;
         },
         .addr_idu_low => {
             const params: AddrIduParams = uop.params.addr_idu;
-            const input: u8 = state.registers.getU8(params.addr).*;
+            const input: u8 = self.registers.getU8(params.addr).*;
             const addr: u16 = 0xFF00 + @as(u16, input);
-            state.address_bus = addr;
-            const output: *u8 = state.registers.getU8(params.idu_out);
+            self.address_bus = addr;
+            const output: *u8 = self.registers.getU8(params.idu_out);
             // +% -1 <=> +% 255
             const idu_factor: u8 = @bitCast(@as(i8, params.idu));
             output.* = input +% idu_factor;
         },
         .alu_adf => {
-            const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const input_flag, const flag_overflow = @addWithOverflow(input_1, flag);
             const result, const overflow = @addWithOverflow(input_2, input_flag);
             output.* = result;
@@ -858,46 +859,46 @@ pub fn cycle(state: *State, req: *def.Request) void {
             const half_bcd: u1 = @truncate(((input_1 & 0xF) + (input_2 & 0xF) + flag) >> 4);
             // TODO: Super hacky. ADD HL, r16 does not change the zero flag, but all other kinds of ADD instructions do.
             const zero: u1 = if(uop.params.alu.output == .a) @intFromBool(result == 0) else flags.zero;
-            state.registers.r8.f = .{ .carry = flag_overflow | overflow, .half_bcd = half_bcd, .n_bcd = 0, .zero = zero};
+            self.registers.r8.f = .{ .carry = flag_overflow | overflow, .half_bcd = half_bcd, .n_bcd = 0, .zero = zero};
         },
         .alu_and => {
-            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, const input_2, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             output.* = input_1 & input_2;
             
-            state.registers.r8.f = .{ .carry = 0, .half_bcd = 1, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
+            self.registers.r8.f = .{ .carry = 0, .half_bcd = 1, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
         },
         .alu_assign => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             output.* = input_1;
         },
         .alu_bit => {
-            const input_1, _, const input_2, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, const input_2, _, _ = AluParams.Unpack(&self.registers, uop.params.alu);
             const result: u8 = input_1 & (@as(u8, 1) << @as(u3, @intCast(input_2)));
 
-            state.registers.r8.f = .{ .carry = flags.carry, .half_bcd = 1, .n_bcd = 0, .zero = @intFromBool(result == 0) };
+            self.registers.r8.f = .{ .carry = flags.carry, .half_bcd = 1, .n_bcd = 0, .zero = @intFromBool(result == 0) };
         },
         .alu_ccf => {
-            state.registers.r8.f = .{ .carry = ~flags.carry, .half_bcd = 0, .n_bcd = 0, .zero = flags.zero };
+            self.registers.r8.f = .{ .carry = ~flags.carry, .half_bcd = 0, .n_bcd = 0, .zero = flags.zero };
         },
         .alu_cp => {
-            const input_1, const input_2, _, _, _ = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, const input_2, _, _, _ = AluParams.Unpack(&self.registers, uop.params.alu);
             const result, const overflow = @subWithOverflow(input_1, input_2);
 
             const half_bcd: u1 = @truncate(((input_1 & 0xF) -% (input_2 & 0xF)) >> 4);
-            state.registers.r8.f = .{ .carry = overflow, .half_bcd = half_bcd, .n_bcd = 1, .zero = @intFromBool(result == 0) };
+            self.registers.r8.f = .{ .carry = overflow, .half_bcd = half_bcd, .n_bcd = 1, .zero = @intFromBool(result == 0) };
         },
         .alu_daa_adjust => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const low: u1 = ~flags.n_bcd & @intFromBool((input_1 & 0xF) > 0x09) | flags.half_bcd;
             const high: u1 = ~flags.n_bcd & @intFromBool(input_1 > 0x99) | flags.carry;
             const offset: u8 = 0x06 * @as(u8, low) + 0x60 * @as(u8, high);
             const result = if (flags.n_bcd == 1) input_1 -% offset else input_1 +% offset;
             output.* = result;
 
-            state.registers.r8.f = .{ .carry = high, .half_bcd = 0, .n_bcd = flags.n_bcd, .zero = @intFromBool(result == 0) };
+            self.registers.r8.f = .{ .carry = high, .half_bcd = 0, .n_bcd = flags.n_bcd, .zero = @intFromBool(result == 0) };
         },
         .alu_inc => {
-            const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, const input_2, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             // TODO: This works but it is a type unsafe to cast a i2 to u4 and back.
             const factor: i2 = @bitCast(@as(u2, @truncate(input_2)));
             // +% -1 <=> +% 255
@@ -906,101 +907,101 @@ pub fn cycle(state: *State, req: *def.Request) void {
 
             const half_bcd: u1 = @truncate(((input_1 & 0xF) +% factor_inc) >> 4);
             const n_bcd: u1 = if(factor < 0) 1 else 0;
-            state.registers.r8.f = .{ .carry = flags.carry, .half_bcd = half_bcd, .n_bcd = n_bcd, .zero = @intFromBool(output.* == 0) };
+            self.registers.r8.f = .{ .carry = flags.carry, .half_bcd = half_bcd, .n_bcd = n_bcd, .zero = @intFromBool(output.* == 0) };
         },
         .alu_not => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             output.* = ~input_1;
 
-            state.registers.r8.f = .{ .carry = flags.carry, .half_bcd = 1, .n_bcd = 1, .zero = flags.zero };
+            self.registers.r8.f = .{ .carry = flags.carry, .half_bcd = 1, .n_bcd = 1, .zero = flags.zero };
         },
         .alu_or => {
-            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, const input_2, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             output.* = input_1 | input_2;
 
-            state.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
+            self.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
         }, 
         .alu_res => {
-            const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, const input_2, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const mask: u8 = @as(u8, 1) << @as(u3, @intCast(input_2));
             const result: u8 = input_1 & ~mask;
             output.* = result;
         }, 
         .alu_sbf => {
-            const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, const input_2, _, const flag, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const input_flag, const flag_overflow = @addWithOverflow(input_2, flag);
             const result, const overflow = @subWithOverflow(input_1, input_flag);
             output.* = result;
 
             const half_bcd: u1 = @truncate(((input_1 & 0xF) -% (input_2 & 0xF) -% flag) >> 4);
-            state.registers.r8.f = .{ .carry = flag_overflow | overflow, .half_bcd = half_bcd, .n_bcd = 1, .zero = @intFromBool(result == 0) };
+            self.registers.r8.f = .{ .carry = flag_overflow | overflow, .half_bcd = half_bcd, .n_bcd = 1, .zero = @intFromBool(result == 0) };
         },
         .alu_scf => {
-            state.registers.r8.f = .{ .carry = 1, .half_bcd = 0, .n_bcd = 0, .zero = flags.zero };
+            self.registers.r8.f = .{ .carry = 1, .half_bcd = 0, .n_bcd = 0, .zero = flags.zero };
         },
         .alu_set => {
-            const input_1, _, const input_2, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, const input_2, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const mask: u8 = @as(u8, 1) << @as(u3, @intCast(input_2));
             const result: u8 = input_1 | mask;
             output.* = result;
         },
         .alu_slf => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             var result, const shifted_bit = @shlWithOverflow(input_1, 1);
-            state.registers.r8.p.temp_msb = shifted_bit;
-            const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
+            self.registers.r8.p.temp_msb = shifted_bit;
+            const flag: u8 = self.registers.getFlag(uop.params.alu.ffid);
             result |= flag;
             output.* = result;
 
             // TODO: Workaround to not set the flag values for rlca. Need a better flag system.
             const zero: u1 = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
-            state.registers.r8.f = .{ .carry = shifted_bit, .half_bcd = 0, .n_bcd = 0, .zero = zero };
+            self.registers.r8.f = .{ .carry = shifted_bit, .half_bcd = 0, .n_bcd = 0, .zero = zero };
         },
         .alu_srf => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const lsb: u1 = @truncate(input_1); 
             const msb: u1 = @intCast(input_1 >> 7);
-            state.registers.r8.p.temp_lsb = lsb;
-            state.registers.r8.p.temp_msb = msb;
-            const flag: u8 = state.registers.getFlag(uop.params.alu.ffid);
+            self.registers.r8.p.temp_lsb = lsb;
+            self.registers.r8.p.temp_msb = msb;
+            const flag: u8 = self.registers.getFlag(uop.params.alu.ffid);
             const result: u8 = (input_1 >> 1) | (flag << 7);
             output.* = result;
 
             // TODO: Workaround to not set the flag values for rra. Need a better flag system.
             const zero: u1 = if(uop.params.alu.input_1 == uop.params.alu.input_2.rfid) @intFromBool(result == 0) else 0;
-            state.registers.r8.f = .{ .carry = lsb, .half_bcd = 0, .n_bcd = 0, .zero = zero };
+            self.registers.r8.f = .{ .carry = lsb, .half_bcd = 0, .n_bcd = 0, .zero = zero };
         },
         .alu_swap => {
-            const input_1, _, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, _, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             const result = (input_1 << 4) | (input_1 >> 4);
             output.* = result;
 
-            state.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(result == 0) };
+            self.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(result == 0) };
         },
         .alu_xor => {
-            const input_1, const input_2, _, _, const output = AluParams.Unpack(&state.registers, uop.params.alu);
+            const input_1, const input_2, _, _, const output = AluParams.Unpack(&self.registers, uop.params.alu);
             output.* = input_1 ^ input_2;
 
-            state.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
+            self.registers.r8.f = .{ .carry = 0, .half_bcd = 0, .n_bcd = 0, .zero = @intFromBool(output.* == 0) };
         },
         .change_ime => {
-            state.interrupt_master_enable = uop.params.misc.ime_value;
+            self.interrupt_master_enable = uop.params.misc.ime_value;
         },
         .conditional_check => {
             const params: MiscParams = uop.params.misc;
             const cc = params.cc;
             const flag: u1 = switch(cc) {
-                .not_zero => ~state.registers.r8.f.zero,
-                .zero => state.registers.r8.f.zero,
-                .not_carry => ~state.registers.r8.f.carry,
-                .carry => state.registers.r8.f.carry,
-                .const_one => state.registers.r8.p.const_one,
+                .not_zero => ~self.registers.r8.f.zero,
+                .zero => self.registers.r8.f.zero,
+                .not_carry => ~self.registers.r8.f.carry,
+                .carry => self.registers.r8.f.carry,
+                .const_one => self.registers.r8.p.const_one,
             };
 
             if(flag == 0) { // Load next instruction
-                assert((state.uop_fifo.length() % 4) == 1); // We assume that conditional_check uop is followed by another uop inside of this mcycle (Decode step).
-                state.uop_fifo.clear();
-                state.uop_fifo.write(&[_]MicroOpData{
+                assert((self.uop_fifo.length() % 4) == 1); // We assume that conditional_check uop is followed by another uop inside of this mcycle (Decode step).
+                self.uop_fifo.clear();
+                self.uop_fifo.write(&[_]MicroOpData{
                     Nop(),
                     AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Nop(), Decode(opcode_bank_default),
                 });
@@ -1009,11 +1010,11 @@ pub fn cycle(state: *State, req: *def.Request) void {
         .dbus => {
             const params: DBusParams = uop.params.dbus;
             if(params.source == .dbus) { // Read
-                const target: *u8 = state.registers.getU8(params.target);
-                req.* = def.Request{ .requestor = .cpu, .address = state.address_bus, .value = .{ .read = target } };
+                const target: *u8 = self.registers.getU8(params.target);
+                req.* = def.Request{ .requestor = .cpu, .address = self.address_bus, .value = .{ .read = target } };
             } else if(params.target == .dbus) { // Write
-                const source: *u8 = state.registers.getU8(params.source);
-                req.* = def.Request{ .requestor = .cpu,.address = state.address_bus, .value = .{ .write = source.* } };
+                const source: *u8 = self.registers.getU8(params.source);
+                req.* = def.Request{ .requestor = .cpu,.address = self.address_bus, .value = .{ .write = source.* } };
             } else {
                 unreachable;
             }
@@ -1027,25 +1028,25 @@ pub fn cycle(state: *State, req: *def.Request) void {
             // TODO: Using an external system would also allow me to split this decode function into decode and decode_interrupt
             // When an interrupt is pending or the IE bits are changed, we will inform the cpu about this. if all other conditions are met,
             // the cpu will replace the last instruction (decode) with the decode_interrupt instruction!
-            const interrupt_signal: u8 =  state.interrupt_enable.value & state.interrupt_flag.value;
-            if(state.interrupt_master_enable and interrupt_signal != 0) {
+            const interrupt_signal: u8 =  self.interrupt_enable.value & self.interrupt_flag.value;
+            if(self.interrupt_master_enable and interrupt_signal != 0) {
                 const interrupt_idx: u3 = getLowestSetBit(interrupt_signal);
                 const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
-                state.uop_fifo.write(interrupt_uops.items);
+                self.uop_fifo.write(interrupt_uops.items);
 
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
-                const result: u8 = state.interrupt_flag.value & ~mask;
-                state.interrupt_flag.value = result;
+                const result: u8 = self.interrupt_flag.value & ~mask;
+                self.interrupt_flag.value = result;
 
                 // TODO: Because we are preparing to load the next instruction but not decoding it we are skipping one byte.
                 // Removing the pc again is more of a hack and it should not happen. 
                 // I should rethink when exactly an interrupt would happen when it is triggered during an instruction.
                 // And how that interacts with the EI instruction.
-                state.registers.r16.pc -= 1;
+                self.registers.r16.pc -= 1;
             } else {
                 const params: DecodeParams = uop.params.decode;
                 const opcode_bank = opcode_banks[params.bank_idx];
-                const opcode: u8 = state.registers.r8.ir;
+                const opcode: u8 = self.registers.r8.ir;
                 if(opcode == 0x10 and params.bank_idx == opcode_bank_default) {
                     std.debug.print("STOP_NOT_IMPLEMENTED\n", .{});
                     unreachable;
@@ -1056,7 +1057,7 @@ pub fn cycle(state: *State, req: *def.Request) void {
                     // std.debug.print("DECODED INVALID OPCODE: BANK: {}: OPCODE: {X:0>2}\n", .{ params.bank_idx, opcode });
                     // unreachable;
                 }
-                state.uop_fifo.write(uops.items);
+                self.uop_fifo.write(uops.items);
             }
         },
         .halt => {
@@ -1068,59 +1069,59 @@ pub fn cycle(state: *State, req: *def.Request) void {
             //             halt-again-flag = true: increment pcl, reset halt-again-flag => just like normal.
 
             // TODO: So many conditionals, a way to implement this better?
-            const pc_curr: u16 = state.registers.r16.pc;
+            const pc_curr: u16 = self.registers.r16.pc;
             if(pc_curr == 0) {}
             const halt_uop: u8 = 0x76;
-            const interrupt_signal: u8 =  state.interrupt_enable.value & state.interrupt_flag.value;
+            const interrupt_signal: u8 =  self.interrupt_enable.value & self.interrupt_flag.value;
             if(interrupt_signal == 0) { // No interrupt pending
-                state.registers.r8.ir = halt_uop;
-                state.halt_again = true;
+                self.registers.r8.ir = halt_uop;
+                self.halt_again = true;
             } else { // Interrupt pending
-                if(state.interrupt_master_enable) {
-                    state.registers.r8.ir = halt_uop;
-                    state.halt_again = false;
+                if(self.interrupt_master_enable) {
+                    self.registers.r8.ir = halt_uop;
+                    self.halt_again = false;
                 } else {
-                    if(state.halt_again) {
-                        state.registers.r16.pc += 1;
-                        state.halt_again = false;
+                    if(self.halt_again) {
+                        self.registers.r16.pc += 1;
+                        self.halt_again = false;
                     }
                 }
             }
         },
         .idu_adjust => {
             const params: IduAdjustParams = uop.params.idu_adjust;
-            const input_low: u8 = state.registers.getU8(params.input).*;
-            const z: u8 = state.registers.r8.z;
+            const input_low: u8 = self.registers.getU8(params.input).*;
+            const z: u8 = self.registers.r8.z;
             const result, const overflow = @addWithOverflow(z, input_low);
-            state.registers.r8.z = result;
+            self.registers.r8.z = result;
 
             // TODO: Can we do this better? Relative jumps to not change the flags, but other instructions do.
             if(params.change_flags) {
                 const half_bcd: u1 = @truncate(((input_low & 0xF) + (z & 0xF)) >> 4);
-                state.registers.r8.f = .{ .carry = overflow, .half_bcd = half_bcd, .n_bcd = 0, .zero = 0 };
+                self.registers.r8.f = .{ .carry = overflow, .half_bcd = half_bcd, .n_bcd = 0, .zero = 0 };
             }
 
             const z_sign: u1 = @intCast(z >> 7);
             const carry: bool = overflow == 1;
             const amplitude: i2 = @intFromBool(carry) ^ z_sign;
             const adjust: i2 = if(z_sign == 1) -amplitude else amplitude;
-            const input_high: u8 = state.registers.getU8(@enumFromInt(@intFromEnum(params.input) + 1)).*;
-            state.registers.r8.w = input_high +% @as(u8, @bitCast(@as(i8, adjust)));
+            const input_high: u8 = self.registers.getU8(@enumFromInt(@intFromEnum(params.input) + 1)).*;
+            self.registers.r8.w = input_high +% @as(u8, @bitCast(@as(i8, adjust)));
         },
         .nop => {
         },
         .set_pc => {
             const params: MiscParams = uop.params.misc;
             const new_pc: u16 = @as(u16, params.rst_idx) * 0x08;
-            state.registers.r16.pc = new_pc;
+            self.registers.r16.pc = new_pc;
         },
         .wz_writeback => {
             const params: MiscParams = uop.params.misc;
-            const target: *u16 = state.registers.getU16(params.write_back);
-            target.* = state.registers.r16.wz;
+            const target: *u16 = self.registers.getU16(params.write_back);
+            target.* = self.registers.r16.wz;
 
             // NOTE: POP AF can write non-zero to unused, which is not allowed.
-            state.registers.r8.f._unused = 0;
+            self.registers.r8.f._unused = 0;
         },
         else => { 
             std.debug.print("CPU_MICRO_OP_NOT_IMPLEMENTED: {any}\n", .{uop});
@@ -1129,28 +1130,28 @@ pub fn cycle(state: *State, req: *def.Request) void {
     }
 }
 
-pub fn request(state: *State, req: *def.Request) void {
+pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
         mem_map.hram_low...(mem_map.hram_high - 1) => {
             const hram_idx: u16 = req.address - mem_map.hram_low;
-            req.apply(&state.hram[hram_idx]);
+            req.apply(&self.hram[hram_idx]);
         },
         mem_map.interrupt_enable => {
-            req.apply(&state.interrupt_enable);
+            req.apply(&self.interrupt_enable);
         },
         mem_map.interrupt_flag => {
-            req.apply(&state.interrupt_flag);
+            req.apply(&self.interrupt_flag);
         },
         else => {},
     }
 }
 
-pub fn pushInterrupts(state: *State, vblank: bool, stat: bool, timer: bool, serial: bool, joypad: bool) void {
-    state.interrupt_flag.bits.v_blank |= vblank;
-    state.interrupt_flag.bits.lcd_stat |= stat;
-    state.interrupt_flag.bits.timer |= timer;
-    state.interrupt_flag.bits.serial |= serial;
-    state.interrupt_flag.bits.joypad |= joypad;
+pub fn pushInterrupts(self: *Self, vblank: bool, stat: bool, timer: bool, serial: bool, joypad: bool) void {
+    self.interrupt_flag.bits.v_blank |= vblank;
+    self.interrupt_flag.bits.lcd_stat |= stat;
+    self.interrupt_flag.bits.timer |= timer;
+    self.interrupt_flag.bits.serial |= serial;
+    self.interrupt_flag.bits.joypad |= joypad;
 }
 
 fn getLowestSetBit(value: u8) u3 {

@@ -33,7 +33,7 @@ const TestType = struct {
 
 // TODO: Need to rethink all of the functions and how they are structured. The code is pretty awfull.
 
-fn initializeCpu(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), test_case: *const TestType) !void {
+fn initializeCpu(cpu: *CPU, memory: *std.AutoHashMap(u16, u8), test_case: *const TestType) !void {
     cpu.interrupt_master_enable = false;
     cpu.registers.r16.pc = test_case.initial.pc;
     cpu.registers.r16.sp = test_case.initial.sp;
@@ -59,7 +59,7 @@ fn initializeCpu(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), test_case: 
     cpu.uop_fifo.write(uops.items);
 }
 
-fn testOutput(cpu: *const CPU.State, memory: *std.AutoHashMap(u16, u8), test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
+fn testOutput(cpu: *const CPU, memory: *std.AutoHashMap(u16, u8), test_case: *const TestType, not_enough_uops: bool, m_cycle_failed: bool) !void {
     try std.testing.expectEqual(false, not_enough_uops);
     try std.testing.expectEqual(false, m_cycle_failed);
     // Note: pc - 1, because we prefetch, the SingleStepTests don't implement that.
@@ -130,9 +130,9 @@ pub fn runSingleStepTests() !void {
     defer test_dir.close();
 
     // Initialized once to only initialize the opcode banks once!
-    var cpu: CPU.State = .{};
-    CPU.init(&cpu, alloc);
-    defer CPU.deinit(&cpu, alloc);
+    var cpu: CPU = .{};
+    cpu.init(alloc);
+    defer cpu.deinit(alloc);
 
     var memory: std.AutoHashMap(u16, u8) = .init(alloc);
     defer memory.deinit();

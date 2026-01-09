@@ -9,6 +9,8 @@ const std = @import("std");
 const def = @import("defines.zig");
 const mem_map = @import("mem_map.zig");
 
+const Self = @This();
+
 const apu_channels = 4;
 // TODO: Pandocs talks about a DIV-APU that triggers those functions. When DIV is reset these might trigger again, so this is inprecise.
 pub const t_cycles_per_volume_step = 65_536;
@@ -99,177 +101,177 @@ const LFSR = packed union {
     },
 };
 
-pub const State = struct {
-    control: Control = .{},
-    volume: Volume = .{},
-    panning: Panning = .{},
 
-    ch1_sweep: Channel1Sweep = .{},
-    ch1_length: Channel12Length = .{},
-    ch1_volume: Channel12Volume = .{},
-    ch1_period_low: Channel12PeriodLow = .{},
-    ch1_period_high: Channel12PeriodHigh = .{},
+control: Control = .{},
+volume: Volume = .{},
+panning: Panning = .{},
 
-    ch2_length: Channel12Length = .{},
-    ch2_volume: Channel12Volume = .{},
-    ch2_period_low: Channel12PeriodLow = .{},
-    ch2_period_high: Channel12PeriodHigh = .{},
+ch1_sweep: Channel1Sweep = .{},
+ch1_length: Channel12Length = .{},
+ch1_volume: Channel12Volume = .{},
+ch1_period_low: Channel12PeriodLow = .{},
+ch1_period_high: Channel12PeriodHigh = .{},
 
-    ch3_dac: Channel3Dac = .{},
-    ch3_length: Channel3Length = .{},
-    ch3_volume: Channel3Volume = .{},
-    ch3_period_low: Channel3PeriodLow = .{},
-    ch3_period_high: Channel3PeriodHigh = .{},
-    ch3_wave_table: [ch3_wave_table_size]u8 = @splat(0),
+ch2_length: Channel12Length = .{},
+ch2_volume: Channel12Volume = .{},
+ch2_period_low: Channel12PeriodLow = .{},
+ch2_period_high: Channel12PeriodHigh = .{},
 
-    ch4_length: Channel4Length = .{},
-    ch4_volume: Channel4Volume = .{},
-    ch4_freq: Channel4Freq = .{},
-    ch4_control: Channel4Control = .{},
+ch3_dac: Channel3Dac = .{},
+ch3_length: Channel3Length = .{},
+ch3_volume: Channel3Volume = .{},
+ch3_period_low: Channel3PeriodLow = .{},
+ch3_period_high: Channel3PeriodHigh = .{},
+ch3_wave_table: [ch3_wave_table_size]u8 = @splat(0),
 
-    apu_on: bool = false,
+ch4_length: Channel4Length = .{},
+ch4_volume: Channel4Volume = .{},
+ch4_freq: Channel4Freq = .{},
+ch4_control: Channel4Control = .{},
 
-    sample_tick: u16 = def.t_cycles_per_sample - 1, 
-    channel_values: [apu_channels]u4 = @splat(0),
-    // TODO: duplicated with control register above.
-    channels_on: [apu_channels]bool = @splat(false),
+apu_on: bool = false,
 
-    func_volume_tick: u16 = t_cycles_per_volume_step - 1,
-    func_volume_paces: [apu_channels]u4 = @splat(0),
-    func_volume_values: [apu_channels]u4 = @splat(0),
-    
-    func_length_tick: u14 = t_cycles_per_length_step - 1,
-    // Note: [2] is unused. Not support by ch3.
-    func_length_values: [apu_channels]u8 = @splat(0),
-    func_length_on: [apu_channels]bool = @splat(false),
+sample_tick: u16 = def.t_cycles_per_sample - 1, 
+channel_values: [apu_channels]u4 = @splat(0),
+// TODO: duplicated with control register above.
+channels_on: [apu_channels]bool = @splat(false),
 
-    func_period_tick: u15 = t_cycles_per_period_step - 1,
-    // Note: Each channel requires at least: [u13, u13, u12, u24]
-    // TODO: u24 does not seem to be hardware accurate. Sameboy uses "a counter (8bit) for a counter (16bit)". Which matches the lfsr_shift being a u4.
-    func_period_values: [apu_channels]u24 = @splat(0),
-    func_period_shadow: u11 = 0,
-    func_period_pace: u4 = 0,
-    func_period_on: bool = false,
+func_volume_tick: u16 = t_cycles_per_volume_step - 1,
+func_volume_paces: [apu_channels]u4 = @splat(0),
+func_volume_values: [apu_channels]u4 = @splat(0),
 
-    ch1_duty_idx: u3 = 0,
-    ch2_duty_idx: u3 = 0,
-    ch3_wave_ram_idx: u5 = 0,
-    ch4_lfsr: LFSR = .{ .value = 0 },
-};
+func_length_tick: u14 = t_cycles_per_length_step - 1,
+// Note: [2] is unused. Not support by ch3.
+func_length_values: [apu_channels]u8 = @splat(0),
+func_length_on: [apu_channels]bool = @splat(false),
 
-pub fn init(state: *State) void {
-    state.* = .{};
+func_period_tick: u15 = t_cycles_per_period_step - 1,
+// Note: Each channel requires at least: [u13, u13, u12, u24]
+// TODO: u24 does not seem to be hardware accurate. Sameboy uses "a counter (8bit) for a counter (16bit)". Which matches the lfsr_shift being a u4.
+func_period_values: [apu_channels]u24 = @splat(0),
+func_period_shadow: u11 = 0,
+func_period_pace: u4 = 0,
+func_period_on: bool = false,
+
+ch1_duty_idx: u3 = 0,
+ch2_duty_idx: u3 = 0,
+ch3_wave_ram_idx: u5 = 0,
+ch4_lfsr: LFSR = .{ .value = 0 },
+
+
+pub fn init(self: *Self) void {
+    self.* = .{};
 }
 
-pub fn request(state: *State, req: *def.Request) void {
+pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
-        mem_map.sound_panning => { req.apply(&state.panning); },
-        mem_map.master_volume => { req.apply(&state.volume); },
+        mem_map.sound_panning => { req.apply(&self.panning); },
+        mem_map.master_volume => { req.apply(&self.volume); },
         mem_map.sound_control => {
             if(req.isWrite()) {
-                req.value.write = (req.value.write & 0xF0) | (@as(u8, @bitCast(state.control)) & 0x0F);
+                req.value.write = (req.value.write & 0xF0) | (@as(u8, @bitCast(self.control)) & 0x0F);
             }
-            req.apply(&state.control);
+            req.apply(&self.control);
             // TODO: Turning of apu leads to:
             // all APU registers are cleared but read-only, except sound_control.
             // Wave RAM can still be written to.
-            state.apu_on = state.control.enable_apu;
+            self.apu_on = self.control.enable_apu;
         },
-        mem_map.ch1_sweep => { req.apply(&state.ch1_sweep); },
-        mem_map.ch1_length => { req.apply(&state.ch1_length); },
-        mem_map.ch1_volume => { req.apply(&state.ch1_volume); },
-        mem_map.ch1_low_period => { req.apply(&state.ch1_period_low); },
-        mem_map.ch1_high_period => { req.apply(&state.ch1_period_high);
+        mem_map.ch1_sweep => { req.apply(&self.ch1_sweep); },
+        mem_map.ch1_length => { req.apply(&self.ch1_length); },
+        mem_map.ch1_volume => { req.apply(&self.ch1_volume); },
+        mem_map.ch1_low_period => { req.apply(&self.ch1_period_low); },
+        mem_map.ch1_high_period => { req.apply(&self.ch1_period_high);
             if(req.isWrite()) {
-                if(state.ch1_period_high.trigger) {
-                    const period: u11 = state.ch1_period_low.period | @as(u11, state.ch1_period_high.period) << 8;
-                    state.func_period_values[0] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
-                    state.func_volume_paces[0] = state.ch1_volume.pace;
-                    state.func_volume_values[0] = state.ch1_volume.initial;
-                    state.func_period_shadow = period;
-                    state.func_period_pace = if(state.ch1_sweep.pace == 0) 7 else state.ch1_sweep.pace;
-                    state.func_period_on = state.ch1_sweep.pace != 0 or state.ch1_sweep.step != 0;
-                    state.ch1_duty_idx = 0;
+                if(self.ch1_period_high.trigger) {
+                    const period: u11 = self.ch1_period_low.period | @as(u11, self.ch1_period_high.period) << 8;
+                    self.func_period_values[0] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    self.func_volume_paces[0] = self.ch1_volume.pace;
+                    self.func_volume_values[0] = self.ch1_volume.initial;
+                    self.func_period_shadow = period;
+                    self.func_period_pace = if(self.ch1_sweep.pace == 0) 7 else self.ch1_sweep.pace;
+                    self.func_period_on = self.ch1_sweep.pace != 0 or self.ch1_sweep.step != 0;
+                    self.ch1_duty_idx = 0;
 
                     // TODO: Enabling this immediate overflow check leads to channel 1 being muted all the time?
-                    // _, const overflow = freqSweepStep(state);
+                    // _, const overflow = freqSweepStep(self);
                     const overflow: u1 = 0;
-                    state.channels_on[0] = overflow == 0 and channel_dbg_enable[0];
-                    state.control.ch1_on = overflow == 0 and channel_dbg_enable[0];
+                    self.channels_on[0] = overflow == 0 and channel_dbg_enable[0];
+                    self.control.ch1_on = overflow == 0 and channel_dbg_enable[0];
                 }
-                state.func_length_on[0] = state.ch1_period_high.length_on;
-                if(state.channels_on[0] and state.func_length_on[0]) {
-                    state.func_length_values[0] = channel_length_table[0] - state.ch1_length.length_init;
-                }
-            }
-        },
-        mem_map.ch2_length => { req.apply(&state.ch2_length); },
-        mem_map.ch2_volume => { req.apply(&state.ch2_volume); },
-        mem_map.ch2_low_period => { req.apply(&state.ch2_period_low); },
-        mem_map.ch2_high_period => { req.apply(&state.ch2_period_high);
-            if(req.isWrite()) {
-                if(state.ch2_period_high.trigger) {
-                    const period: u11 = state.ch2_period_low.period | @as(u11, state.ch2_period_high.period) << 8;
-                    state.func_period_values[1] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
-                    state.func_volume_paces[1] = state.ch2_volume.pace;
-                    state.func_volume_values[1] = state.ch2_volume.initial;
-                    state.ch2_duty_idx = 0;
-                    state.channels_on[1] = channel_dbg_enable[1];
-                    state.control.ch2_on = channel_dbg_enable[1];
-                }
-                state.func_length_on[1] = state.ch2_period_high.length_on;
-                if(state.channels_on[1] and state.func_length_on[1]) {
-                    state.func_length_values[1] = channel_length_table[1] - state.ch2_length.length_init;
+                self.func_length_on[0] = self.ch1_period_high.length_on;
+                if(self.channels_on[0] and self.func_length_on[0]) {
+                    self.func_length_values[0] = channel_length_table[0] - self.ch1_length.length_init;
                 }
             }
         },
-        mem_map.ch3_length => { req.apply(&state.ch3_length); },
-        mem_map.ch3_volume => { req.apply(&state.ch3_volume); },
-        mem_map.ch3_low_period => { req.apply(&state.ch3_period_low); },
-        mem_map.ch3_dac => { req.apply(&state.ch3_dac);
+        mem_map.ch2_length => { req.apply(&self.ch2_length); },
+        mem_map.ch2_volume => { req.apply(&self.ch2_volume); },
+        mem_map.ch2_low_period => { req.apply(&self.ch2_period_low); },
+        mem_map.ch2_high_period => { req.apply(&self.ch2_period_high);
             if(req.isWrite()) {
-                if(!state.ch3_dac.dac_on and state.channels_on[2]) {
-                    state.channels_on[2] = false;
-                    state.control.ch2_on = false;
+                if(self.ch2_period_high.trigger) {
+                    const period: u11 = self.ch2_period_low.period | @as(u11, self.ch2_period_high.period) << 8;
+                    self.func_period_values[1] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+                    self.func_volume_paces[1] = self.ch2_volume.pace;
+                    self.func_volume_values[1] = self.ch2_volume.initial;
+                    self.ch2_duty_idx = 0;
+                    self.channels_on[1] = channel_dbg_enable[1];
+                    self.control.ch2_on = channel_dbg_enable[1];
+                }
+                self.func_length_on[1] = self.ch2_period_high.length_on;
+                if(self.channels_on[1] and self.func_length_on[1]) {
+                    self.func_length_values[1] = channel_length_table[1] - self.ch2_length.length_init;
                 }
             }
         },
-        mem_map.ch3_high_period => { req.apply(&state.ch3_period_high);
+        mem_map.ch3_length => { req.apply(&self.ch3_length); },
+        mem_map.ch3_volume => { req.apply(&self.ch3_volume); },
+        mem_map.ch3_low_period => { req.apply(&self.ch3_period_low); },
+        mem_map.ch3_dac => { req.apply(&self.ch3_dac);
             if(req.isWrite()) {
-                if(state.ch3_period_high.trigger) {
-                    const period: u11 = state.ch3_period_low.period | @as(u11, state.ch3_period_high.period) << 8;
-                    state.func_period_values[2] = ch3_t_cycles_per_period * (2047 - @as(u12, period));
-                    state.ch3_wave_ram_idx = 1; // Note: First sample read must be at idx 1.
-                    state.channels_on[2] = channel_dbg_enable[2];
-                    state.control.ch3_on = channel_dbg_enable[2];
+                if(!self.ch3_dac.dac_on and self.channels_on[2]) {
+                    self.channels_on[2] = false;
+                    self.control.ch2_on = false;
                 }
-                state.func_length_on[2] = state.ch3_period_high.length_on;
-                if(state.channels_on[2] and state.func_length_on[2]) {
-                    state.func_length_values[2] = channel_length_table[2] - state.ch3_length.initial;
+            }
+        },
+        mem_map.ch3_high_period => { req.apply(&self.ch3_period_high);
+            if(req.isWrite()) {
+                if(self.ch3_period_high.trigger) {
+                    const period: u11 = self.ch3_period_low.period | @as(u11, self.ch3_period_high.period) << 8;
+                    self.func_period_values[2] = ch3_t_cycles_per_period * (2047 - @as(u12, period));
+                    self.ch3_wave_ram_idx = 1; // Note: First sample read must be at idx 1.
+                    self.channels_on[2] = channel_dbg_enable[2];
+                    self.control.ch3_on = channel_dbg_enable[2];
+                }
+                self.func_length_on[2] = self.ch3_period_high.length_on;
+                if(self.channels_on[2] and self.func_length_on[2]) {
+                    self.func_length_values[2] = channel_length_table[2] - self.ch3_length.initial;
                 }
             }
         },
         mem_map.wave_low...(mem_map.wave_high - 1) => {
             const wave_idx: u16 = req.address - mem_map.wave_low;
-            req.apply(&state.ch3_wave_table[wave_idx]);
+            req.apply(&self.ch3_wave_table[wave_idx]);
         },
-        mem_map.ch4_length => { req.apply(&state.ch4_length); },
-        mem_map.ch4_volume => { req.apply(&state.ch4_volume); },
-        mem_map.ch4_freq => { req.apply(&state.ch4_freq); },
-        mem_map.ch4_control => { req.apply(&state.ch4_control);
+        mem_map.ch4_length => { req.apply(&self.ch4_length); },
+        mem_map.ch4_volume => { req.apply(&self.ch4_volume); },
+        mem_map.ch4_freq => { req.apply(&self.ch4_freq); },
+        mem_map.ch4_control => { req.apply(&self.ch4_control);
             if(req.isWrite()) {
-                if(state.ch4_control.trigger) {
-                    const divisor = lfsr_divisor_table[state.ch4_freq.divider];
-                    state.func_period_values[3] = divisor << state.ch4_freq.shift;
-                    state.func_volume_paces[3] = state.ch4_volume.pace;
-                    state.func_volume_values[3] = state.ch4_volume.initial;
-                    state.ch4_lfsr = .{ .value = 0 };
-                    state.channels_on[3] = channel_dbg_enable[3];
-                    state.control.ch4_on = channel_dbg_enable[3];
+                if(self.ch4_control.trigger) {
+                    const divisor = lfsr_divisor_table[self.ch4_freq.divider];
+                    self.func_period_values[3] = divisor << self.ch4_freq.shift;
+                    self.func_volume_paces[3] = self.ch4_volume.pace;
+                    self.func_volume_values[3] = self.ch4_volume.initial;
+                    self.ch4_lfsr = .{ .value = 0 };
+                    self.channels_on[3] = channel_dbg_enable[3];
+                    self.control.ch4_on = channel_dbg_enable[3];
                 }
-                state.func_length_on[3] = state.ch4_control.length_on;
-                if(state.channels_on[3] and state.func_length_on[3]) {
-                    state.func_length_values[3] = channel_length_table[3] - state.ch4_length.initial;
+                self.func_length_on[3] = self.ch4_control.length_on;
+                if(self.channels_on[3] and self.func_length_on[3]) {
+                    self.func_length_values[3] = channel_length_table[3] - self.ch4_length.initial;
                 }
             }
         },
@@ -277,133 +279,133 @@ pub fn request(state: *State, req: *def.Request) void {
     }
 }
 
-pub fn cycle(state: *State) ?def.Sample {
-    if(!state.apu_on) {
-        return sample(state);
+pub fn cycle(self: *Self) ?def.Sample {
+    if(!self.apu_on) {
+        return sample(self);
     }
 
-    state.func_period_tick, var overflow: u1 = @subWithOverflow(state.func_period_tick, 1);
+    self.func_period_tick, var overflow: u1 = @subWithOverflow(self.func_period_tick, 1);
     if(overflow == 1) {
-        state.func_period_pace, overflow = @subWithOverflow(state.func_period_pace, 1);
-        if(state.channels_on[0] and overflow == 1 and state.func_period_on) {
+        self.func_period_pace, overflow = @subWithOverflow(self.func_period_pace, 1);
+        if(self.channels_on[0] and overflow == 1 and self.func_period_on) {
             var overflow_second: u1 = 0;
-            const new_period: u11, overflow = freqSweepStep(state);
-            if(state.ch1_sweep.step > 0 and overflow == 0) {
-                state.func_period_shadow = new_period;
-                state.ch1_period_low.period = @truncate(new_period);
-                state.ch1_period_high.period = @truncate(new_period >> 8);
-                _, overflow_second = freqSweepStep(state);
+            const new_period: u11, overflow = freqSweepStep(self);
+            if(self.ch1_sweep.step > 0 and overflow == 0) {
+                self.func_period_shadow = new_period;
+                self.ch1_period_low.period = @truncate(new_period);
+                self.ch1_period_high.period = @truncate(new_period >> 8);
+                _, overflow_second = freqSweepStep(self);
             }
 
             const keep_on: bool = overflow == 0 and overflow_second == 0;
-            state.channels_on[0] = keep_on;
-            state.control.ch1_on = keep_on;
+            self.channels_on[0] = keep_on;
+            self.control.ch1_on = keep_on;
         }
     }
 
-    state.func_volume_tick, overflow = @subWithOverflow(state.func_volume_tick, 1);
+    self.func_volume_tick, overflow = @subWithOverflow(self.func_volume_tick, 1);
     if(overflow == 1) {
         inline for(0..apu_channels) |channel_idx| {
             const channel_pace: u4, const increase: bool = switch(channel_idx) {
-                inline 0 => .{ state.ch1_volume.pace, state.ch1_volume.increase },
-                inline 1 => .{ state.ch2_volume.pace, state.ch2_volume.increase },
+                inline 0 => .{ self.ch1_volume.pace, self.ch1_volume.increase },
+                inline 1 => .{ self.ch2_volume.pace, self.ch2_volume.increase },
                 inline 2 => .{ 0, false }, // Unsupported by channel 3.
-                inline 3 => .{ state.ch4_volume.pace, state.ch4_volume.increase },
+                inline 3 => .{ self.ch4_volume.pace, self.ch4_volume.increase },
                 else => unreachable,
             };
             if(channel_pace != 0) {
-                state.func_volume_paces[channel_idx], overflow = @subWithOverflow(state.func_volume_paces[channel_idx], 1);
+                self.func_volume_paces[channel_idx], overflow = @subWithOverflow(self.func_volume_paces[channel_idx], 1);
                 if(overflow == 1) {
-                    const current: u4 = state.func_volume_values[channel_idx];
-                    state.func_volume_values[channel_idx] = if(increase) current +| 1 else current -| 1;
-                    state.func_volume_paces[channel_idx] = channel_pace;
+                    const current: u4 = self.func_volume_values[channel_idx];
+                    self.func_volume_values[channel_idx] = if(increase) current +| 1 else current -| 1;
+                    self.func_volume_paces[channel_idx] = channel_pace;
                 }
             }
         }
     }
 
-    state.func_length_tick, overflow = @subWithOverflow(state.func_length_tick, 1);
+    self.func_length_tick, overflow = @subWithOverflow(self.func_length_tick, 1);
     if(overflow == 1) {
         inline for(0..apu_channels) |channel_idx| {
-            state.func_length_values[channel_idx], overflow = @subWithOverflow(state.func_length_values[channel_idx], 1);
-            if(overflow == 1 and state.channels_on[channel_idx] and state.func_length_on[channel_idx]) {
-                state.channels_on[channel_idx] = false;
+            self.func_length_values[channel_idx], overflow = @subWithOverflow(self.func_length_values[channel_idx], 1);
+            if(overflow == 1 and self.channels_on[channel_idx] and self.func_length_on[channel_idx]) {
+                self.channels_on[channel_idx] = false;
                 switch (channel_idx) {
-                    inline 0 => state.control.ch1_on = false,
-                    inline 1 => state.control.ch2_on = false,
-                    inline 2 => state.control.ch3_on = false,
-                    inline 3 => state.control.ch4_on = false,
+                    inline 0 => self.control.ch1_on = false,
+                    inline 1 => self.control.ch2_on = false,
+                    inline 2 => self.control.ch3_on = false,
+                    inline 3 => self.control.ch4_on = false,
                     else => unreachable,
                 }
             }
         }
     }
 
-    state.func_period_values[0], overflow = @subWithOverflow(state.func_period_values[0], 1);
-    if(state.channels_on[0] and overflow == 1) {
-        const ch1_bit: u4 = wave_duty_table[state.ch1_length.duty_cycle][state.ch1_duty_idx];
-        state.channel_values[0] = state.func_volume_values[0] * ch1_bit;
+    self.func_period_values[0], overflow = @subWithOverflow(self.func_period_values[0], 1);
+    if(self.channels_on[0] and overflow == 1) {
+        const ch1_bit: u4 = wave_duty_table[self.ch1_length.duty_cycle][self.ch1_duty_idx];
+        self.channel_values[0] = self.func_volume_values[0] * ch1_bit;
 
-        const period: u11 = state.ch1_period_low.period | @as(u11, state.ch1_period_high.period) << 8;
-        state.func_period_values[0] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
-        state.ch1_duty_idx +%= 1;
+        const period: u11 = self.ch1_period_low.period | @as(u11, self.ch1_period_high.period) << 8;
+        self.func_period_values[0] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+        self.ch1_duty_idx +%= 1;
     }
 
-    state.func_period_values[1], overflow = @subWithOverflow(state.func_period_values[1], 1);
-    if(state.channels_on[1] and overflow == 1) {
-        const ch2_bit: u4 = wave_duty_table[state.ch2_length.duty_cycle][state.ch2_duty_idx];
-        state.channel_values[1] = state.func_volume_values[1] * ch2_bit;
+    self.func_period_values[1], overflow = @subWithOverflow(self.func_period_values[1], 1);
+    if(self.channels_on[1] and overflow == 1) {
+        const ch2_bit: u4 = wave_duty_table[self.ch2_length.duty_cycle][self.ch2_duty_idx];
+        self.channel_values[1] = self.func_volume_values[1] * ch2_bit;
 
-        const period: u11 = state.ch2_period_low.period | @as(u11, state.ch2_period_high.period) << 8;
-        state.func_period_values[1] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
-        state.ch2_duty_idx +%= 1;
+        const period: u11 = self.ch2_period_low.period | @as(u11, self.ch2_period_high.period) << 8;
+        self.func_period_values[1] = ch1_2_t_cycles_per_period * (2047 - @as(u13, period));
+        self.ch2_duty_idx +%= 1;
     }
 
-    state.func_period_values[2], overflow = @subWithOverflow(state.func_period_values[2], 1);
-    if(state.channels_on[2] and overflow == 1) {
+    self.func_period_values[2], overflow = @subWithOverflow(self.func_period_values[2], 1);
+    if(self.channels_on[2] and overflow == 1) {
         var ch3_value: u4 = ch3_dac_off_value;
-        if(state.ch3_dac.dac_on) {
-            const byte_idx: u4 = @intCast(state.ch3_wave_ram_idx / 2);
-            const byte: u8 = state.ch3_wave_table[byte_idx];
+        if(self.ch3_dac.dac_on) {
+            const byte_idx: u4 = @intCast(self.ch3_wave_ram_idx / 2);
+            const byte: u8 = self.ch3_wave_table[byte_idx];
 
-            const nibble_idx: u3 = @intCast(state.ch3_wave_ram_idx % 2);
+            const nibble_idx: u3 = @intCast(self.ch3_wave_ram_idx % 2);
             const shift: u3 = nibble_idx * 4;
             const mask: u8 = @as(u8, 0xF0) >> shift;
             ch3_value = @intCast((byte & mask) >> (4 - shift));
         }
-        ch3_value = if(state.ch3_volume.shift == 0b00) 0 else ch3_value >> (state.ch3_volume.shift - 1);
-        state.channel_values[2] = ch3_value;
+        ch3_value = if(self.ch3_volume.shift == 0b00) 0 else ch3_value >> (self.ch3_volume.shift - 1);
+        self.channel_values[2] = ch3_value;
 
-        const period: u11 = state.ch3_period_low.period | @as(u11, state.ch3_period_high.period) << 8;
-        state.func_period_values[2] = ch3_t_cycles_per_period * (2047 - @as(u12, period));
-        state.ch3_wave_ram_idx +%= 1;
+        const period: u11 = self.ch3_period_low.period | @as(u11, self.ch3_period_high.period) << 8;
+        self.func_period_values[2] = ch3_t_cycles_per_period * (2047 - @as(u12, period));
+        self.ch3_wave_ram_idx +%= 1;
     }
 
-    state.func_period_values[3], overflow = @subWithOverflow(state.func_period_values[3], 1);
-    if(state.channels_on[3] and overflow == 1) {
-        const xor: u1 = ~(state.ch4_lfsr.bits.b0 ^ state.ch4_lfsr.bits.b1);
-        state.ch4_lfsr.bits.b15 = xor;
-        state.ch4_lfsr.bits.b7 = if(state.ch4_freq.is_short) xor else state.ch4_lfsr.bits.b7;
-        state.ch4_lfsr.value >>= 1;
+    self.func_period_values[3], overflow = @subWithOverflow(self.func_period_values[3], 1);
+    if(self.channels_on[3] and overflow == 1) {
+        const xor: u1 = ~(self.ch4_lfsr.bits.b0 ^ self.ch4_lfsr.bits.b1);
+        self.ch4_lfsr.bits.b15 = xor;
+        self.ch4_lfsr.bits.b7 = if(self.ch4_freq.is_short) xor else self.ch4_lfsr.bits.b7;
+        self.ch4_lfsr.value >>= 1;
 
-        const ch4_bit: u1 = state.ch4_lfsr.bits.b0;
-        state.channel_values[3] = state.func_volume_values[3] * ch4_bit;
+        const ch4_bit: u1 = self.ch4_lfsr.bits.b0;
+        self.channel_values[3] = self.func_volume_values[3] * ch4_bit;
 
-        const divisor = lfsr_divisor_table[state.ch4_freq.divider];
-        state.func_period_values[3] = divisor << state.ch4_freq.shift;
+        const divisor = lfsr_divisor_table[self.ch4_freq.divider];
+        self.func_period_values[3] = divisor << self.ch4_freq.shift;
     }
 
-    return sample(state);
+    return sample(self);
 }
 
-fn sample(state: *State) ?def.Sample {
-    state.sample_tick, const overflow = @subWithOverflow(state.sample_tick, 1);
+fn sample(self: *Self) ?def.Sample {
+    self.sample_tick, const overflow = @subWithOverflow(self.sample_tick, 1);
     if(overflow == 0) {
         return null;
     }
 
-    state.sample_tick = def.t_cycles_per_sample - 1;
-    return mixChannels(state.channel_values, state.panning, state.volume);
+    self.sample_tick = def.t_cycles_per_sample - 1;
+    return mixChannels(self.channel_values, self.panning, self.volume);
 }
 
 fn mixChannels(channels: [apu_channels]u4, panning: Panning, volume: Volume) def.Sample {
@@ -414,8 +416,8 @@ fn mixChannels(channels: [apu_channels]u4, panning: Panning, volume: Volume) def
 
     var mix_left: f32 = 0.0;
     var mix_right: f32 = 0.0;
-    for(channels, panning_left, panning_right) |state, left, right| {
-        const channel: f32 = @floatFromInt(state);
+    for(channels, panning_left, panning_right) |self, left, right| {
+        const channel: f32 = @floatFromInt(self);
         const normalized: f32 = channel / 15.0;
         const value: f32 = normalized * 2.0 - 1.0;
         mix_left += if(left) value * scaling else 0.0;
@@ -424,20 +426,20 @@ fn mixChannels(channels: [apu_channels]u4, panning: Panning, volume: Volume) def
 
     const volume_left: f32 = @floatFromInt(volume.left_volume);
     const volume_left_normal: f32 = (volume_left + 1.0) / 8.0;
-    const state_left: f32 = mix_left * volume_left_normal;
+    const self_left: f32 = mix_left * volume_left_normal;
 
     const volume_right: f32 = @floatFromInt(volume.right_volume);
     const volume_right_normal: f32 = (volume_right + 1.0) / 8.0;
-    const state_right: f32 = mix_right * volume_right_normal;
+    const self_right: f32 = mix_right * volume_right_normal;
 
-    return .{ .left = state_left, .right = state_right };
+    return .{ .left = self_left, .right = self_right };
 }
 
-fn freqSweepStep(state: *State) struct{ u11, u1 } {
-    const delta: u11 = state.func_period_shadow >> state.ch1_sweep.step;
-    if(state.ch1_sweep.decrease) {
-        return @subWithOverflow(state.func_period_shadow, delta);
+fn freqSweepStep(self: *Self) struct{ u11, u1 } {
+    const delta: u11 = self.func_period_shadow >> self.ch1_sweep.step;
+    if(self.ch1_sweep.decrease) {
+        return @subWithOverflow(self.func_period_shadow, delta);
     } else {
-        return @addWithOverflow(state.func_period_shadow, delta);
+        return @addWithOverflow(self.func_period_shadow, delta);
     }
 }

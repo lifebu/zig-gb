@@ -5,7 +5,7 @@ const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 const mem_map = @import("../mem_map.zig");
 
-pub fn fetchInstruction(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8)) !void {
+pub fn fetchInstruction(cpu: *CPU, memory: *std.AutoHashMap(u16, u8)) !void {
     cpu.uop_fifo.clear();
     // Load a nop instruction to fetch the required instruction.
     const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
@@ -14,10 +14,10 @@ pub fn fetchInstruction(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8)) !voi
     try executeCPUFor(cpu, memory, 4);
 }
 
-pub fn executeCPUFor(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), t_cycles: usize) !void {
+pub fn executeCPUFor(cpu: *CPU, memory: *std.AutoHashMap(u16, u8), t_cycles: usize) !void {
     for(0..t_cycles) |_| {
         var request: def.Request = .{};
-        CPU.cycle(cpu, &request);
+        cpu.cycle(&request);
 
         const entry: std.AutoHashMap(u16, u8).GetOrPutResult = try memory.getOrPut(request.address);
         switch (request.value) {
@@ -25,12 +25,12 @@ pub fn executeCPUFor(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), t_cycle
             .write => |write| entry.value_ptr.* = @bitCast(write),
         }
         if(request.isWrite()) {
-            CPU.request(cpu, &request);
+            cpu.request(&request);
         }
     }
 }
 
-pub fn isFullInstructionLoaded(cpu: *CPU.State, bank: u2, opcode: u8) bool {
+pub fn isFullInstructionLoaded(cpu: *CPU, bank: u2, opcode: u8) bool {
     const alloc = std.testing.allocator;
 
     const instruction = CPU.opcode_banks[bank][opcode].items;

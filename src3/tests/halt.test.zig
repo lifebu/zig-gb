@@ -7,7 +7,7 @@ const mem_map = @import("../mem_map.zig");
 
 const cpu_helper = @import("cpu_helper.zig");
 
-pub fn init(cpu: *CPU.State, memory: *std.AutoHashMap(u16, u8), wram: []const u8) !void {
+pub fn init(cpu: *CPU, memory: *std.AutoHashMap(u16, u8), wram: []const u8) !void {
     memory.clearRetainingCapacity();
     for (wram, 0..) |value, idx| {
         try memory.put(@intCast(mem_map.wram_low + idx), value);
@@ -22,9 +22,9 @@ pub fn runHaltTests() !void {
     var memory: std.AutoHashMap(u16, u8) = .init(alloc);
     defer memory.deinit();
 
-    var cpu: CPU.State = .{};
-    CPU.init(&cpu, alloc);
-    defer CPU.deinit(&cpu, alloc);
+    var cpu: CPU = .{};
+    cpu.init(alloc);
+    defer cpu.deinit(alloc);
 
     // TODO: Can we combine the code from all of the cases?
 

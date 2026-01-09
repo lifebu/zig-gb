@@ -5,7 +5,7 @@ const def = @import("../defines.zig");
 const APU = @import("../apu.zig");
 const mem_map = @import("../mem_map.zig");
 
-fn initWaveTable(apu: *APU.State, pattern: [32]u4) void {
+fn initWaveTable(apu: *APU, pattern: [32]u4) void {
     for(&apu.ch3_wave_table, 0..) |*wave, idx| {
         const first_idx: usize = idx * 2;
         const low_nibble: u8 = pattern[first_idx + 1];
@@ -14,17 +14,16 @@ fn initWaveTable(apu: *APU.State, pattern: [32]u4) void {
     }
 }
 
-fn cpuWrite(apu: *APU.State, address: u16, value: u8) void {
+fn cpuWrite(apu: *APU, address: u16, value: u8) void {
     var request: def.Request = .{ .address = address, .value = .{ .write = value } };
-    APU.request(apu, &request);
+    apu.request(&request);
 }
 
 pub fn runApuChannelTests() !void {
-    var apu: APU.State = .{};
-    APU.init(&apu);
+    var apu: APU  = .{};
 
     // CH3: Channel status bit is updated.
-    APU.init(&apu);
+    apu.init();
     cpuWrite(&apu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
         .period = 0, .length_on = false, .trigger = true,
     }));
@@ -54,7 +53,7 @@ pub fn runApuChannelTests() !void {
         .{ .period = 2047 - 16 },
     };
     for(test_cases) |test_case| {
-        APU.init(&apu);
+        apu.init();
         cpuWrite(&apu, mem_map.sound_control, @bitCast(APU.Control{
             .enable_apu = true, .ch1_on = false, .ch2_on = false, .ch3_on = false, .ch4_on = false,
         }));
@@ -78,7 +77,7 @@ pub fn runApuChannelTests() !void {
         for(0..32) |sample_idx| {
             const cycles_per_value: u13 = APU.ch3_t_cycles_per_period * (2048 - @as(u13, test_case.period));
             for(0..cycles_per_value) |_| {
-                _ = APU.cycle(&apu);
+                _ = apu.cycle();
             }
 
             var expected = wave_pattern[pattern_idx];

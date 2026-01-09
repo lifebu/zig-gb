@@ -8,13 +8,17 @@ const mem_map = @import("../mem_map.zig");
 
 const sokol = @import("sokol");
 
-fn drawSample(apu: *APU.State, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
+const is_stereo = true;
+const samples_per_frame = if(is_stereo) 2 else 1;
+const default_platform_volume = 0.15;
+
+fn drawSample(apu: *APU, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
     apu.channel_values[0] = ch1;
     apu.channel_values[1] = ch2;
     apu.channel_values[2] = ch3;
     apu.channel_values[3] = ch4;
     apu.sample_tick = 0;
-    return APU.cycle(apu).?;
+    return apu.cycle().?;
 }
 
 pub fn runApuSamplingTests() !void {
@@ -22,8 +26,8 @@ pub fn runApuSamplingTests() !void {
     // TODO: Test that the sample rate was hit over a period of time?
     // TODO: Test that we never wasted any samples.
     // TODO: Test we handle less than 60fps correctly.
-    var apu: APU.State = .{};
-    APU.init(&apu);
+    var apu: APU = .{};
+    apu.init();
 
     var sample: def.Sample = .{};
     apu.volume = .{
@@ -97,7 +101,7 @@ pub fn runApuSamplingTests() !void {
             apu.panning.ch4_right = test_case.right;
 
             apu.sample_tick = 0;
-            sample = APU.cycle(&apu).?;
+            sample = apu.cycle().?;
 
             const expected_left: f32 = if(test_case.left) 0.25 else 0.0;
             std.testing.expectApproxEqAbs(expected_left, sample.left, std.math.floatEps(f32)) catch |err| {
@@ -130,17 +134,17 @@ const State = struct {
     curr_cycles: u64 = 0,
     curr_input_idx: usize = 0,
     input_states: std.ArrayList(Inputs) = .empty,
-    apu: *APU.State,
-    platform: *Platform.State,
+    apu: *APU,
+    platform: *Platform,
 };
 export fn init_test(state_opaque: ?*anyopaque) void {
     const state: *State = @alignCast(@ptrCast(state_opaque.?));
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },
-        .num_channels = def.samples_per_frame,
+        .num_channels = samples_per_frame,
         .sample_rate = def.sample_rate,
     });
-    APU.init(state.apu);
+    state.apu.init();
 }
 export fn event_test(ev: ?*const sokol.app.Event) void {
     const e: *const sokol.app.Event = ev orelse &.{};
@@ -160,7 +164,7 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
     const state: *State = @alignCast(@ptrCast(state_opaque.?));
     if(state.use_precalc) {
         const frames_used: i32 = sokol.audio.push(&state.result_samples.items[state.samples_pushed], @intCast(state.result_samples.items.len));
-        state.samples_pushed += @as(usize, @intCast(frames_used)) * def.samples_per_frame;
+        state.samples_pushed += @as(usize, @intCast(frames_used)) * samples_per_frame;
         if(state.samples_pushed >= state.result_samples.items.len) {
             state.audio_done = true;
             sokol.app.quit();
@@ -168,9 +172,9 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
     } else {
         const cycles_per_frame = 70224; 
         for(0..cycles_per_frame) |_| {
-            const sample: ?def.Sample = APU.cycle(state.apu);
+            const sample: ?def.Sample = state.apu.cycle();
             if(sample) |value| {
-                Platform.pushSample(state.platform, value);
+                state.platform.pushSample(value);
             }
 
             state.curr_cycles += 1;
@@ -188,9 +192,9 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
 }
 
 pub fn runApuOutputTest(use_precalc: bool) !void {
-    var apu: APU.State = .{};
-    var platform: Platform.State = .{};
-    APU.init(&apu);
+    var apu: APU = .{};
+    var platform: Platform = .{};
+    apu.init();
 
     const alloc = std.testing.allocator;
 
@@ -228,11 +232,11 @@ pub fn runApuOutputTest(use_precalc: bool) !void {
 
         if(use_precalc) {
             while(curr_cycles < cycles) : (curr_cycles += 1) {
-                const sample: ?def.Sample = APU.cycle(&apu);
+                const sample: ?def.Sample = apu.cycle();
                 if(sample) |sample_val| {
-                    const sample_left: f32 = sample_val.left * def.default_platform_volume;
-                    const sample_right: f32 = sample_val.right * def.default_platform_volume;
-                    if(def.is_stereo) {
+                    const sample_left: f32 = sample_val.left * default_platform_volume;
+                    const sample_right: f32 = sample_val.right * default_platform_volume;
+                    if(is_stereo) {
                         try state.result_samples.append(alloc, sample_left);
                         try state.result_samples.append(alloc, sample_right);
                     } else {

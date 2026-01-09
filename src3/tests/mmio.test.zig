@@ -6,7 +6,7 @@ const MMIO = @import("../mmio.zig");
 const mem_map = @import("../mem_map.zig");
 
 pub fn runInputTests() !void {
-    var mmio: MMIO.State = .{};
+    var mmio: MMIO = .{};
 
     const TestCase = struct {
         name: []const u8,
@@ -139,8 +139,8 @@ pub fn runInputTests() !void {
             var val: u32 = 0; val += 1;
         }
         var request: def.Request = .{ .address = mem_map.joypad, .value = .{ .write = testCase.write } };
-        _ = MMIO.updateInputState(&mmio, &testCase.input);
-        MMIO.request(&mmio, &request);
+        _ = mmio.updateInputState(&testCase.input);
+        mmio.request(&request);
         std.testing.expectEqual(testCase.expected, mmio.joypad) catch |err| {
             std.debug.print("Failed {d}: {s}\n", .{ i, testCase.name });
             return err;
@@ -150,7 +150,7 @@ pub fn runInputTests() !void {
     // Lower nibble is read-only to cpu.
     mmio.joypad = 0b1111_1111;
     var request: def.Request = .{ .address = mem_map.joypad, .value = .{ .write = 0b1111_0000 } };
-    MMIO.request(&mmio, &request);
+    mmio.request(&request);
     std.testing.expectEqual(0b1111_1111, mmio.joypad) catch |err| {
         std.debug.print("Failed {d}: {s}\n", .{ testCases.len, "Lower nibble is ready-only to cpu" });
         return err;
@@ -158,7 +158,7 @@ pub fn runInputTests() !void {
 
     // Interrupt
     var irq_joypad: bool = false;
-    irq_joypad = MMIO.updateInputState(&mmio, &def.InputState{
+    irq_joypad = mmio.updateInputState(&def.InputState{
         .down_pressed = false, .up_pressed = false, .left_pressed = false, .right_pressed = false,
         .start_pressed = false, .select_pressed = false, .b_pressed = false, .a_pressed = false,
     });
@@ -166,7 +166,7 @@ pub fn runInputTests() !void {
         std.debug.print("Failed: Joypad interrupt is triggered correctly.\n", .{});
         return err;
     };
-    irq_joypad = MMIO.updateInputState(&mmio, &def.InputState{
+    irq_joypad = mmio.updateInputState(&def.InputState{
         .down_pressed = true, .up_pressed = true, .left_pressed = true, .right_pressed = true,
         .start_pressed = true, .select_pressed = true, .b_pressed = true, .a_pressed = true,
     });
@@ -177,12 +177,12 @@ pub fn runInputTests() !void {
 }
 
 pub fn runDividerTests() !void {
-    var mmio: MMIO.State = .{};
+    var mmio: MMIO = .{};
     var irq_timer: bool = false;
 
     var request: def.Request = .{ .address = mem_map.divider, .value = .{ .write = 255 } };
-    MMIO.request(&mmio, &request);
-    _ = MMIO.cycle(&mmio);
+    mmio.request(&request);
+    _ = mmio.cycle();
     std.testing.expectEqual(0, mmio.divider) catch |err| {
         std.debug.print("Failed: Divider is reset by writing to DIV.\n", .{});
         return err;
@@ -192,7 +192,7 @@ pub fn runDividerTests() !void {
     const div_freq = 256;
     for(0..300) |_| {
         for(0..div_freq) |_| {
-            _, irq_timer = MMIO.cycle(&mmio);
+            _, irq_timer = mmio.cycle();
         }
         expected_div +%= 1;
         std.testing.expectEqual(expected_div, mmio.divider) catch |err| {
@@ -203,7 +203,7 @@ pub fn runDividerTests() !void {
 }
 
 pub fn runTimerTest() !void {
-    var mmio: MMIO.State = .{};
+    var mmio: MMIO = .{};
     var irq_timer: bool = false;
 
     const CycleTestCase = struct {
@@ -224,7 +224,7 @@ pub fn runTimerTest() !void {
         mmio = .{};
         mmio.timer_control = @bitCast(cycleCase.timer_control);
         for(0..cycleCase.cycles) |_| {
-            _, irq_timer = MMIO.cycle(&mmio);
+            _, irq_timer = mmio.cycle();
         }
         std.testing.expectEqual(0x01, mmio.timer) catch |err| {
             std.debug.print("Failed: Timer increments every {d} cycles.\n", .{ cycleCase.cycles });
@@ -238,7 +238,7 @@ pub fn runTimerTest() !void {
     mmio.timer_mod = 0x05;
     mmio.timer_control = .{ .enable = true, .clock = 3 };
     for(0..256) |_| {
-        _, irq_timer = MMIO.cycle(&mmio);
+        _, irq_timer = mmio.cycle();
     }
     // TIMA value is applied 4 cycles later.
     std.testing.expectEqual(0x00, mmio.timer) catch |err| {
@@ -250,7 +250,7 @@ pub fn runTimerTest() !void {
         return err;
     };
     for(0..4) |_| {
-        _, irq_timer = MMIO.cycle(&mmio);
+        _, irq_timer = mmio.cycle();
     }
     std.testing.expectEqual(0x05, mmio.timer) catch |err| {
         std.debug.print("Failed: Timer mod is applied after 4 cycles.\n", .{});
@@ -266,9 +266,9 @@ pub fn runTimerTest() !void {
     mmio.timer = 0x05;
     mmio.system_counter = 0xFFFD;
     mmio.timer_control = .{ .enable = true, .clock = 3 };
-    _, irq_timer = MMIO.cycle(&mmio);
+    _, irq_timer = mmio.cycle();
     mmio.timer_control = .{ .enable = false, .clock = 3 };
-    _, irq_timer = MMIO.cycle(&mmio);
+    _, irq_timer = mmio.cycle();
     std.testing.expectEqual(0x06, mmio.timer) catch |err| {
         std.debug.print("Failed: Disabling timer can increment it.\n", .{});
         return err;
@@ -280,12 +280,12 @@ pub fn runTimerTest() !void {
     mmio.timer_mod = 0x05;
     mmio.timer_control = .{ .enable = true, .clock = 3 };
     for(0..256) |_| {
-        _, irq_timer = MMIO.cycle(&mmio);
+        _, irq_timer = mmio.cycle();
     }
     var request: def.Request = .{ .address = mem_map.timer, .value = .{ .write = 0x10 } };
-    MMIO.request(&mmio, &request);
+    mmio.request(&request);
     for(0..4) |_| {
-        _, irq_timer = MMIO.cycle(&mmio);
+        _, irq_timer = mmio.cycle();
     }
     std.testing.expectEqual(0x10, mmio.timer) catch |err| {
         std.debug.print("Failed: Writing to timer aborts modulo.\n", .{});
@@ -302,11 +302,11 @@ pub fn runTimerTest() !void {
     mmio.timer_mod = 0x05;
     mmio.timer_control = .{ .enable = true, .clock = 3 };
     for(0..(256 + 3)) |_| {
-        _, irq_timer = MMIO.cycle(&mmio);
+        _, irq_timer = mmio.cycle();
     }
     request = .{ .address = mem_map.timer, .value = .{ .write = 0x33 } };
-    MMIO.request(&mmio, &request);
-    _, irq_timer = MMIO.cycle(&mmio);
+    mmio.request(&request);
+    _, irq_timer = mmio.cycle();
     std.testing.expectEqual(0x05, mmio.timer) catch |err| {
         std.debug.print("Failed: Writing to tima on 4th cycle leads to the write being ignored.\n", .{});
         return err;
@@ -318,11 +318,11 @@ pub fn runTimerTest() !void {
     mmio.timer_mod = 0x05;
     mmio.timer_control = .{ .enable = true, .clock = 3 };
     for(0..(256 + 3)) |_| {
-        _, irq_timer = MMIO.cycle(&mmio);
+        _, irq_timer = mmio.cycle();
     }
     request = .{ .address = mem_map.timer_mod, .value = .{ .write = 0x22 } };
-    MMIO.request(&mmio, &request);
-    _, irq_timer = MMIO.cycle(&mmio);
+    mmio.request(&request);
+    _, irq_timer = mmio.cycle();
     std.testing.expectEqual(0x22, mmio.timer) catch |err| {
         std.debug.print("Failed: Writing to timer mod on 4th cycle leads to the new value used for the modulo.\n", .{});
         return err;

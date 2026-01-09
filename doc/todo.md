@@ -1,7 +1,6 @@
 # Next:
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
-- Make all types "classes".
 - Check and compare src1 implementation with src3. Is there some things I missed?
 
 # Define Emulator Lifetime.
