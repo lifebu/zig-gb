@@ -37,7 +37,7 @@ export fn init() void {
     APU.init(&state.apu);
     CART.init(&state.cart);
     CPU.init(&state.cpu, alloc);
-    MEMORY.init(&state.memory, state.config.files.boot_rom.?);
+    MEMORY.init(&state.memory, state.config.emulation.model);
     PPU.init(&state.ppu);
     Platform.init(&state.platform, state.config, imgui_cb);
     MMIO.init(&state.mmio);

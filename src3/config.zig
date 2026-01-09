@@ -7,7 +7,6 @@ const Self = @This();
 
 const Files = struct {
     rom: ?[]const u8 = null,
-    boot_rom: ?[]const u8 = null,
 };
 const Audio = struct {
     // TODO: Sample rate would be harder to do as apu needs that info as well.
@@ -20,18 +19,9 @@ const Graphics = struct {
     palette: def.Palette = .{},
 };
 const Emulation = struct {
-    model: enum {
-        dmg,
-    } = .dmg,
-    ppu: enum {
-        void,
-        frame,
-        cycle,
-    } = .cycle,
-    apu: enum {
-        void,
-        cycle,
-    } = .cycle,
+    model: def.GBModel = .dmg,  
+    ppu: def.PPUModel = .cycle,
+    apu: def.APUModel = .cycle,
 };
 const Debug = struct {
     enable_gb_breakpoint: bool = false,
@@ -47,7 +37,6 @@ debug: Debug = .{},
 pub const default: Self = .{};
 pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     if(self.files.rom) |data| alloc.free(data);
-    if(self.files.boot_rom) |data| alloc.free(data);
 }
 
 pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {
@@ -60,11 +49,6 @@ pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {
         std.log.warn("Failed to parse config file, will use default: {f}.\n", .{diagnostics});
         return err;
     };
-
-    // TODO: This is super hacky and leads to a crashes for the first 2 starts without a config file.
-    if(self.files.boot_rom == null) {
-        self.files.boot_rom = try std.fmt.allocPrint(alloc, "data/bootroms/dmg_boot.bin", .{});
-    }
 }
 
 pub fn save(self: Self, alloc: std.mem.Allocator, path: []const u8) !void {

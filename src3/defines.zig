@@ -75,6 +75,11 @@ pub const Request = struct {
     }
 };
 
+// system
+pub const GBModel = enum  { dmg };
+pub const PPUModel = enum { void, frame, cycle };
+pub const APUModel = enum { void, cycle };
+
 // graphics
 pub const Palette = struct {
     color_0: [3]u8 = .{ 224, 248, 208 },

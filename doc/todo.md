@@ -4,12 +4,6 @@
 - Make all types "classes".
 - Check and compare src1 implementation with src3. Is there some things I missed?
 
-# Config file
-- Config file based on zig zon.
-- Use this to allow settings for the user.
-- Use CLI.zig for this.
-    => Rename this to Options.zig
-
 # Define Emulator Lifetime.
 - So that you can run a game and load a new one from the ImGui menu.
 - We have a "core" that contains what is currently in the frame() function in main.

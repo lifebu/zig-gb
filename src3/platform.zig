@@ -210,7 +210,7 @@ pub export fn event(ev_opt: ?*const sokol.app.Event, state_opaque: ?*anyopaque) 
     else if(ev.key_code == .Q and (ev.modifiers & sokol.app.modifier_ctrl != 0)) {
         sokol.app.requestQuit();
     }
-    else if(ev.key_code == .GRAVE_ACCENT) {
+    else if((ev.key_code == .ESCAPE or ev.key_code == .CAPS_LOCK) and ev.type == .KEY_DOWN) {
         state.imgui_state.imgui_visible = !state.imgui_state.imgui_visible;
     }
 }

@@ -5,6 +5,8 @@ const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
 const mem_map = @import("mem_map.zig");
 
+const dmg_rom: *const[256:0]u8 = @embedFile("bootroms/dmg_boot.bin");
+
 const oam_size = mem_map.oam_high - mem_map.oam_low;
 const work_ram_size = mem_map.wram_high - mem_map.wram_low;
 
@@ -36,12 +38,11 @@ pub const State = struct {
     work_ram: [work_ram_size]u8 = @splat(0),
 };
 
-pub fn init(state: *State, path: []const u8) void {
+pub fn init(state: *State, model: def.GBModel) void {
     state.* = .{};
-
-    const file = std.fs.cwd().openFile(path, .{}) catch unreachable;
-    const len = file.readAll(&state.rom) catch unreachable;
-    std.debug.assert(len == state.rom.len);
+    switch (model) {
+        .dmg => state.rom = dmg_rom.*,
+    }
 }
 
 pub fn cycle(state: *State, req: *def.Request) void {
