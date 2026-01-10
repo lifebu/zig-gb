@@ -1,5 +1,35 @@
 # Next:
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
+- IO Register: If an IO register has a bit that is unused, reading that byte would return 1.
+    - options:
+        - instantiate unused with 1 and mask writes of?
+        - instantiate unused with 0, mask writes and reads of?
+        - instantiate unused with any, mask reads of? (just let them be overwriten).
+    ?- Add this to the request struct?
+        - IF: 0b111?_???
+        - IE: 0b111?_???
+        - timer_control: 0b1111_1???
+        - stat: 0b1???_????
+        - joyp: 0b11??_????
+        - boot_rom: 0b1111_111x (where x: is finished)?
+        - serial_control: 0b?111_11??
+        - all the apu registers (sameboy read_mask).
+    => applyRW(self: *Request, value: anytype, mask_read: u8, mask_write: u8)
+        - read_mask: unused bits when reading 
+        - write_mask: some bits are read-only
+        - write_mask can also change conditionally ~ equivilant to reject?
+        => reject() => applyReadWrite(elem, 0x00, 0x00);
+    => apply(self: *Request, value: anytype);
+    - This allows:
+        - to remove the reject() function
+        - simplify usage code a lot.
+    ?- Do this masks define what is allowed or what is blocked?
+        - Good example: FF26: sound_control: Has read-only and unused bits.
+        - Sameboy: What is blocked.
+        - Mask: what is available? (Masking away though :/)
+    - Are "Write-only" bits relevant?
+        - Yes, these bits return 1 when you read them again, even if you write 0.
+
 
 # Modular subsystems
 - Have multiple subsystems the user can choose (from the config file).
@@ -23,6 +53,7 @@
 # Integrate Tracy Profiler!
 - the other zig emulator had tracy.
 - also zig itself uses tracy so I could check their integration as well.
+- https://codeberg.org/Games-by-Mason/tracy_zig
 
 # Add a splash screen
 - shown when no gb file is running.

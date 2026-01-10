@@ -159,7 +159,6 @@ pub fn request(self: *Self, req: *def.Request) void {
         // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
         // That "latched" data will not change until you do it again by repeating this pattern.
         // This way you can read the RTC registers while the clocks keeps ticking.
-
     }
 
     // memory

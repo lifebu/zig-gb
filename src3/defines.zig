@@ -36,6 +36,7 @@ pub const Request = struct {
 
     address: u16 = invalid_addr,
     // TODO: Some systems want to implement "only some bits are read/write". How could I do that?
+    // Maybe with an optional mask bits used in apply?
     value: union(enum) {
         read: *u8,
         write: u8,
@@ -95,6 +96,7 @@ pub const default_color_ids: [overscan_resolution]u8 = @splat(0);
 
 pub const resolution_width = 160;
 pub const resolution_height = 144;
+// TODO: configureable? How?
 pub const scaling = 3;
 
 pub const window_width = resolution_width * scaling;
