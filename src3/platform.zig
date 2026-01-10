@@ -190,7 +190,7 @@ pub export fn event(ev_opt: ?*const sokol.app.Event, self_opaque: ?*anyopaque) v
     const ev: *const sokol.app.Event = ev_opt orelse return;
     _ = sokol.imgui.handleEvent(ev.*);
 
-    const escape: bool = (ev.key_code == .ESCAPE or ev.key_code == .CAPS_LOCK) and ev.type == .MOUSE_DOWN;
+    const escape: bool = (ev.key_code == .ESCAPE or ev.key_code == .CAPS_LOCK) and ev.type == .KEY_DOWN;
     const mouse_right: bool = ev.mouse_button == .RIGHT and ev.type == .MOUSE_DOWN;
 
     if(ev.key_code == self.keybinds.key_up) {
