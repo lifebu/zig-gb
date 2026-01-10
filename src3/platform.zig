@@ -133,7 +133,7 @@ pub fn deinit(_: *Self) void {
     sokol.audio.shutdown();
 }
 
-pub fn frame(self: *Self, colorids: [def.overscan_resolution]u8) void {
+pub fn frame(self: *Self, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo) void {
     // ui
     sokol.imgui.newFrame(.{
         .width = sokol.app.width(),
@@ -141,7 +141,7 @@ pub fn frame(self: *Self, colorids: [def.overscan_resolution]u8) void {
         .delta_time = sokol.app.frameDuration(),
         .dpi_scale = sokol.app.dpiScale(),
     });
-    self.imgui.render();
+    self.imgui.render(alloc);
 
     // graphics
     var window_title: [64]u8 = undefined;
@@ -161,6 +161,11 @@ pub fn frame(self: *Self, colorids: [def.overscan_resolution]u8) void {
     sokol.imgui.render();
     sokol.gfx.endPass();
     sokol.gfx.commit();
+
+    // audio
+    if(samples_opt) |samples| while(samples.readItem()) |sample| {
+        self.pushSample(sample);
+    };
 }
 
 pub fn pushSample(self: *Self, sample: def.Sample) void {

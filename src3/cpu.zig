@@ -808,15 +808,12 @@ halt_again: bool = false,
 
 
 pub fn init(self: *Self, alloc: std.mem.Allocator) void {
+    self.* = .{};
+
     opcode_banks = genOpcodeBanks(alloc);
-
     const opcode_bank = opcode_banks[opcode_bank_default];
-    const uops: MicroOpArray = opcode_bank[self.registers.r8.ir];
+    const uops: MicroOpArray = opcode_bank[0]; // NOP
     self.uop_fifo.write(uops.items);
-
-    self.hram = @splat(0);
-    self.interrupt_enable = .{ .value = 0 };
-    self.interrupt_flag = .{ .value = 0 };
 }
 
 pub fn deinit(_: *Self, alloc: std.mem.Allocator) void {

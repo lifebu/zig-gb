@@ -1,6 +1,8 @@
 const std = @import("std");
 const Keycode = @import("sokol").app.Keycode;
 
+const Fifo = @import("util/fifo.zig");
+
 // input
 // TODO: Is this optimal? Can we make it easier to calculate the dpad and button bytes?
 pub const InputState = packed struct {
@@ -88,6 +90,9 @@ pub const Palette = struct {
     color_3: [3]u8 = .{ 8, 24, 32 },
 };
 
+// TODO: Make this array of u2 instead?
+pub const default_color_ids: [overscan_resolution]u8 = @splat(0);
+
 pub const resolution_width = 160;
 pub const resolution_height = 144;
 pub const scaling = 3;
@@ -105,16 +110,19 @@ pub const byte_per_line = 2;
 // system
 pub const system_freq = 4 * 1_024 * 1_024;
 pub const t_cycles_in_60fps = system_freq / 60;
+pub const t_cycles_per_frame = 70_224;
 pub const t_cycles_per_m_cycle = 4;
 pub const config_path = "config.zon";
 
 // audio
 pub const sample_rate = 44_100;
 pub const t_cycles_per_sample = (system_freq / sample_rate);
+pub const samples_per_frame = t_cycles_per_frame / t_cycles_per_sample;
 
 pub const Sample = struct {
     left: f32 = 0.0, right: f32 = 0.0,
 };
+pub const SampleFifo = Fifo.RingbufferFifo(Sample, samples_per_frame);
 
 // memory
 pub const addr_space = 0x1_0000;

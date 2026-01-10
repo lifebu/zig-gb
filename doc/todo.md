@@ -1,19 +1,12 @@
 # Next:
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
-- Check and compare src1 implementation with src3. Is there some things I missed?
-
-# Define Emulator Lifetime.
-- So that you can run a game and load a new one from the ImGui menu.
-- We have a "core" that contains what is currently in the frame() function in main.
-- It runs the subsystems.
-- It is initialized with the config file.
-- When we change roms I could just unload the entire state of the core and the subsystems.
-- Then load a new core => No cleanup code needed?
-
 # Modular subsystems
 - Have multiple subsystems the user can choose (from the config file).
 - Really good for tests. There you could use PPU_Void to increase test performance if you don't test the ppu.
+- Use comptime ducktyping:
+    ppu: anytype,
+    ppu.init() => ppu must have init function with this signature.
 - PPU:
     - PPU_Void: only reports hardcoded timings to the rest of the system.
     - PPU_Frame: renders the entire scene once per frame (ported from src1).

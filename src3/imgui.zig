@@ -7,7 +7,6 @@ const Self = @This();
 
 
 imgui_visible: bool = false,
-str_buff: [256]u8 = undefined,
 gb_dialog_open: bool = false,
 current_dir: std.fs.Dir = undefined,
 // TODO: Need to find a good way for imgui (ui) to tell the system that the user did something.
@@ -19,7 +18,7 @@ pub fn init(state: *Self, imgui_cb: *const fn ([]u8) void) void {
     state.current_dir = std.fs.cwd().openDir(".", .{ .iterate = true }) catch unreachable;
 }
 
-pub fn render(self: *Self) void {
+pub fn render(self: *Self, alloc: std.mem.Allocator) void {
     if(!self.imgui_visible) {
         return;
     }
@@ -38,14 +37,14 @@ pub fn render(self: *Self) void {
 
         // TODO: Once we have a config file I can save the last folder that was opened and open the file dialog there.
         if(self.gb_dialog_open) {
-            ShowFileDialogue(self, "gb");
+            ShowFileDialogue(self, alloc, "gb");
         }
 
         imgui.igEndMainMenuBar();
     }
 } 
 
-pub fn ShowFileDialogue(self: *Self, file_extension: []const u8) void {
+pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: []const u8) void {
     const menu_height = 18;
     imgui.igSetNextWindowPos(.{ .x = 0, .y = menu_height }, imgui.ImGuiCond_Once);
     imgui.igSetNextWindowSize(.{ .x = def.window_width, .y = def.window_height - menu_height }, imgui.ImGuiCond_Once);
@@ -55,11 +54,14 @@ pub fn ShowFileDialogue(self: *Self, file_extension: []const u8) void {
         self.current_dir = self.current_dir.openDir("..", .{ .iterate = true }) catch unreachable;
     }
 
+    // TODO: Can we have this sorted alphabetically?
     var iter = self.current_dir.iterate();
     while(iter.next() catch unreachable) |entry| {
         switch(entry.kind) {
             .directory => {
-                const title = std.fmt.bufPrintZ(&self.str_buff, "[Dir] {s}", .{ entry.name }) catch unreachable;
+                const title = std.fmt.allocPrintSentinel(alloc, "[Dir] {s}", .{ entry.name }, 0) catch unreachable;
+                defer alloc.free(title);
+
                 if(imgui.igSelectable(@ptrCast(title))) {
                     self.current_dir = self.current_dir.openDir(entry.name, .{ .iterate = true }) catch unreachable;
                 }
@@ -74,9 +76,12 @@ pub fn ShowFileDialogue(self: *Self, file_extension: []const u8) void {
                 } else { // has no extension.
                     continue;
                 }
-                const title = std.fmt.bufPrintZ(&self.str_buff, "[File] {s}", .{ entry.name }) catch unreachable;
+                const title = std.fmt.allocPrintSentinel(alloc, "[File] {s}", .{ entry.name }, 0) catch unreachable;
+                defer alloc.free(title);
+
                 if(imgui.igSelectable(@ptrCast(title))) {
-                    const full_path = self.current_dir.realpath(entry.name, &self.str_buff) catch unreachable;
+                    // Note: cleaned up by config and main.
+                    const full_path = self.current_dir.realpathAlloc(alloc, entry.name) catch unreachable;
                     if(self.imgui_cb) |callback| {
                         callback(full_path);
                     }

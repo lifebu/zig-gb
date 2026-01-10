@@ -18,7 +18,8 @@ fn drawSample(apu: *APU, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
     apu.channel_values[2] = ch3;
     apu.channel_values[3] = ch4;
     apu.sample_tick = 0;
-    return apu.cycle().?;
+    apu.cycle();
+    return apu.samples.readItem().?;
 }
 
 pub fn runApuSamplingTests() !void {
@@ -101,7 +102,8 @@ pub fn runApuSamplingTests() !void {
             apu.panning.ch4_right = test_case.right;
 
             apu.sample_tick = 0;
-            sample = apu.cycle().?;
+            apu.cycle();
+            sample = apu.samples.readItem().?;
 
             const expected_left: f32 = if(test_case.left) 0.25 else 0.0;
             std.testing.expectApproxEqAbs(expected_left, sample.left, std.math.floatEps(f32)) catch |err| {
@@ -172,9 +174,9 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
     } else {
         const cycles_per_frame = 70224; 
         for(0..cycles_per_frame) |_| {
-            const sample: ?def.Sample = state.apu.cycle();
-            if(sample) |value| {
-                state.platform.pushSample(value);
+            state.apu.cycle();
+            if(state.apu.samples.readItem()) |sample| {
+                state.platform.pushSample(sample);
             }
 
             state.curr_cycles += 1;
@@ -232,8 +234,8 @@ pub fn runApuOutputTest(use_precalc: bool) !void {
 
         if(use_precalc) {
             while(curr_cycles < cycles) : (curr_cycles += 1) {
-                const sample: ?def.Sample = apu.cycle();
-                if(sample) |sample_val| {
+                apu.cycle();
+                if(apu.samples.readItem()) |sample_val| {
                     const sample_left: f32 = sample_val.left * default_platform_volume;
                     const sample_right: f32 = sample_val.right * default_platform_volume;
                     if(is_stereo) {

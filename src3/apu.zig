@@ -158,6 +158,8 @@ ch2_duty_idx: u3 = 0,
 ch3_wave_ram_idx: u5 = 0,
 ch4_lfsr: LFSR = .{ .value = 0 },
 
+samples: def.SampleFifo = .{},
+
 
 pub fn init(self: *Self) void {
     self.* = .{};
@@ -279,9 +281,9 @@ pub fn request(self: *Self, req: *def.Request) void {
     }
 }
 
-pub fn cycle(self: *Self) ?def.Sample {
+pub fn cycle(self: *Self) void {
     if(!self.apu_on) {
-        return sample(self);
+        sample(self);
     }
 
     self.func_period_tick, var overflow: u1 = @subWithOverflow(self.func_period_tick, 1);
@@ -395,17 +397,18 @@ pub fn cycle(self: *Self) ?def.Sample {
         self.func_period_values[3] = divisor << self.ch4_freq.shift;
     }
 
-    return sample(self);
+    sample(self);
 }
 
-fn sample(self: *Self) ?def.Sample {
+fn sample(self: *Self) void {
     self.sample_tick, const overflow = @subWithOverflow(self.sample_tick, 1);
     if(overflow == 0) {
-        return null;
+        return;
     }
 
     self.sample_tick = def.t_cycles_per_sample - 1;
-    return mixChannels(self.channel_values, self.panning, self.volume);
+    const result: def.Sample = mixChannels(self.channel_values, self.panning, self.volume);
+    self.samples.writeItemDiscardWhenFull(result);
 }
 
 fn mixChannels(channels: [apu_channels]u4, panning: Panning, volume: Volume) def.Sample {

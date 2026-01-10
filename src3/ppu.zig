@@ -182,7 +182,9 @@ object_fifo: ObjectFiFo = .{},
 lcd_overscan_x: u8 = 0, 
 fetcher_data: FetcherData = .{},
 
-colorIds: [def.overscan_resolution]u8 = @splat(0),
+// TODO: Make this array of u2 instead?
+// TODO: rename to color_ids (naming convention)
+colorIds: [def.overscan_resolution]u8 = def.default_color_ids,
 
 
 pub fn init(self: *Self) void {

@@ -2,7 +2,6 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 /// Fifo interface on top of a statically allocated ringbuffer.
-/// Similar to std.RingBuffer.
 pub fn RingbufferFifo( comptime T: type, comptime capacity: usize) type {
     return struct {
         const Self = @This();
