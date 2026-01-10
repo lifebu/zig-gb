@@ -15,6 +15,23 @@
     - APU_Void: Only reports very basic states (if at all). 
     - APU_Cycle: Updated every cycle.
 
+# Move implementations into subfolder in src3.
+
+# Remove old src and rename src3 to src
+- This also means some cleanup in build.zig
+
+# Integrate Tracy Profiler!
+- the other zig emulator had tracy.
+- also zig itself uses tracy so I could check their integration as well.
+
+# Add a splash screen
+- shown when no gb file is running.
+- with a small logo. embed this in the code and remove data/background.png
+- convert image to gb palette: https://gameboy.prodigle.dev/
+- convert gb palette image to 2bpp: https://rgbds.gbdev.io/docs/v1.0.1/rgbgfx.1
+- create a function to parse and read a 2bpp file and convert it to [overscan_resolution]u8.
+- use @embedFile() for the resulting file: splash.bin
+
 # Tests
 - Use GB Test suites and run them. Create all the harness to run and test their outputs (different approaches).
     - List of GB Test Roms with expected outputs:
@@ -22,7 +39,7 @@
     => This has a list of required outputs and a shell script that uses rgbds to compile them.
     => Also has release verions you can download.
 - Interrupt Sources Test:
-    - VBlanK, Stat 
+    - VBlanK, Stat
 
 # APU:
 - CH3: Length timer + "Frame Sequencer" is working.
@@ -50,6 +67,7 @@
 - We also should never waste any samples (i.e, the platform sound buffer is already full).
 
 # Soon:
+- Try to get a version of the emulator running in a browser via github.io? (or other website).
 - PPU Missing bg_window_enable for backgrounds.
 - Need to check why most games just dont work at all.
     - Some of them try to access illegal memory (metroid2) (0xFFEE).

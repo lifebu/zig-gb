@@ -29,7 +29,12 @@ export fn init() void {
     state.platform.init(state.config, imgui_cb);
 
     if(state.config.files.rom) |rom_file| {
-        imgui_cb(rom_file);
+        // TODO: This is pretty bad. imgui callback frees the previous string.
+        // Which makes rom_file invalid iff you use a launch parameter.
+        const dupe = alloc.dupe(u8, rom_file) catch unreachable;
+        errdefer alloc.free(dupe);
+
+        imgui_cb(dupe);
     }
 }
 
