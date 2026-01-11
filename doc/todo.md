@@ -1,10 +1,21 @@
 # Next:
+- Move implementations into subfolder in src3.
+- Remove old src and rename src3 to src
+    - This also means some cleanup in build.zig
+- Cart: implement and test (mooneye) mbc 1,2,5:
+    - rom banks, highest rom bit, ram banks, mbc1 bank mode.
+- PPU: Check OAM Timing:
+    - A lot of games try to write to OAM during draw and oam_scan which is not allowed.
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
+- Savegames:
+    - only iff: a cart has ram + battery 
+    - savagames are just dumps of the cart ram.
+    - loading a rom: load a savegame.
+    - loading another rom or shutdown: create a savegame.
+    - save as a .sav file.
+- APU: Try to pass the blargg apu tests.
+- PPU: Try to pass dmc Acid2!
 
-# Move implementations into subfolder in src3.
-
-# Remove old src and rename src3 to src
-- This also means some cleanup in build.zig
 
 - Improve the string handling code for the rom and last_dir path.
     - It is super annoying that everywhere you want to overwrite the path you first have to make sure that there is not already a path.
