@@ -1074,6 +1074,12 @@ pub fn cycle(self: *Self, req: *def.Request) void {
             } else { // Interrupt pending
                 if(self.interrupt_master_enable) {
                     self.registers.r8.ir = halt_uop;
+                    // TODO: This is bad, the decode for an interrupt decrements the pc before saving it. which means it point to the halt again.
+                    // So we need to increment it one more so after decrementing the correct instruction after halt is decoded.
+                    // Otherwise we have a deadlock.
+                    // This only happens because halt is the ONLY INSTRUCTION, that does not increment the PC in it's AddrIdu step.
+                    // I really need better testing for this. This was actually not caught by any testroms I tried so far.
+                    self.registers.r16.pc += 1;
                     self.halt_again = false;
                 } else {
                     if(self.halt_again) {

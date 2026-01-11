@@ -231,8 +231,8 @@ pub fn loadFile(self: *Self, path: []const u8, alloc: std.mem.Allocator) void {
     self.ranges = info_table.get(self.features.mapper);
     self.bank_mode = 0;
 
-    std.log.info("Rom Features: mapper: {}, rom_size: {}Byte, has_ram: {}, ram_size: {}Byte", .{ 
-        self.features.mapper, header_rom_size_byte, self.features.has_ram, ram_size_byte,
+    std.log.info("Rom Features: type: {X:0>2}, mapper: {}, rom_size: {}kByte, has_ram: {}, ram_size: {}kByte", .{ 
+        cart_type, self.features.mapper, header_rom_size_byte / 1024, self.features.has_ram, ram_size_byte / 1024,
     });
     if((self.features.has_ram and self.ram_banks.len == 0) or 
         (!self.features.has_ram and self.ram_banks.len != 0)) {
