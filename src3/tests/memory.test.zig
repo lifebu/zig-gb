@@ -97,3 +97,57 @@ pub fn runDMATest() !void {
         return err;
     };
 }
+
+pub fn runRequestTest() !void {
+    var register: u8 = 0x00;
+    var reader: u8 = 0x00;
+    var request: def.Request = .{ .address = 0xFFFF, .value = .{ .write = 0xFF } };
+
+    // All bits are writeable.
+    register = 0x00;
+    request = .{ .address = 0xFFFF, .value = .{ .write = 0xFF } };
+    request.apply(&register);
+    std.testing.expectEqual(0xFF, register) catch |err| {
+        std.debug.print("Failed: All bits are writeable by default.\n", .{});
+        return err;
+    };
+
+    // ALl bits are readable.
+    register = 0xFF;
+    reader = 0x00;
+    request = .{ .address = 0xFFFF, .value = .{ .read = &reader } };
+    request.apply(&register);
+    std.testing.expectEqual(0xFF, reader) catch |err| {
+        std.debug.print("Failed: All bits are readable by default.\n", .{});
+        return err;
+    };
+
+    // Lower nibble is writeable.
+    register = 0x00;
+    request = .{ .address = 0xFFFF, .value = .{ .write = 0xFF } };
+    request.applyAllowedRW(&register, 0xFF, 0xF0);
+    std.testing.expectEqual(0xF0, register) catch |err| {
+        std.debug.print("Failed: Writes to some bits can be blocked.\n", .{});
+        return err;
+    };
+
+    // Lower nibble is readable.
+    register = 0x00;
+    reader = 0x00;
+    request = .{ .address = 0xFFFF, .value = .{ .read = &reader } };
+    request.applyAllowedRW(&register, 0xF0, 0xFF);
+    std.testing.expectEqual(0x0F, reader) catch |err| {
+        std.debug.print("Failed: Reads to some bits can be blocked and return 1.\n", .{});
+        return err;
+    };
+
+    // The lower 5 bits are readable.
+    register = 0x08;
+    reader = 0x00;
+    request = .{ .address = 0xFFFF, .value = .{ .read = &reader } };
+    request.applyAllowedRW(&register, 0x1F, 0x1F);
+    std.testing.expectEqual(0xE8, reader) catch |err| {
+        std.debug.print("Failed: Reads to some bits can be blocked and return 1.\n", .{});
+        return err;
+    };
+}

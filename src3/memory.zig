@@ -8,18 +8,19 @@ const mem_map = @import("mem_map.zig");
 const Self = @This();
 
 const dmg_rom: *const[def.boot_rom_size:0]u8 = @embedFile("bootroms/dmg_boot.bin");
-
-const oam_size = mem_map.oam_high - mem_map.oam_low;
 const work_ram_size = mem_map.wram_high - mem_map.wram_low;
+
+pub const BootRom = packed struct(u8) {
+    finished: bool = false, _: u7 = 0,
+};
 
 const DmaMicroOp = enum { nop, read, write };
 const DmaFifo = Fifo.RingbufferFifo(DmaMicroOp, 8);
 const dma_start: [4]DmaMicroOp = .{ .nop, .nop, .nop, .nop };
 const dma_step: [4]DmaMicroOp = .{ .nop, .read, .nop, .write };
 
-
 // boot
-boot_rom_enabled: bool = true,
+boot: BootRom = .{},
 boot_rom: [def.boot_rom_size]u8 = @splat(0),
 
 // dma
@@ -77,14 +78,9 @@ fn cycleDMA(self: *Self, req: *def.Request) void {
 pub fn request(self: *Self, req: *def.Request) void {
     switch (req.address) {
         0...(def.boot_rom_size - 1) => {
-            if(!self.boot_rom_enabled) {
-                return;
-            }
-            if(req.isWrite()) {
-                req.reject();
-            } else {
+            if(!self.boot.finished) {
                 const rom_idx: u16 = req.address - 0;
-                req.apply(&self.boot_rom[rom_idx]);
+                req.applyAllowedRW(&self.boot_rom[rom_idx], 0xFF, 0x00);
             }
         },
         mem_map.wram_low...(mem_map.wram_high - 1) => {
@@ -106,13 +102,8 @@ pub fn request(self: *Self, req: *def.Request) void {
             }
         },
         mem_map.boot_rom => {
-            if(!self.boot_rom_enabled) {
-                return;
-            }
-            if(req.isWrite()) {
-                self.boot_rom_enabled = false;
-            }
-            req.reject(); // TODO: Should subsequent reads be able to read this?
+            const mask_write: u8 = if(self.boot.finished) 0x00 else 0x01;
+            req.applyAllowedRW(&self.boot, 0x01, mask_write);
         },
         mem_map.unused_low...(mem_map.unused_high - 1) => {
             req.reject();

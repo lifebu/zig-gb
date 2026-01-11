@@ -93,14 +93,14 @@ fn cycleTimer(self: *Self) bool {
 pub fn request(self: *Self, req: *def.Request) void {
     switch (req.address) {
         mem_map.joypad => {
-            var value: u8 = self.joypad;
-            req.apply(&value);
+            req.applyAllowedRW(&self.joypad, 0xCF, 0x30);
             if(req.isWrite()) {
-                self.joypad = createJoypad(self, value);
+                self.joypad = createJoypad(self);
             }
         },
         mem_map.serial_control => {
-            req.apply(&self.serial_control);
+            // Note: masks changes on gbc to 0x83
+            req.applyAllowedRW(&self.serial_control, 0x81, 0x81);
         },
         mem_map.serial_data => {
             req.apply(&self.serial_data);
@@ -119,7 +119,7 @@ pub fn request(self: *Self, req: *def.Request) void {
             req.apply(&self.timer);
         },
         mem_map.timer_control => {
-            req.apply(&self.timer_control);
+            req.applyAllowedRW(&self.timer_control, 0x07, 0x07);
         },
         mem_map.timer_mod => {
             req.apply(&self.timer_mod);
@@ -128,17 +128,16 @@ pub fn request(self: *Self, req: *def.Request) void {
     }
 }
 
-fn createJoypad(self: *Self, value: u8) u8 {
-    const joyp = (value & 0xF0) | (self.joypad & 0x0F);
-    const select_dpad: bool = (joyp & 0x10) != 0x10;
-    const select_buttons: bool = (joyp & 0x20) != 0x20;
+fn createJoypad(self: *Self) u8 {
+    const select_dpad: bool = (self.joypad & 0x10) != 0x10;
+    const select_buttons: bool = (self.joypad & 0x20) != 0x20;
     const nibble: u4 = 
     if(select_dpad and select_buttons) self.dpad & self.buttons 
         else if (select_dpad) self.dpad 
             else if (select_buttons) self.buttons
                 else 0x0F;
 
-    return (joyp & 0xF0) | nibble; 
+    return (self.joypad & 0xF0) | nibble; 
 } 
 
 pub fn updateInputState(self: *Self, input_state: *const def.InputState) bool {

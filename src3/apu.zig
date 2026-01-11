@@ -54,7 +54,7 @@ pub const Channel1Sweep = packed struct(u8) {
 pub const Channel12Length = packed struct(u8) {
     length_init: u6 = 0, duty_cycle: u2 = 0,
 };
-pub const Channel12Volume = packed struct(u8) {
+pub const Channel124Volume = packed struct(u8) {
     pace: u3 = 0, increase: bool = false, initial: u4 = 0,
 };
 pub const Channel12PeriodLow = packed struct(u8) {
@@ -85,9 +85,6 @@ pub const Channel3PeriodHigh = packed struct(u8) {
 pub const Channel4Length = packed struct(u8) {
     initial: u6 = 0, _: u2 = 0,
 };
-pub const Channel4Volume = packed struct(u8) {
-    pace: u3 = 0, increase: bool = false, initial: u4 = 0,
-};
 pub const Channel4Freq = packed struct(u8) {
     divider: u3 = 0, is_short: bool = false, shift: u4 = 0,
 };
@@ -108,12 +105,12 @@ panning: Panning = .{},
 
 ch1_sweep: Channel1Sweep = .{},
 ch1_length: Channel12Length = .{},
-ch1_volume: Channel12Volume = .{},
+ch1_volume: Channel124Volume = .{},
 ch1_period_low: Channel12PeriodLow = .{},
 ch1_period_high: Channel12PeriodHigh = .{},
 
 ch2_length: Channel12Length = .{},
-ch2_volume: Channel12Volume = .{},
+ch2_volume: Channel124Volume = .{},
 ch2_period_low: Channel12PeriodLow = .{},
 ch2_period_high: Channel12PeriodHigh = .{},
 
@@ -125,7 +122,7 @@ ch3_period_high: Channel3PeriodHigh = .{},
 ch3_wave_table: [ch3_wave_table_size]u8 = @splat(0),
 
 ch4_length: Channel4Length = .{},
-ch4_volume: Channel4Volume = .{},
+ch4_volume: Channel124Volume = .{},
 ch4_freq: Channel4Freq = .{},
 ch4_control: Channel4Control = .{},
 
@@ -169,21 +166,17 @@ pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
         mem_map.sound_panning => { req.apply(&self.panning); },
         mem_map.master_volume => { req.apply(&self.volume); },
-        mem_map.sound_control => {
-            if(req.isWrite()) {
-                req.value.write = (req.value.write & 0xF0) | (@as(u8, @bitCast(self.control)) & 0x0F);
-            }
-            req.apply(&self.control);
+        mem_map.sound_control => { req.applyAllowedRW(&self.control, 0x8F, 0x80);
             // TODO: Turning of apu leads to:
             // all APU registers are cleared but read-only, except sound_control.
             // Wave RAM can still be written to.
             self.apu_on = self.control.enable_apu;
         },
-        mem_map.ch1_sweep => { req.apply(&self.ch1_sweep); },
-        mem_map.ch1_length => { req.apply(&self.ch1_length); },
+        mem_map.ch1_sweep => { req.applyAllowedRW(&self.ch1_sweep, 0x7F, 0xFF); },
+        mem_map.ch1_length => { req.applyAllowedRW(&self.ch1_length, 0xC0, 0xFF); },
         mem_map.ch1_volume => { req.apply(&self.ch1_volume); },
-        mem_map.ch1_low_period => { req.apply(&self.ch1_period_low); },
-        mem_map.ch1_high_period => { req.apply(&self.ch1_period_high);
+        mem_map.ch1_low_period => { req.applyAllowedRW(&self.ch1_period_low, 0x00, 0xFF); },
+        mem_map.ch1_high_period => { req.applyAllowedRW(&self.ch1_period_high, 0x40, 0xC7 );
             if(req.isWrite()) {
                 if(self.ch1_period_high.trigger) {
                     const period: u11 = self.ch1_period_low.period | @as(u11, self.ch1_period_high.period) << 8;
@@ -207,10 +200,10 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.ch2_length => { req.apply(&self.ch2_length); },
+        mem_map.ch2_length => { req.applyAllowedRW(&self.ch2_length, 0xC0, 0xFF); },
         mem_map.ch2_volume => { req.apply(&self.ch2_volume); },
-        mem_map.ch2_low_period => { req.apply(&self.ch2_period_low); },
-        mem_map.ch2_high_period => { req.apply(&self.ch2_period_high);
+        mem_map.ch2_low_period => { req.applyAllowedRW(&self.ch2_period_low, 0x00, 0xFF); },
+        mem_map.ch2_high_period => { req.applyAllowedRW(&self.ch2_period_high, 0x40, 0xC7);
             if(req.isWrite()) {
                 if(self.ch2_period_high.trigger) {
                     const period: u11 = self.ch2_period_low.period | @as(u11, self.ch2_period_high.period) << 8;
@@ -227,10 +220,10 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.ch3_length => { req.apply(&self.ch3_length); },
-        mem_map.ch3_volume => { req.apply(&self.ch3_volume); },
-        mem_map.ch3_low_period => { req.apply(&self.ch3_period_low); },
-        mem_map.ch3_dac => { req.apply(&self.ch3_dac);
+        mem_map.ch3_length => { req.applyAllowedRW(&self.ch3_length, 0x00, 0xFF); },
+        mem_map.ch3_volume => { req.applyAllowedRW(&self.ch3_volume, 0x60, 0x60); },
+        mem_map.ch3_low_period => { req.applyAllowedRW(&self.ch3_period_low, 0x00, 0xFF); },
+        mem_map.ch3_dac => { req.applyAllowedRW(&self.ch3_dac, 0x80, 0x80);
             if(req.isWrite()) {
                 if(!self.ch3_dac.dac_on and self.channels_on[2]) {
                     self.channels_on[2] = false;
@@ -238,7 +231,7 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.ch3_high_period => { req.apply(&self.ch3_period_high);
+        mem_map.ch3_high_period => { req.applyAllowedRW(&self.ch3_period_high, 0x40, 0xC7);
             if(req.isWrite()) {
                 if(self.ch3_period_high.trigger) {
                     const period: u11 = self.ch3_period_low.period | @as(u11, self.ch3_period_high.period) << 8;
@@ -257,10 +250,10 @@ pub fn request(self: *Self, req: *def.Request) void {
             const wave_idx: u16 = req.address - mem_map.wave_low;
             req.apply(&self.ch3_wave_table[wave_idx]);
         },
-        mem_map.ch4_length => { req.apply(&self.ch4_length); },
+        mem_map.ch4_length => { req.applyAllowedRW(&self.ch4_length, 0x00, 0x3F); },
         mem_map.ch4_volume => { req.apply(&self.ch4_volume); },
         mem_map.ch4_freq => { req.apply(&self.ch4_freq); },
-        mem_map.ch4_control => { req.apply(&self.ch4_control);
+        mem_map.ch4_control => { req.applyAllowedRW(&self.ch4_control, 0xC0, 0x40);
             if(req.isWrite()) {
                 if(self.ch4_control.trigger) {
                     const divisor = lfsr_divisor_table[self.ch4_freq.divider];

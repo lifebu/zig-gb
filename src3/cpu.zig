@@ -1011,7 +1011,7 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 req.* = def.Request{ .requestor = .cpu, .address = self.address_bus, .value = .{ .read = target } };
             } else if(params.target == .dbus) { // Write
                 const source: *u8 = self.registers.getU8(params.source);
-                req.* = def.Request{ .requestor = .cpu,.address = self.address_bus, .value = .{ .write = source.* } };
+                req.* = def.Request{ .requestor = .cpu, .address = self.address_bus, .value = .{ .write = source.* } };
             } else {
                 unreachable;
             }
@@ -1134,10 +1134,10 @@ pub fn request(self: *Self, req: *def.Request) void {
             req.apply(&self.hram[hram_idx]);
         },
         mem_map.interrupt_enable => {
-            req.apply(&self.interrupt_enable);
+            req.applyAllowedRW(&self.interrupt_enable, 0x1F, 0x1F);
         },
         mem_map.interrupt_flag => {
-            req.apply(&self.interrupt_flag);
+            req.applyAllowedRW(&self.interrupt_flag, 0x1F, 0x1F);
         },
         else => {},
     }

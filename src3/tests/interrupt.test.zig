@@ -22,10 +22,10 @@ pub fn runInterruptTests() !void {
     cpu.interrupt_flag.value = 0b0000_0000;
     cpu.registers.r16.pc = mem_map.wram_low;
     cpu.registers.r16.hl = mem_map.interrupt_flag;
-    cpu.registers.r8.a = 0xFF;
+    cpu.registers.r8.a = 0x1F;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
-    std.testing.expectEqual(0xFF, cpu.interrupt_flag.value) catch |err| {
+    std.testing.expectEqual(0x1F, cpu.interrupt_flag.value) catch |err| {
         std.debug.print("Failed: CPU can write to IF.\n", .{});
         return err;
     };

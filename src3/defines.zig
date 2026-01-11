@@ -30,7 +30,6 @@ pub const Keybinds = struct {
 
 // memory
 var void_byte: u8 = 0x00;
-pub const open_bus: u8 = 0xFF;
 pub const Request = struct {
     const invalid_addr: u16 = 0xFEED;
 
@@ -45,20 +44,29 @@ pub const Request = struct {
         unknown, cpu, dma
     } = .unknown,
 
-    pub fn apply(self: *Request, value: anytype) void {
-        if(!self.isValid()) {
-            return; // TODO: Should this be an error?
-        }
-
-        switch (self.value) {
-            .read => |read| read.* = @bitCast(value.*),
-            .write => |write| value.* = @bitCast(write),
-        }
+    /// Use the masks to specify which bits are allowed to be read from (returns 1 if not allowed) or written to.
+    pub fn applyAllowedRW(self: *Request, value: anytype, mask_read: u8, mask_write: u8) void {
+        if(!self.isValid()) return;
         self.address = invalid_addr;
+
+        const value_u8: u8 = @bitCast(value.*);
+        switch (self.value) {
+            .read => |read| {
+                read.* = value_u8 | ~mask_read;
+            },
+            .write => |write| {
+                const write_u8: u8 = @bitCast(write);
+                value.* = @bitCast((value_u8 & ~mask_write) | (write_u8 & mask_write));
+            },
+        }
+    }
+
+    pub fn apply(self: *Request, value: anytype) void {
+        self.applyAllowedRW(value, 0xFF, 0xFF);
     }
     pub fn reject(self: *Request) void {
-        var value: u8 = open_bus;
-        self.apply(&value);
+        var temp: u8 = 0;
+        self.applyAllowedRW(&temp, 0x00, 0x00);
     }
     pub fn isValid(self: *Request) bool {
         return self.address != invalid_addr;

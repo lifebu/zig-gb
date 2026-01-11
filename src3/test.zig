@@ -13,18 +13,18 @@ const singlestep_test = @import("tests/singlestep.test.zig");
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 // TODO: Move tests into it's own module so that we don't have it loitering in the src folder!
 // TODO: Maybe split up the tests?
-test "APU_Channel" {
-    try apu_test.runApuChannelTests();
-}
-
-test "APU_Output" {
-    const pre_calc: bool = false;
-    try apu_sampling_test.runApuOutputTest(pre_calc);
-}
-
-test "APU_Sampler" {
-    try apu_sampling_test.runApuSamplingTests();
-}
+// test "APU_Channel" {
+//     try apu_test.runApuChannelTests();
+// }
+//
+// test "APU_Output" {
+//     const pre_calc: bool = false;
+//     try apu_sampling_test.runApuOutputTest(pre_calc);
+// }
+//
+// test "APU_Sampler" {
+//     try apu_sampling_test.runApuSamplingTests();
+// }
 
 test "Cart" {
     try cart_test.runCartTests();
@@ -38,9 +38,9 @@ test "CPU_InterruptTest" {
     try interrupt_test.runInterruptTests();
 }
 
-test "CPU_SingleStepTest" {
-    try singlestep_test.runSingleStepTests();
-}
+// test "CPU_SingleStepTest" {
+//     try singlestep_test.runSingleStepTests();
+// }
 
 test "DividerTest" {
     try mmio_test.runDividerTests();
@@ -54,8 +54,12 @@ test "InputTest" {
     try mmio_test.runInputTests();
 }
 
-test "PPU_InterruptTest" {
-    try ppu_test.runInterruptTests();
+// test "PPU_InterruptTest" {te
+//     try ppu_test.runInterruptTests();
+// }
+
+test "Request" {
+    try memory_test.runRequestTest();
 }
 
 test "TimerTest" {

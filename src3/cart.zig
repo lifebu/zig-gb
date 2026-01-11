@@ -127,6 +127,8 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
+    // TODO: Having this very different code section for mbc only and the witch case below feels like not the best code structure?
+    // The "IsInRange() and isWrite()" feels very microoptimized.
     // mbc
     if (isInRange(self.ranges.ram_enable, req.address) and req.isWrite()) {
         // TODO: This also enables access to the RTC registers.
@@ -164,28 +166,17 @@ pub fn request(self: *Self, req: *def.Request) void {
     // memory
     switch(req.address) {
         mem_map.rom_low...(mem_map.rom_middle - 1) => {
-            if(req.isWrite() or self.rom_banks.len == 0) {
-                req.reject();
-            } else {
-                const rom_idx: u16 = req.address - mem_map.rom_low;
-                req.apply(&self.rom_banks[self.rom_bank_low][rom_idx]);
-            }
+            const rom_idx: u16 = req.address - mem_map.rom_low;
+            req.applyAllowedRW(&self.rom_banks[self.rom_bank_low][rom_idx], 0xFF, 0x00);
         },
         mem_map.rom_middle...(mem_map.rom_high - 1) => {
-            if(req.isWrite() or self.rom_banks.len == 0) {
-                req.reject();
-            } else {
-                const rom_idx: u16 = req.address - mem_map.rom_middle;
-                req.apply(&self.rom_banks[self.rom_bank_high][rom_idx]);
-            }
+            const rom_idx: u16 = req.address - mem_map.rom_middle;
+            req.applyAllowedRW(&self.rom_banks[self.rom_bank_high][rom_idx], 0xFF, 0x00);
         },
         mem_map.cart_ram_low...(mem_map.cart_ram_high - 1) => {
-            if(!self.ram_enable or self.ram_banks.len == 0) {
-                req.reject();
-            } else {
-                const ram_idx: u16 = req.address - mem_map.cart_ram_low;
-                req.apply(&self.ram_banks[self.ram_bank][ram_idx]);
-            }
+            const allowed: u8 = if(self.ram_enable and self.ram_banks.len != 0) 0xFF else 0x00;
+            const ram_idx: u16 = req.address - mem_map.cart_ram_low;
+            req.applyAllowedRW(&self.ram_banks[self.ram_bank][ram_idx], allowed, allowed);
         },
         else => {},
     }

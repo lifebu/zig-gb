@@ -352,7 +352,8 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
 
     self.draw_cycles +%= 1;
     self.lcd_stat.ly_is_lyc = self.lcd_y == self.lcd_y_compare;
-    irq_stat |= self.lcd_stat.lyc_select and self.lcd_stat.ly_is_lyc;
+    const lyc_stat: bool = self.lcd_stat.lyc_select and self.lcd_stat.ly_is_lyc;
+    irq_stat |= lyc_stat;
 
     return .{ irq_vblank, irq_stat };
 }
@@ -377,18 +378,10 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             }
         },
         mem_map.lcd_stat => {
-            if(req.isWrite()) {
-                // ly_is_lyc and ppu mode are read only.
-                req.value.write = (req.value.write & 0xF8) | (@as(u8, @bitCast(self.lcd_stat)) & 0x07);
-            }
-            req.apply(&self.lcd_stat);
+            req.applyAllowedRW(&self.lcd_stat, 0xFF, 0xF8);
         },
         mem_map.lcd_y => {
-            if(req.isWrite()) {
-                req.reject();
-            } else {
-                req.apply(&self.lcd_y);
-            }
+            req.applyAllowedRW(&self.lcd_y, 0xFF, 0x00);
         },
         mem_map.lcd_y_compare => {
             req.apply(&self.lcd_y_compare);
@@ -406,20 +399,20 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             req.apply(&self.window_y);
         },
         mem_map.oam_low...(mem_map.oam_high - 1) => {
-            if (self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw) {
-                req.reject();
-            } else {
-                const oam_idx: u16 = req.address - mem_map.oam_low;
-                req.apply(&self.oam[oam_idx]);
+            const mask: u8 = if(self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw) 0x00 else 0xFF;
+            if(mask == 0x00) {
+                std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
+            const oam_idx: u16 = req.address - mem_map.oam_low;
+            req.applyAllowedRW(&self.oam[oam_idx], mask, mask);
         },
         mem_map.vram_low...(mem_map.vram_high - 1) => {
-            if (self.lcd_stat.mode == .draw) {
-                req.reject();
-            } else {
-                //const vram_idx: u16 = req.address - mem_map.vram_low;
-                req.apply(&memory[req.address]);
+            const mask: u8 = if(self.lcd_stat.mode == .draw) 0x00 else 0xFF;
+            if(mask == 0x00) {
+                std.log.warn("VRAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
+            //const vram_idx: u16 = req.address - mem_map.vram_low;
+            req.applyAllowedRW(&memory[req.address], mask, mask);
         },
         mem_map.bg_palette => {
             req.apply(&memory[req.address]);
