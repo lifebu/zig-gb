@@ -84,17 +84,6 @@ pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: [
             const new_entry: std.fs.Dir.Entry = .{ .kind = entry.kind, .name = alloc.dupe(u8, entry.name) catch unreachable };
             info.append(alloc, new_entry) catch unreachable;
         }
-        // switch(entry.kind) {
-        //     .directory => {
-        //         const new_entry: std.fs.Dir.Entry = .{ .kind = entry.kind, .name = alloc.dupe(u8, entry.name) catch unreachable };
-        //         info.append(alloc, new_entry) catch unreachable;
-        //     },
-        //     .file => {
-        //         const new_entry: std.fs.Dir.Entry = .{ .kind = entry.kind, .name = alloc.dupe(u8, entry.name) catch unreachable };
-        //         info.append(alloc, new_entry) catch unreachable;
-        //     },
-        //     else => {},
-        // }
     }
 
     std.mem.sort(std.fs.Dir.Entry, info.items, {}, dirLessThan);
