@@ -253,7 +253,7 @@ pub fn request(self: *Self, req: *def.Request) void {
         mem_map.ch4_length => { req.applyAllowedRW(&self.ch4_length, 0x00, 0x3F); },
         mem_map.ch4_volume => { req.apply(&self.ch4_volume); },
         mem_map.ch4_freq => { req.apply(&self.ch4_freq); },
-        mem_map.ch4_control => { req.applyAllowedRW(&self.ch4_control, 0xC0, 0x40);
+        mem_map.ch4_control => { req.applyAllowedRW(&self.ch4_control, 0x40, 0xC0);
             if(req.isWrite()) {
                 if(self.ch4_control.trigger) {
                     const divisor = lfsr_divisor_table[self.ch4_freq.divider];
