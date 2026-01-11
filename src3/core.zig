@@ -10,6 +10,7 @@ const def = @import("defines.zig");
 const Memory = @import("memory.zig");
 const MMIO = @import("mmio.zig");
 const PPU = @import("ppu.zig");
+const PPUVoid = @import("ppu_void.zig");
 
 const Self = @This();
 
@@ -22,7 +23,7 @@ cart: Cart = .{},
 cpu: CPU = .{},
 memory: Memory = .{},
 ppu: switch(build_options.ppu_model) {
-    .void => PPU,
+    .void => PPUVoid,
     .frame => PPU,
     .cycle => PPU,
 } = .{},
