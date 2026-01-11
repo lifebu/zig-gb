@@ -94,6 +94,7 @@ pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: [
                 defer alloc.free(title);
 
                 if(imgui.igSelectable(@ptrCast(title))) {
+                    // TODO: Every time this changes we should safe the path. If the emulator crashes this is lost.
                     self.current_dir = self.current_dir.openDir(item.name, .{ .iterate = true }) catch unreachable;
                 }
             },

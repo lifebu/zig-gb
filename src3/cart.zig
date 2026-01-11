@@ -174,7 +174,7 @@ pub fn request(self: *Self, req: *def.Request) void {
             req.applyAllowedRW(&self.rom_banks[self.rom_bank_high][rom_idx], 0xFF, 0x00);
         },
         mem_map.cart_ram_low...(mem_map.cart_ram_high - 1) => {
-            if(!self.features.has_ram) {
+            if(!self.features.has_ram or self.ram_banks.len == 0) {
                 std.log.err("Cart has no wram, but game tried to access to cart ram?. {f}", .{ req });
                 req.reject();
                 return;
@@ -231,11 +231,12 @@ pub fn loadFile(self: *Self, path: []const u8, alloc: std.mem.Allocator) void {
     self.ranges = info_table.get(self.features.mapper);
     self.bank_mode = 0;
 
-    assert(self.features.mapper != .unsupported);
-    assert((self.features.has_ram and self.ram_banks.len != 0) or 
-            !self.features.has_ram and self.ram_banks.len == 0);
-
     std.log.info("Rom Features: mapper: {}, rom_size: {}Byte, has_ram: {}, ram_size: {}Byte", .{ 
         self.features.mapper, header_rom_size_byte, self.features.has_ram, ram_size_byte,
     });
+    if((self.features.has_ram and self.ram_banks.len == 0) or 
+        (!self.features.has_ram and self.ram_banks.len != 0)) {
+        std.log.warn("Cart Header and Ram size do not match. Would be ignored by real gameboy.", .{});
+    }
+    assert(self.features.mapper != .unsupported);
 }
