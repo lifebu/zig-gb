@@ -33,7 +33,7 @@ keybinds: def.Keybinds = .{},
 
 pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
     // ui
-    self.imgui.init(imgui_cb);
+    self.imgui.init(config, imgui_cb);
 
     // gfx
     const gfx_config = config.graphics;
@@ -127,7 +127,9 @@ pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
     self.keybinds = config.keybinds;
 }
 
-pub fn deinit(_: *Self) void {
+pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: *Config) void {
+    self.imgui.deinit(alloc, config);
+
     sokol.imgui.shutdown();
     sokol.gfx.shutdown();
     sokol.audio.shutdown();

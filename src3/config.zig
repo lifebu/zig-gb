@@ -7,6 +7,7 @@ const Self = @This();
 
 const Files = struct {
     rom: ?[]const u8 = null,
+    last_dir: ?[]const u8 = null,
 };
 const Audio = struct {
     // TODO: Sample rate would be harder to do as apu needs that info as well.
@@ -35,6 +36,7 @@ debug: Debug = .{},
 pub const default: Self = .{};
 pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     if(self.files.rom) |data| alloc.free(data);
+    if(self.files.last_dir) |data| alloc.free(data);
 }
 
 pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {

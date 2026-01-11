@@ -1,6 +1,7 @@
 const std = @import("std");
 const imgui = @import("cimgui");
 
+const Config = @import("config.zig");
 const def = @import("defines.zig"); 
 
 const Self = @This();
@@ -13,9 +14,21 @@ current_dir: std.fs.Dir = undefined,
 imgui_cb: ?*const fn ([]u8) void = null,
 
 
-pub fn init(state: *Self, imgui_cb: *const fn ([]u8) void) void {
-    state.imgui_cb = imgui_cb;
-    state.current_dir = std.fs.cwd().openDir(".", .{ .iterate = true }) catch unreachable;
+pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
+    self.imgui_cb = imgui_cb;
+
+    const has_rom: bool = config.files.rom != null;
+    self.imgui_visible = !has_rom;
+    self.gb_dialog_open = !has_rom;
+
+    const start_dir = config.files.last_dir orelse ".";
+    self.current_dir = std.fs.cwd().openDir(start_dir, .{ .iterate = true }) catch unreachable;
+}
+
+pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: *Config) void {
+    const full_path = self.current_dir.realpathAlloc(alloc, ".") catch unreachable;
+    if(config.files.last_dir) |data| alloc.free(data);
+    config.files.last_dir = full_path;
 }
 
 pub fn render(self: *Self, alloc: std.mem.Allocator) void {
@@ -35,7 +48,6 @@ pub fn render(self: *Self, alloc: std.mem.Allocator) void {
             imgui.igEndMenu();
         }
 
-        // TODO: Once we have a config file I can save the last folder that was opened and open the file dialog there.
         if(self.gb_dialog_open) {
             ShowFileDialogue(self, alloc, "gb");
         }

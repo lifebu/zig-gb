@@ -1,19 +1,15 @@
 # Next:
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
-# Modular subsystems
-- PPU:
-    - PPU_Void: only reports hardcoded timings to the rest of the system.
-    - PPU_Frame: renders the entire scene once per frame (ported from src1).
-    - PPU_Cycle: PPU that updates every cycle (src3 version).
-- APU:
-    - APU_Void: Only reports very basic states (if at all). 
-    - APU_Cycle: Updated every cycle.
-
 # Move implementations into subfolder in src3.
 
 # Remove old src and rename src3 to src
 - This also means some cleanup in build.zig
+
+- Improve the string handling code for the rom and last_dir path.
+    - It is super annoying that everywhere you want to overwrite the path you first have to make sure that there is not already a path.
+    - If there is you need to deallocate it first.
+    - Also super annoying that I need to kill the rom path from the config so that it is not written to the file?
 
 # Integrate Tracy Profiler!
 - the other zig emulator had tracy.
@@ -142,6 +138,13 @@
 - Once we have cgb support, it can just switch out a different cpu-core for the emulator!
 - Add .dll hot-reloading of emulator code.
 - Some of the data that I need to create with the uOps i could do with a memory arena scratch space (like the fetcher_data_low, fetcher_data_high).
+
+# Later:
+## Modular subsystems implementations
+- PPU:
+    - PPU_Frame: renders the entire scene once per frame (ported from src1).
+- APU:
+    - APU_Void: Only reports very basic states (if at all). 
 
 # Version 1.0:
 ## Define 1.0:

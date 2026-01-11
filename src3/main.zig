@@ -69,8 +69,14 @@ export fn deinit() void {
         state.core = null;
     }
 
+    state.platform.deinit(alloc, &state.config);
+
+    // TODO: This is for not writing the rom name into the config. This is pretty stupid.
+    if(state.config.files.rom) |data| alloc.free(data);
+    state.config.files.rom = null;
+    state.config.save(alloc, def.config_path) catch unreachable;
+
     state.config.deinit(alloc);
-    state.platform.deinit();
     _ = state.allocator.deinit();
 }
 

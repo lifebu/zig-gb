@@ -48,6 +48,7 @@ pub const Request = struct {
     pub fn applyAllowedRW(self: *Request, value: anytype, mask_read: u8, mask_write: u8) void {
         if(!self.isValid()) return;
         self.address = invalid_addr;
+        self.requestor = .unknown;
 
         const value_u8: u8 = @bitCast(value.*);
         switch (self.value) {
