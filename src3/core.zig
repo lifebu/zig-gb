@@ -21,8 +21,8 @@ apu: switch (build_options.apu_model) {
 } = .{},
 cart: Cart = .{},
 cpu: switch (build_options.cpu_model) {
+    .instruction => CPU,
     .cycle => CPU,
-    .uop => CPU,
 } = .{},
 memory: Memory = .{},
 ppu: switch(build_options.ppu_model) {

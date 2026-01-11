@@ -1050,9 +1050,7 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 }
                 const uops: MicroOpArray = opcode_bank[opcode];
                 if(uops.items.len == 0) {
-                    // TODO: While this is useful, single step tests fail with this.
-                    // std.debug.print("DECODED INVALID OPCODE: BANK: {}: OPCODE: {X:0>2}\n", .{ params.bank_idx, opcode });
-                    // unreachable;
+                    std.log.err("Decoded invalid opcode. Addr: {X:0>4}, Op: [{}][{X:0>2}]", .{ self.registers.r16.pc - 1, params.bank_idx, opcode });
                 }
                 self.uop_fifo.write(uops.items);
             }

@@ -5,14 +5,14 @@ const builtin = @import("builtin");
 
 const src_folder = "src3/";
 
-pub const CPUModel = enum { cycle, uop };
+pub const CPUModel = enum { instruction, cycle };
 pub const PPUModel = enum { void, frame, cycle };
 pub const APUModel = enum { void, cycle };
 
 pub fn build(b: *std.Build) void {
     // llvm backend required for vscode debug symbols.
     const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
-    const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.uop;
+    const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.cycle;
     const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
     const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
 
