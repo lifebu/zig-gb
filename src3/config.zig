@@ -20,8 +20,6 @@ const Graphics = struct {
 };
 const Emulation = struct {
     model: def.GBModel = .dmg,  
-    ppu: def.PPUModel = .cycle,
-    apu: def.APUModel = .cycle,
 };
 const Debug = struct {
     enable_gb_breakpoint: bool = false,

@@ -5,9 +5,14 @@ const builtin = @import("builtin");
 
 const src_folder = "src3/";
 
+pub const PPUModel = enum { void, frame, cycle };
+pub const APUModel = enum { void, cycle };
+
 pub fn build(b: *std.Build) void {
     // llvm backend required for vscode debug symbols.
     const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
+    const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
+    const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
 
     // exe
     // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
@@ -23,8 +28,12 @@ pub fn build(b: *std.Build) void {
         }),
         .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
     });
-
     b.installArtifact(exe);
+
+    const options = b.addOptions();
+    options.addOption(PPUModel, "ppu_model", ppu_model);
+    options.addOption(APUModel, "apu_model", apu_model);
+    exe.root_module.addOptions("build_options", options);
 
 
     // TODO: Remove sfml once we moved completly to sokol.

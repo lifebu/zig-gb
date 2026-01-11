@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const assert = std.debug.assert;
 
 const APU = @import("apu.zig");
@@ -13,11 +14,18 @@ const PPU = @import("ppu.zig");
 const Self = @This();
 
 
-apu: APU = .{},
+apu: switch (build_options.apu_model) {
+    .void => APU,
+    .cycle => APU,
+} = .{},
 cart: Cart = .{},
 cpu: CPU = .{},
 memory: Memory = .{},
-ppu: PPU = .{},
+ppu: switch(build_options.ppu_model) {
+    .void => PPU,
+    .frame => PPU,
+    .cycle => PPU,
+} = .{},
 mmio: MMIO = .{},
 
 

@@ -2,11 +2,6 @@
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 
 # Modular subsystems
-- Have multiple subsystems the user can choose (from the config file).
-- Really good for tests. There you could use PPU_Void to increase test performance if you don't test the ppu.
-- Use comptime ducktyping:
-    ppu: anytype,
-    ppu.init() => ppu must have init function with this signature.
 - PPU:
     - PPU_Void: only reports hardcoded timings to the rest of the system.
     - PPU_Frame: renders the entire scene once per frame (ported from src1).
@@ -26,6 +21,8 @@
 - https://codeberg.org/Games-by-Mason/tracy_zig
 
 # Add a splash screen
+- documentation how to use a build step to generate the file:
+    https://ziglang.org/learn/build-system/#embed-file
 - shown when no gb file is running.
 - with a small logo. embed this in the code and remove data/background.png
 - convert image to gb palette: https://gameboy.prodigle.dev/
