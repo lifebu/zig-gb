@@ -399,7 +399,9 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             req.apply(&self.window_y);
         },
         mem_map.oam_low...(mem_map.oam_high - 1) => {
-            const mask: u8 = if(self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw) 0x00 else 0xFF;
+            const mode_is_blocking: bool = self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw;
+            // TODO: During DMA transfer the PPU must read 0xFF during oam_scan and draw. DMA has higher prio access to oam.
+            const mask: u8 = if(mode_is_blocking and req.requestor == .cpu) 0x00 else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }

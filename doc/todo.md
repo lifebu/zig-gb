@@ -6,6 +6,13 @@
     - rom banks, highest rom bit, ram banks, mbc1 bank mode.
 - PPU: Check OAM Timing:
     - A lot of games try to write to OAM during draw and oam_scan which is not allowed.
+    https://www.reddit.com/r/EmuDev/comments/9o5pw8/gameboy_legend_of_zelda_dma_transfers/
+    "So, proper behavior seems to be that DMA transfer overrides mode-2 access to OAM."
+    https://gbdev.io/pandocs/OAM_DMA_Transfer.html
+    => It seems I need to implement that the ppu cannot access oam during oam dma?
+    https://gbdev.io/pandocs/Accessing_VRAM_and_OAM.html
+    => During DMA Transfer the PPU cannot access OAM and will read FF from OAM during that time.
+    => Save the last requestor in the PPU. If it is DMA change what values we read from OAM.
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 - Savegames:
     - only iff: a cart has ram + battery 
