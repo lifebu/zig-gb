@@ -71,6 +71,7 @@ const MapperRanges = struct {
     ram_bank: ?MapperRange = null,
     bank_mode: ?MapperRange = null,
     rtc: ?MapperRange = null,
+    min_bank: u1 = 1,
 };
 const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
     // unsupported
@@ -83,6 +84,7 @@ const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
         .rom_bank =     .{ .low = 0x2000, .high = 0x3FFF },
         .ram_bank =     .{ .low = 0x4000, .high = 0x5FFF },
         .bank_mode =    .{ .low = 0x6000, .high = 0x7FFF },
+        .min_bank = 1,
     },
     // mbc_3
     .{
@@ -90,6 +92,7 @@ const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
         .rom_bank =     .{ .low = 0x2000, .high = 0x3FFF },
         .ram_bank =     .{ .low = 0x4000, .high = 0x5FFF },
         .rtc =          .{ .low = 0x6000, .high = 0x7FFF },
+        .min_bank = 1,
     },
     // mbc_5
     .{
@@ -97,6 +100,7 @@ const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
         .rom_bank =     .{ .low = 0x2000, .high = 0x2FFF },
         .rom_bank_msb = .{ .low = 0x3000, .high = 0x3FFF },
         .ram_bank =     .{ .low = 0x4000, .high = 0x5FFF },
+        .min_bank = 0,
     },
 }};
 
@@ -105,6 +109,7 @@ const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
 rom_banks: [][rom_bank_size_byte]u8 = &.{},
 rom_bank_low: u9 = 0,
 rom_bank_high: u9 = 1,
+rom_bank_highest_bit: u1 = 0,
 
 // ram
 ram_enable: bool = false,
@@ -136,11 +141,10 @@ pub fn request(self: *Self, req: *def.Request) void {
 
     } else if (isInRange(self.ranges.rom_bank, req.address) and req.isWrite()) {
         const mask: u9 = @intCast(self.rom_banks.len - 1);
-        self.rom_bank_high = @truncate(@max(1, req.value.write) & mask);
+        self.rom_bank_high = @truncate(@max(self.ranges.min_bank, req.value.write) & mask);
 
     } else if (isInRange(self.ranges.rom_bank_msb, req.address) and req.isWrite()) {
-        std.debug.print("Highest ROM bit not supported!\n", .{});
-        unreachable;
+        self.rom_bank_highest_bit = @truncate(req.value.write);
 
     } else if (isInRange(self.ranges.ram_bank, req.address) and req.isWrite()) {
         // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
@@ -171,7 +175,9 @@ pub fn request(self: *Self, req: *def.Request) void {
         },
         mem_map.rom_middle...(mem_map.rom_high - 1) => {
             const rom_idx: u16 = req.address - mem_map.rom_middle;
-            req.applyAllowedRW(&self.rom_banks[self.rom_bank_high][rom_idx], 0xFF, 0x00);
+            const bank_highest: u10 = self.rom_bank_highest_bit;
+            const bank_idx: u10 = self.rom_bank_high | (bank_highest << 8);
+            req.applyAllowedRW(&self.rom_banks[bank_idx][rom_idx], 0xFF, 0x00);
         },
         mem_map.cart_ram_low...(mem_map.cart_ram_high - 1) => {
             if(!self.features.has_ram or self.ram_banks.len == 0) {
@@ -210,6 +216,7 @@ pub fn loadFile(self: *Self, path: []const u8, alloc: std.mem.Allocator) void {
 
     self.rom_bank_low = 0;
     self.rom_bank_high = 1;
+    self.rom_bank_highest_bit = 0;
 
     // ram
     const ram_size: u8 = rom[header_ram_size];
