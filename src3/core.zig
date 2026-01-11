@@ -20,7 +20,10 @@ apu: switch (build_options.apu_model) {
     .cycle => APU,
 } = .{},
 cart: Cart = .{},
-cpu: CPU = .{},
+cpu: switch (build_options.cpu_model) {
+    .cycle => CPU,
+    .uop => CPU,
+} = .{},
 memory: Memory = .{},
 ppu: switch(build_options.ppu_model) {
     .void => PPUVoid,

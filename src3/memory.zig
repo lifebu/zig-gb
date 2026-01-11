@@ -14,10 +14,10 @@ pub const BootRom = packed struct(u8) {
     finished: bool = false, _: u7 = 0,
 };
 
-const DmaMicroOp = enum { nop, read, write };
+const DmaMicroOp = enum { nop, bus_conflict, read, write };
 const DmaFifo = Fifo.RingbufferFifo(DmaMicroOp, 8);
 const dma_start: [4]DmaMicroOp = .{ .nop, .nop, .nop, .nop };
-const dma_step: [4]DmaMicroOp = .{ .nop, .read, .nop, .write };
+const dma_step: [4]DmaMicroOp = .{ .bus_conflict, .read, .bus_conflict, .write };
 
 // boot
 boot: BootRom = .{},
@@ -53,17 +53,18 @@ pub fn cycle(self: *Self, req: *def.Request) void {
 
 fn cycleDMA(self: *Self, req: *def.Request) void {
     const uop = self.dma_fifo.readItem() orelse return;
-    if(req.address < mem_map.hram_low or req.address > (mem_map.hram_high) - 1) {
-        req.reject(); // DMA Bus conflict
-    }
-
     switch(uop) {
         .nop => {},
+        .bus_conflict => {
+            dmaBusConflict(req);
+        },
         .read => {
+            dmaBusConflict(req);
             req.* = .{ .requestor = .dma, .address = self.src_addr, .value = .{ .read = &self.byte } };
             self.src_addr += 1;
         },
         .write => {
+            dmaBusConflict(req);
             req.* = .{ .requestor = .dma, .address = self.dest_addr, .value = .{ .write = self.byte } };
             self.dest_addr += 1;
 
@@ -72,6 +73,12 @@ fn cycleDMA(self: *Self, req: *def.Request) void {
                 self.dma_fifo.write(&dma_step);
             }
         },
+    }
+}
+
+fn dmaBusConflict(req: *def.Request) void {
+    if(req.address < mem_map.hram_low or req.address > (mem_map.hram_high) - 1) {
+        req.reject(); // DMA Bus conflict
     }
 }
 

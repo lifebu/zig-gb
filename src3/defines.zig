@@ -31,6 +31,7 @@ pub const Keybinds = struct {
 // memory
 var void_byte: u8 = 0x00;
 pub const Request = struct {
+    // TODO: Use an optional address or something. This invalid address creates issues with tests.
     const invalid_addr: u16 = 0xFEED;
 
     address: u16 = invalid_addr,

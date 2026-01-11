@@ -175,7 +175,7 @@ pub fn request(self: *Self, req: *def.Request) void {
         },
         mem_map.cart_ram_low...(mem_map.cart_ram_high - 1) => {
             if(!self.features.has_ram) {
-                std.log.err("Cart has no wram, but game tried to write to cart ram?. {f}", .{ req });
+                std.log.err("Cart has no wram, but game tried to access to cart ram?. {f}", .{ req });
                 req.reject();
                 return;
             }
