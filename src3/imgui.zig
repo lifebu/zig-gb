@@ -56,6 +56,12 @@ pub fn render(self: *Self, alloc: std.mem.Allocator) void {
     }
 } 
 
+fn dirLessThan(_: void, lhs: std.fs.Dir.Entry, rhs: std.fs.Dir.Entry) bool {
+    if(lhs.kind != rhs.kind) {
+        return lhs.kind == .directory;
+    }
+    return std.mem.order(u8, lhs.name, rhs.name) == .lt;
+}
 pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: []const u8) void {
     const menu_height = 18;
     imgui.igSetNextWindowPos(.{ .x = 0, .y = menu_height }, imgui.ImGuiCond_Once);
@@ -66,20 +72,44 @@ pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: [
         self.current_dir = self.current_dir.openDir("..", .{ .iterate = true }) catch unreachable;
     }
 
-    // TODO: Can we have this sorted alphabetically?
+    var info: std.ArrayList(std.fs.Dir.Entry) = .empty;
+    defer {
+        for(info.items) |item| { alloc.free(item.name); }
+        info.deinit(alloc);
+    }
+
     var iter = self.current_dir.iterate();
     while(iter.next() catch unreachable) |entry| {
-        switch(entry.kind) {
+        if(entry.kind == .directory or entry.kind == .file) {
+            const new_entry: std.fs.Dir.Entry = .{ .kind = entry.kind, .name = alloc.dupe(u8, entry.name) catch unreachable };
+            info.append(alloc, new_entry) catch unreachable;
+        }
+        // switch(entry.kind) {
+        //     .directory => {
+        //         const new_entry: std.fs.Dir.Entry = .{ .kind = entry.kind, .name = alloc.dupe(u8, entry.name) catch unreachable };
+        //         info.append(alloc, new_entry) catch unreachable;
+        //     },
+        //     .file => {
+        //         const new_entry: std.fs.Dir.Entry = .{ .kind = entry.kind, .name = alloc.dupe(u8, entry.name) catch unreachable };
+        //         info.append(alloc, new_entry) catch unreachable;
+        //     },
+        //     else => {},
+        // }
+    }
+
+    std.mem.sort(std.fs.Dir.Entry, info.items, {}, dirLessThan);
+    for(info.items) |item| {
+        switch(item.kind) {
             .directory => {
-                const title = std.fmt.allocPrintSentinel(alloc, "[Dir] {s}", .{ entry.name }, 0) catch unreachable;
+                const title = std.fmt.allocPrintSentinel(alloc, "[Dir] {s}", .{ item.name }, 0) catch unreachable;
                 defer alloc.free(title);
 
                 if(imgui.igSelectable(@ptrCast(title))) {
-                    self.current_dir = self.current_dir.openDir(entry.name, .{ .iterate = true }) catch unreachable;
+                    self.current_dir = self.current_dir.openDir(item.name, .{ .iterate = true }) catch unreachable;
                 }
             },
             .file => {
-                var sequence = std.mem.splitAny(u8, entry.name, ".");
+                var sequence = std.mem.splitAny(u8, item.name, ".");
                 _ = sequence.next(); // skip filename
                 if(sequence.next()) |extension| {
                     if(!std.mem.eql(u8, extension, file_extension)) {
@@ -88,12 +118,12 @@ pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: [
                 } else { // has no extension.
                     continue;
                 }
-                const title = std.fmt.allocPrintSentinel(alloc, "[File] {s}", .{ entry.name }, 0) catch unreachable;
+                const title = std.fmt.allocPrintSentinel(alloc, "[File] {s}", .{ item.name }, 0) catch unreachable;
                 defer alloc.free(title);
 
                 if(imgui.igSelectable(@ptrCast(title))) {
                     // Note: cleaned up by config and main.
-                    const full_path = self.current_dir.realpathAlloc(alloc, entry.name) catch unreachable;
+                    const full_path = self.current_dir.realpathAlloc(alloc, item.name) catch unreachable;
                     if(self.imgui_cb) |callback| {
                         callback(full_path);
                     }
