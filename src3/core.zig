@@ -33,7 +33,7 @@ ppu: switch(build_options.ppu_model) {
 mmio: MMIO = .{},
 
 
-pub fn init(self: *Self, config: Config, alloc: std.mem.Allocator) void {
+pub fn init(self: *Self, alloc: std.mem.Allocator, config: Config) void {
     self.* = .{};
     self.apu.init();
     self.cart.init();
@@ -46,9 +46,11 @@ pub fn init(self: *Self, config: Config, alloc: std.mem.Allocator) void {
     self.cart.loadFile(config.files.rom.?, alloc);
 }
 
-pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: Config) void {
     self.cpu.deinit(alloc);
-    self.cart.deinit(alloc);
+
+    assert(config.files.rom != null);
+    self.cart.deinit(alloc, config.files.rom.?);
 }
 
 // TODO: Should you be able to run the core for a set of cycles instead of an entire frame? Maybe for debug purposes? (Like rendering?)

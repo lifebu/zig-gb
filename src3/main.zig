@@ -40,15 +40,16 @@ export fn init() void {
 
 fn imgui_cb(file_path: []const u8) void {
     const alloc = state.allocator.allocator();
+    if(state.core) |*loaded_core| {
+        loaded_core.deinit(alloc, state.config);
+    }
+
     // TODO: memory management of that rom string is super annoying, can we do that better?
     if(state.config.files.rom) |data| alloc.free(data);
     state.config.files.rom = file_path;
 
-    if(state.core) |*loaded_core| {
-        loaded_core.deinit(alloc);
-    }
     state.core = .{};
-    state.core.?.init(state.config, alloc);
+    state.core.?.init(alloc, state.config);
 }
 
 export fn frame() void {
@@ -65,7 +66,7 @@ export fn frame() void {
 export fn deinit() void {
     const alloc = state.allocator.allocator();
     if(state.core) |*loaded_core| {
-        loaded_core.deinit(alloc);
+        loaded_core.deinit(alloc, state.config);
         state.core = null;
     }
 

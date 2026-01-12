@@ -23,6 +23,7 @@ const MapperType = enum(u3) {
 const CartFeatures = struct {
     mapper: MapperType = .unsupported,
     has_ram: bool = false,
+    has_battery: bool = false,
     has_timer: bool = false,
     has_rumble: bool = false,
     has_accelerometer: bool = false,
@@ -32,29 +33,29 @@ const type_table: [256]CartFeatures = blk: {
     result[0x00] = .{ .mapper = .no_mbc };
     result[0x01] = .{ .mapper = .mbc_1 };
     result[0x02] = .{ .mapper = .mbc_1, .has_ram = true };
-    result[0x03] = .{ .mapper = .mbc_1, .has_ram = true };
+    result[0x03] = .{ .mapper = .mbc_1, .has_ram = true, .has_battery = true };
     result[0x05] = .{ .mapper = .mbc_3 };
-    result[0x06] = .{ .mapper = .mbc_3 };
+    result[0x06] = .{ .mapper = .mbc_3, .has_battery = true };
     result[0x0B] = .{ .mapper = .unsupported }; // MMM01
     result[0x0C] = .{ .mapper = .unsupported, .has_ram = true }; // MMM01
-    result[0x0D] = .{ .mapper = .unsupported, .has_ram = true }; // MMM01
-    result[0x0F] = .{ .mapper = .mbc_3, .has_timer = true };
-    result[0x10] = .{ .mapper = .mbc_3, .has_ram = true, .has_timer = true };
+    result[0x0D] = .{ .mapper = .unsupported, .has_ram = true, .has_battery = true }; // MMM01
+    result[0x0F] = .{ .mapper = .mbc_3, .has_battery = true, .has_timer = true };
+    result[0x10] = .{ .mapper = .mbc_3, .has_ram = true, .has_battery = true, .has_timer = true };
     result[0x11] = .{ .mapper = .mbc_3 };
     result[0x12] = .{ .mapper = .mbc_3, .has_ram = true };
-    result[0x13] = .{ .mapper = .mbc_3, .has_ram = true };
+    result[0x13] = .{ .mapper = .mbc_3, .has_ram = true, .has_battery = true };
     result[0x19] = .{ .mapper = .mbc_5 };
     result[0x1A] = .{ .mapper = .mbc_5, .has_ram = true };
-    result[0x1B] = .{ .mapper = .mbc_5, .has_ram = true };
+    result[0x1B] = .{ .mapper = .mbc_5, .has_ram = true, .has_battery = true };
     result[0x1C] = .{ .mapper = .mbc_5, .has_rumble = true };
     result[0x1D] = .{ .mapper = .mbc_5, .has_ram = true, .has_rumble = true };
-    result[0x1E] = .{ .mapper = .mbc_5, .has_ram = true, .has_rumble = true };
+    result[0x1E] = .{ .mapper = .mbc_5, .has_ram = true, .has_battery = true, .has_rumble = true };
     result[0x20] = .{ .mapper = .unsupported }; // MBC6
-    result[0x22] = .{ .mapper = .unsupported, .has_ram = true, .has_rumble = true, .has_accelerometer = true }; // MBC7
+    result[0x22] = .{ .mapper = .unsupported, .has_ram = true, .has_battery = true, .has_rumble = true, .has_accelerometer = true }; // MBC7
     result[0xFC] = .{ .mapper = .unsupported }; // Pocket Camera
     result[0xFD] = .{ .mapper = .unsupported }; // Bandai Tama5
     result[0xFE] = .{ .mapper = .unsupported }; // HuC3
-    result[0xFF] = .{ .mapper = .unsupported, .has_ram = true }; // HuC1
+    result[0xFF] = .{ .mapper = .unsupported, .has_ram = true, .has_battery = true }; // HuC1
     break :blk result;
 };
 
@@ -126,7 +127,19 @@ pub fn init(self: *Self) void {
     self.* = .{};
 }
 
-pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+pub fn deinit(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8) void {
+    const save_path: []const u8 = getSavePath(alloc, rom_path);
+    defer alloc.free(save_path);
+
+    if(self.features.has_battery and self.features.has_ram) {
+        const save_file: std.fs.File = std.fs.cwd().openFile(save_path, .{ .mode = .write_only }) catch unreachable;
+        defer save_file.close();
+
+        for(self.ram_banks) |bank| {
+            _ = save_file.write(&bank) catch unreachable;
+        }
+    }
+
     alloc.free(self.rom_banks);
     alloc.free(self.ram_banks);
 }
@@ -138,6 +151,7 @@ pub fn request(self: *Self, req: *def.Request) void {
     if (isInRange(self.ranges.ram_enable, req.address) and req.isWrite()) {
         // TODO: This also enables access to the RTC registers.
         self.ram_enable = @as(u4, @truncate(req.value.write)) == 0xA;
+        // TODO: Write to savefile every time we disable the ram bank?
 
     } else if (isInRange(self.ranges.rom_bank, req.address) and req.isWrite()) {
         const mask: u9 = @intCast(self.rom_banks.len - 1);
@@ -194,9 +208,9 @@ pub fn request(self: *Self, req: *def.Request) void {
 }
 
 // TODO: not a great solution to handle the loading and initializing of the emulator, okay for now.
-pub fn loadFile(self: *Self, path: []const u8, alloc: std.mem.Allocator) void {
+pub fn loadFile(self: *Self, rom_path: []const u8, alloc: std.mem.Allocator) void {
     // file
-    const rom: []u8 = std.fs.cwd().readFileAlloc(alloc, path, std.math.maxInt(u32)) catch unreachable;
+    const rom: []u8 = std.fs.cwd().readFileAlloc(alloc, rom_path, std.math.maxInt(u32)) catch unreachable;
     defer alloc.free(rom);
 
     const rom_size: u8 = rom[header_rom_size];
@@ -225,10 +239,6 @@ pub fn loadFile(self: *Self, path: []const u8, alloc: std.mem.Allocator) void {
     self.ram_banks = alloc.alloc([ram_bank_size_byte]u8, num_ram_banks) catch unreachable;
     errdefer alloc.free(self.ram_banks);
 
-    for(0..num_ram_banks) |bank_idx| {
-        @memset(&self.ram_banks[bank_idx], 0);
-    }
-
     self.ram_bank = 0;
     self.ram_enable = false;
 
@@ -246,4 +256,31 @@ pub fn loadFile(self: *Self, path: []const u8, alloc: std.mem.Allocator) void {
         std.log.warn("Cart Header and Ram size do not match. Would be ignored by real gameboy.", .{});
     }
     assert(self.features.mapper != .unsupported);
+
+    // savegame
+    const save_path: []const u8 = getSavePath(alloc, rom_path);
+    defer alloc.free(save_path);
+
+    const save_file: ?std.fs.File = std.fs.cwd().openFile(save_path, .{}) catch |err| blk: {
+        switch(err) { error.FileNotFound => break: blk null, else => unreachable, }
+    };
+    if(self.features.has_battery and self.features.has_ram and save_file != null) { // Savegame ram.
+        const save_content: []const u8 = save_file.?.readToEndAlloc(alloc, std.math.maxInt(u32)) catch unreachable;
+        defer alloc.free(save_content);
+
+        for(0..num_ram_banks) |bank_idx| {
+            const start: u32 = @intCast(bank_idx * ram_bank_size_byte);
+            const end: u32 = start + ram_bank_size_byte;
+            @memcpy(&self.ram_banks[bank_idx], save_content[start..end]);
+        }
+    } else { // Default ram.
+        for(0..num_ram_banks) |bank_idx| {
+            @memset(&self.ram_banks[bank_idx], 0);
+        }
+    }
+}
+
+pub fn getSavePath(alloc: std.mem.Allocator, rom_path: []const u8) []const u8 {
+    var iter = std.mem.splitAny(u8, rom_path, ".");
+    return std.fmt.allocPrint(alloc, "{s}.{s}", .{ iter.first(), "sav" }) catch unreachable;
 }

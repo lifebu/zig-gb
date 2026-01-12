@@ -401,6 +401,8 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
         mem_map.oam_low...(mem_map.oam_high - 1) => {
             const mode_is_blocking: bool = self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw;
             // TODO: During DMA transfer the PPU must read 0xFF during oam_scan and draw. DMA has higher prio access to oam.
+            // TODO: if don't block DMA oam requests, the entire rendering breaks for castlevania and the game becomes unplayable.
+            // But this fixes oam updating to late for links awakening.
             const mask: u8 = if(mode_is_blocking and req.requestor == .cpu) 0x00 else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
