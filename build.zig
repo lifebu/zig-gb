@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "zig-gb",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src3/main.zig"),
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) void {
     const exe_unit_tests = b.addTest(.{
         .name = "test",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src3/test.zig"),
+            .root_source_file = b.path("src/test.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -78,8 +78,8 @@ pub fn build(b: *std.Build) void {
 
 fn buildShader(b: *std.Build) void {
     const tool_dir = "tools/sokol-shdc/";
-    const shaders_in ="src3/shaders/";
-    const shaders_out = "src3/shaders/";
+    const shaders_in ="src/shaders/";
+    const shaders_out = "src/shaders/";
     const shaders = .{
         "gb.glsl",
     };
