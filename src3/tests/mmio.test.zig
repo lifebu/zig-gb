@@ -3,7 +3,6 @@ const std = @import("std");
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
 const MMIO = @import("../mmio.zig");
-const mem_map = @import("../mem_map.zig");
 
 pub fn runInputTests() !void {
     var mmio: MMIO = .{};
@@ -138,7 +137,7 @@ pub fn runInputTests() !void {
         if(i == 0) { // Change value to attach debugger.
             var val: u32 = 0; val += 1;
         }
-        var request: def.Request = .{ .address = mem_map.joypad, .value = .{ .write = testCase.write } };
+        var request: def.Request = .{ .address = def.joypad, .value = .{ .write = testCase.write } };
         _ = mmio.updateInputState(&testCase.input);
         mmio.request(&request);
         std.testing.expectEqual(testCase.expected, mmio.joypad) catch |err| {
@@ -149,7 +148,7 @@ pub fn runInputTests() !void {
 
     // Lower nibble is read-only to cpu.
     mmio.joypad = 0b1111_1111;
-    var request: def.Request = .{ .address = mem_map.joypad, .value = .{ .write = 0b1111_0000 } };
+    var request: def.Request = .{ .address = def.joypad, .value = .{ .write = 0b1111_0000 } };
     mmio.request(&request);
     std.testing.expectEqual(0b1111_1111, mmio.joypad) catch |err| {
         std.debug.print("Failed {d}: {s}\n", .{ testCases.len, "Lower nibble is ready-only to cpu" });
@@ -180,7 +179,7 @@ pub fn runDividerTests() !void {
     var mmio: MMIO = .{};
     var irq_timer: bool = false;
 
-    var request: def.Request = .{ .address = mem_map.divider, .value = .{ .write = 255 } };
+    var request: def.Request = .{ .address = def.divider, .value = .{ .write = 255 } };
     mmio.request(&request);
     _ = mmio.cycle();
     std.testing.expectEqual(0, mmio.divider) catch |err| {
@@ -282,7 +281,7 @@ pub fn runTimerTest() !void {
     for(0..256) |_| {
         _, irq_timer = mmio.cycle();
     }
-    var request: def.Request = .{ .address = mem_map.timer, .value = .{ .write = 0x10 } };
+    var request: def.Request = .{ .address = def.timer, .value = .{ .write = 0x10 } };
     mmio.request(&request);
     for(0..4) |_| {
         _, irq_timer = mmio.cycle();
@@ -304,7 +303,7 @@ pub fn runTimerTest() !void {
     for(0..(256 + 3)) |_| {
         _, irq_timer = mmio.cycle();
     }
-    request = .{ .address = mem_map.timer, .value = .{ .write = 0x33 } };
+    request = .{ .address = def.timer, .value = .{ .write = 0x33 } };
     mmio.request(&request);
     _, irq_timer = mmio.cycle();
     std.testing.expectEqual(0x05, mmio.timer) catch |err| {
@@ -320,7 +319,7 @@ pub fn runTimerTest() !void {
     for(0..(256 + 3)) |_| {
         _, irq_timer = mmio.cycle();
     }
-    request = .{ .address = mem_map.timer_mod, .value = .{ .write = 0x22 } };
+    request = .{ .address = def.timer_mod, .value = .{ .write = 0x22 } };
     mmio.request(&request);
     _, irq_timer = mmio.cycle();
     std.testing.expectEqual(0x22, mmio.timer) catch |err| {

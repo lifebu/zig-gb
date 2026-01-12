@@ -3,7 +3,6 @@ const std = @import("std");
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
-const mem_map = @import("../mem_map.zig");
 
 pub fn fetchInstruction(cpu: *CPU, memory: *std.AutoHashMap(u16, u8)) !void {
     cpu.uop_fifo.clear();

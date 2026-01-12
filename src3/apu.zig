@@ -7,7 +7,6 @@
 const std = @import("std");
 
 const def = @import("defines.zig");
-const mem_map = @import("mem_map.zig");
 
 const Self = @This();
 
@@ -31,7 +30,7 @@ const wave_duty_table: [4][8]u1 = .{
 const lfsr_divisor_table: [8]u24 = .{ 8, 16, 32, 48, 64, 80, 16, 112 };
 // TODO: Would be neat to have this debug feature user facing.
 const channel_dbg_enable: [apu_channels]bool = .{ true, true, true, true };
-const ch3_wave_table_size = mem_map.wave_high - mem_map.wave_low;
+const ch3_wave_table_size = def.wave_high - def.wave_low;
 
 // general
 pub const Control = packed struct(u8) {
@@ -164,19 +163,19 @@ pub fn init(self: *Self) void {
 
 pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
-        mem_map.sound_panning => { req.apply(&self.panning); },
-        mem_map.master_volume => { req.apply(&self.volume); },
-        mem_map.sound_control => { req.applyAllowedRW(&self.control, 0x8F, 0x80);
+        def.sound_panning => { req.apply(&self.panning); },
+        def.master_volume => { req.apply(&self.volume); },
+        def.sound_control => { req.applyAllowedRW(&self.control, 0x8F, 0x80);
             // TODO: Turning of apu leads to:
             // all APU registers are cleared but read-only, except sound_control.
             // Wave RAM can still be written to.
             self.apu_on = self.control.enable_apu;
         },
-        mem_map.ch1_sweep => { req.applyAllowedRW(&self.ch1_sweep, 0x7F, 0xFF); },
-        mem_map.ch1_length => { req.applyAllowedRW(&self.ch1_length, 0xC0, 0xFF); },
-        mem_map.ch1_volume => { req.apply(&self.ch1_volume); },
-        mem_map.ch1_low_period => { req.applyAllowedRW(&self.ch1_period_low, 0x00, 0xFF); },
-        mem_map.ch1_high_period => { req.applyAllowedRW(&self.ch1_period_high, 0x40, 0xC7 );
+        def.ch1_sweep => { req.applyAllowedRW(&self.ch1_sweep, 0x7F, 0xFF); },
+        def.ch1_length => { req.applyAllowedRW(&self.ch1_length, 0xC0, 0xFF); },
+        def.ch1_volume => { req.apply(&self.ch1_volume); },
+        def.ch1_low_period => { req.applyAllowedRW(&self.ch1_period_low, 0x00, 0xFF); },
+        def.ch1_high_period => { req.applyAllowedRW(&self.ch1_period_high, 0x40, 0xC7 );
             if(req.isWrite()) {
                 if(self.ch1_period_high.trigger) {
                     const period: u11 = self.ch1_period_low.period | @as(u11, self.ch1_period_high.period) << 8;
@@ -200,10 +199,10 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.ch2_length => { req.applyAllowedRW(&self.ch2_length, 0xC0, 0xFF); },
-        mem_map.ch2_volume => { req.apply(&self.ch2_volume); },
-        mem_map.ch2_low_period => { req.applyAllowedRW(&self.ch2_period_low, 0x00, 0xFF); },
-        mem_map.ch2_high_period => { req.applyAllowedRW(&self.ch2_period_high, 0x40, 0xC7);
+        def.ch2_length => { req.applyAllowedRW(&self.ch2_length, 0xC0, 0xFF); },
+        def.ch2_volume => { req.apply(&self.ch2_volume); },
+        def.ch2_low_period => { req.applyAllowedRW(&self.ch2_period_low, 0x00, 0xFF); },
+        def.ch2_high_period => { req.applyAllowedRW(&self.ch2_period_high, 0x40, 0xC7);
             if(req.isWrite()) {
                 if(self.ch2_period_high.trigger) {
                     const period: u11 = self.ch2_period_low.period | @as(u11, self.ch2_period_high.period) << 8;
@@ -220,10 +219,10 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.ch3_length => { req.applyAllowedRW(&self.ch3_length, 0x00, 0xFF); },
-        mem_map.ch3_volume => { req.applyAllowedRW(&self.ch3_volume, 0x60, 0x60); },
-        mem_map.ch3_low_period => { req.applyAllowedRW(&self.ch3_period_low, 0x00, 0xFF); },
-        mem_map.ch3_dac => { req.applyAllowedRW(&self.ch3_dac, 0x80, 0x80);
+        def.ch3_length => { req.applyAllowedRW(&self.ch3_length, 0x00, 0xFF); },
+        def.ch3_volume => { req.applyAllowedRW(&self.ch3_volume, 0x60, 0x60); },
+        def.ch3_low_period => { req.applyAllowedRW(&self.ch3_period_low, 0x00, 0xFF); },
+        def.ch3_dac => { req.applyAllowedRW(&self.ch3_dac, 0x80, 0x80);
             if(req.isWrite()) {
                 if(!self.ch3_dac.dac_on and self.channels_on[2]) {
                     self.channels_on[2] = false;
@@ -231,7 +230,7 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.ch3_high_period => { req.applyAllowedRW(&self.ch3_period_high, 0x40, 0xC7);
+        def.ch3_high_period => { req.applyAllowedRW(&self.ch3_period_high, 0x40, 0xC7);
             if(req.isWrite()) {
                 if(self.ch3_period_high.trigger) {
                     const period: u11 = self.ch3_period_low.period | @as(u11, self.ch3_period_high.period) << 8;
@@ -246,14 +245,14 @@ pub fn request(self: *Self, req: *def.Request) void {
                 }
             }
         },
-        mem_map.wave_low...(mem_map.wave_high - 1) => {
-            const wave_idx: u16 = req.address - mem_map.wave_low;
+        def.wave_low...(def.wave_high - 1) => {
+            const wave_idx: u16 = req.address - def.wave_low;
             req.apply(&self.ch3_wave_table[wave_idx]);
         },
-        mem_map.ch4_length => { req.applyAllowedRW(&self.ch4_length, 0x00, 0x3F); },
-        mem_map.ch4_volume => { req.apply(&self.ch4_volume); },
-        mem_map.ch4_freq => { req.apply(&self.ch4_freq); },
-        mem_map.ch4_control => { req.applyAllowedRW(&self.ch4_control, 0x40, 0xC0);
+        def.ch4_length => { req.applyAllowedRW(&self.ch4_length, 0x00, 0x3F); },
+        def.ch4_volume => { req.apply(&self.ch4_volume); },
+        def.ch4_freq => { req.apply(&self.ch4_freq); },
+        def.ch4_control => { req.applyAllowedRW(&self.ch4_control, 0x40, 0xC0);
             if(req.isWrite()) {
                 if(self.ch4_control.trigger) {
                     const divisor = lfsr_divisor_table[self.ch4_freq.divider];

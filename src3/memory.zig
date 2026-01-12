@@ -3,12 +3,11 @@ const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
-const mem_map = @import("mem_map.zig");
 
 const Self = @This();
 
 const dmg_rom: *const[def.boot_rom_size:0]u8 = @embedFile("bootroms/dmg_boot.bin");
-const work_ram_size = mem_map.wram_high - mem_map.wram_low;
+const work_ram_size = def.wram_high - def.wram_low;
 
 pub const BootRom = packed struct(u8) {
     finished: bool = false, _: u7 = 0,
@@ -77,7 +76,7 @@ fn cycleDMA(self: *Self, req: *def.Request) void {
 }
 
 fn dmaBusConflict(req: *def.Request) void {
-    if(req.address < mem_map.hram_low or req.address > (mem_map.hram_high) - 1) {
+    if(req.address < def.hram_low or req.address > (def.hram_high) - 1) {
         req.reject(); // DMA Bus conflict
     }
 }
@@ -90,29 +89,29 @@ pub fn request(self: *Self, req: *def.Request) void {
                 req.applyAllowedRW(&self.boot_rom[rom_idx], 0xFF, 0x00);
             }
         },
-        mem_map.wram_low...(mem_map.wram_high - 1) => {
-            const wram_idx: u16 = req.address - mem_map.wram_low;
+        def.wram_low...(def.wram_high - 1) => {
+            const wram_idx: u16 = req.address - def.wram_low;
             req.apply(&self.work_ram[wram_idx]);
         },
-        mem_map.echo_low...(mem_map.echo_high - 1) => {
-            const wram_idx: u16 = req.address - mem_map.echo_low;
+        def.echo_low...(def.echo_high - 1) => {
+            const wram_idx: u16 = req.address - def.echo_low;
             req.apply(&self.work_ram[wram_idx]);
         },
-        mem_map.dma => {
+        def.dma => {
             req.apply(&self.dma);
             if(req.isWrite()) {
                 self.src_addr = @as(u16, self.dma) << 8;
-                self.dest_addr = mem_map.oam_low;
-                self.dest_limit = mem_map.oam_high - 1;
+                self.dest_addr = def.oam_low;
+                self.dest_limit = def.oam_high - 1;
                 self.dma_fifo.write(&dma_start);
                 self.dma_fifo.write(&dma_step);
             }
         },
-        mem_map.boot_rom => {
+        def.boot_rom => {
             const mask_write: u8 = if(self.boot.finished) 0x00 else 0x01;
             req.applyAllowedRW(&self.boot, 0x01, mask_write);
         },
-        mem_map.unused_low...(mem_map.unused_high - 1) => {
+        def.unused_low...(def.unused_high - 1) => {
             req.reject();
         },
         else => {},

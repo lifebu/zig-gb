@@ -3,7 +3,6 @@ const std = @import("std");
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
 const APU = @import("../apu.zig");
-const mem_map = @import("../mem_map.zig");
 
 fn initWaveTable(apu: *APU, pattern: [32]u4) void {
     for(&apu.ch3_wave_table, 0..) |*wave, idx| {
@@ -24,7 +23,7 @@ pub fn runApuChannelTests() !void {
 
     // CH3: Channel status bit is updated.
     apu.init();
-    cpuWrite(&apu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
+    cpuWrite(&apu, def.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
         .period = 0, .length_on = false, .trigger = true,
     }));
     std.testing.expectEqual(true, apu.control.ch3_on) catch |err| {
@@ -54,22 +53,22 @@ pub fn runApuChannelTests() !void {
     };
     for(test_cases) |test_case| {
         apu.init();
-        cpuWrite(&apu, mem_map.sound_control, @bitCast(APU.Control{
+        cpuWrite(&apu, def.sound_control, @bitCast(APU.Control{
             .enable_apu = true, .ch1_on = false, .ch2_on = false, .ch3_on = false, .ch4_on = false,
         }));
-        cpuWrite(&apu, mem_map.ch3_dac, @bitCast(APU.Channel3Dac{
+        cpuWrite(&apu, def.ch3_dac, @bitCast(APU.Channel3Dac{
             .dac_on = test_case.dac,
         }));
-        cpuWrite(&apu, mem_map.ch3_length, @bitCast(APU.Channel3Length{
+        cpuWrite(&apu, def.ch3_length, @bitCast(APU.Channel3Length{
             .initial = 0,
         }));
-        cpuWrite(&apu, mem_map.ch3_volume, @bitCast(APU.Channel3Volume{
+        cpuWrite(&apu, def.ch3_volume, @bitCast(APU.Channel3Volume{
             .shift = test_case.volume,
         }));
-        cpuWrite(&apu, mem_map.ch3_low_period, @bitCast(APU.Channel3PeriodLow{
+        cpuWrite(&apu, def.ch3_low_period, @bitCast(APU.Channel3PeriodLow{
             .period = @truncate(test_case.period),
         }));
-        cpuWrite(&apu, mem_map.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
+        cpuWrite(&apu, def.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
             .period = @truncate(test_case.period >> 8), .length_on = false, .trigger = true,
         }));
 

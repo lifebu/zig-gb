@@ -3,7 +3,6 @@ const std = @import("std");
 
 const Cart = @import("../cart.zig");
 const def = @import("../defines.zig");
-const mem_map = @import("../mem_map.zig");
 
 pub fn runCartTests() !void {
     // TODO: Create tests by using a trace file with cpu writes to rom/ram and all rom/ram reads.

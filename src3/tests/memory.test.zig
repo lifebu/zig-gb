@@ -3,13 +3,12 @@ const std = @import("std");
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
 const Memory = @import("../memory.zig");
-const mem_map = @import("../mem_map.zig");
 
 pub fn runDMATest() !void {
     var memory: Memory = .{};
 
-    const start_addr: u16 = mem_map.wram_low;
-    const dest_addr: u16 = mem_map.oam_low;
+    const start_addr: u16 = def.wram_low;
+    const dest_addr: u16 = def.oam_low;
     var memory_block: [def.addr_space]u8 = @splat(0);
     for(start_addr..(start_addr + 160), 0..) |addr, i| {
         memory_block[addr] = @truncate(i);
@@ -17,7 +16,7 @@ pub fn runDMATest() !void {
     const start_write: u8 = @truncate(start_addr >> 8);
 
     // correct address calculation.
-    var req: def.Request = .{ .address = mem_map.dma, .value = .{ .write = start_write } };
+    var req: def.Request = .{ .address = def.dma, .value = .{ .write = start_write } };
     memory.request(&req);
     std.testing.expectEqual(false, memory.dma_fifo.isEmpty()) catch |err| {
         std.debug.print("Failed: DMA is triggered by a write request.\n", .{});
@@ -48,7 +47,7 @@ pub fn runDMATest() !void {
 
     // 2 cycle read, 2 cycle write. Includes DMA Bus conflict.
     for(0..160) |offset| {
-        req = .{ .address = mem_map.ch1_high, .value = .{ .write = 0x00 } };
+        req = .{ .address = def.ch1_high, .value = .{ .write = 0x00 } };
         memory.cycle(&req);
         std.testing.expectEqual(false, req.isValid()) catch |err| {
             std.debug.print("Failed: DMA rejects cpu reads/writes outside of HRAM (Bus conflict) {}.\n", .{ offset });
@@ -68,7 +67,7 @@ pub fn runDMATest() !void {
         req.apply(&memory_block[target_addr]);
 
 
-        req = .{ .address = mem_map.hram_low, .value = .{ .write = 0x00 } };
+        req = .{ .address = def.hram_low, .value = .{ .write = 0x00 } };
         memory.cycle(&req);
         std.testing.expectEqual(true, req.isValid()) catch |err| {
             std.debug.print("Failed: DMA allows cpu reads/writes inside of HRAM (Bus conflict) {}.\n", .{ offset });
@@ -76,7 +75,7 @@ pub fn runDMATest() !void {
         };
         req = .{ .address = 0xFFF, .value = .{ .write = 0x00 } };
         memory.cycle(&req);
-        std.testing.expectEqual(mem_map.oam_low + offset, req.address) catch |err| {
+        std.testing.expectEqual(def.oam_low + offset, req.address) catch |err| {
             std.debug.print("Failed: DMA requests a write for offset {}.\n", .{ offset });
             return err;
         };

@@ -4,7 +4,6 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const PPU = @import("../ppu.zig");
 const Memory = @import("../memory.zig");
-const mem_map = @import("../mem_map.zig");
 
 pub fn runInterruptTests() !void {
     // TODO: just let the ppu run for a frame + buffer and check the order of interrupts we get.
@@ -68,19 +67,19 @@ pub fn runInterruptTests() !void {
     };
 
     // Interrupt request: STAT: STAT Blocking.
-    memory.memory[mem_map.interrupt_flag] = 0x00;
+    memory.memory[def.interrupt_flag] = 0x00;
     ppu.lcd_stat = .{ .mode_0_select = true, .mode_2_select = true }; // HBlank, OAMScan
     // ppu.lyCounter = 0;
     ppu.lcd_y = 0;
-    while(memory.memory[mem_map.interrupt_flag] == 0) { // Go until we have an HBlank interrupt.
+    while(memory.memory[def.interrupt_flag] == 0) { // Go until we have an HBlank interrupt.
         irq_vblank, irq_stat = ppu.cycle(&memory.memory);
     }
     // We now got a HBlank stat interrupt, clear it and try to get an OAMScan Stat interrupt.
-    memory.memory[mem_map.interrupt_flag] = 0x00;
+    memory.memory[def.interrupt_flag] = 0x00;
     while(ppu.lcd_y == 0) { // Go until we are on the second line
         irq_vblank, irq_stat = ppu.cycle(&memory.memory);
     }
-    std.testing.expectEqual(0b0000_0000, memory.memory[mem_map.interrupt_flag]) catch |err| {
+    std.testing.expectEqual(0b0000_0000, memory.memory[def.interrupt_flag]) catch |err| {
         std.debug.print("Failed: STAT interrupts are blocked for consecutive STAT sources.\n", .{});
         return err;
     };

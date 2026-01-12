@@ -3,7 +3,6 @@ const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
-const mem_map = @import("mem_map.zig");
 
 const Self = @This();
 
@@ -11,7 +10,7 @@ const Self = @This();
 // I can reach this when I changed ei and interrupt decoding!
 // TODO: This wastes a lost of memory, as the pseudo bank all have to pay the size of the largest.
 const longest_instruction_cycles = 24 + 20; // CALL + InterruptHandler
-const hram_size = mem_map.hram_high - mem_map.hram_low;
+const hram_size = def.hram_high - def.hram_low;
 
 // TODO: Think about how we split this file into multiple files.
 // I think having a defines.zig + instruction_set.zig would be best.
@@ -1133,14 +1132,14 @@ pub fn cycle(self: *Self, req: *def.Request) void {
 
 pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
-        mem_map.hram_low...(mem_map.hram_high - 1) => {
-            const hram_idx: u16 = req.address - mem_map.hram_low;
+        def.hram_low...(def.hram_high - 1) => {
+            const hram_idx: u16 = req.address - def.hram_low;
             req.apply(&self.hram[hram_idx]);
         },
-        mem_map.interrupt_enable => {
+        def.interrupt_enable => {
             req.applyAllowedRW(&self.interrupt_enable, 0x1F, 0x1F);
         },
-        mem_map.interrupt_flag => {
+        def.interrupt_flag => {
             req.applyAllowedRW(&self.interrupt_flag, 0x1F, 0x1F);
         },
         else => {},

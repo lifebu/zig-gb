@@ -1,7 +1,6 @@
 const std = @import("std");
 
 const def = @import("defines.zig");
-const mem_map = @import("mem_map.zig");
 
 const Self = @This();
 
@@ -92,36 +91,36 @@ fn cycleTimer(self: *Self) bool {
 
 pub fn request(self: *Self, req: *def.Request) void {
     switch (req.address) {
-        mem_map.joypad => {
+        def.joypad => {
             req.applyAllowedRW(&self.joypad, 0xCF, 0x30);
             if(req.isWrite()) {
                 self.joypad = createJoypad(self);
             }
         },
-        mem_map.serial_control => {
+        def.serial_control => {
             // Note: masks changes on gbc to 0x83
             req.applyAllowedRW(&self.serial_control, 0x81, 0x81);
         },
-        mem_map.serial_data => {
+        def.serial_data => {
             req.apply(&self.serial_data);
         },
-        mem_map.divider => {
+        def.divider => {
             req.apply(&self.divider);
             if(req.isWrite()) {
                 self.system_counter = 0;
                 self.divider = 0;
             }
         },
-        mem_map.timer => {
+        def.timer => {
             if(req.isWrite() and self.overflow_tick > 0) {
                 self.overflow_detected = false;
             }
             req.apply(&self.timer);
         },
-        mem_map.timer_control => {
+        def.timer_control => {
             req.applyAllowedRW(&self.timer_control, 0x07, 0x07);
         },
-        mem_map.timer_mod => {
+        def.timer_mod => {
             req.apply(&self.timer_mod);
         },
         else => {},

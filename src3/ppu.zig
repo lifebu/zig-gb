@@ -3,11 +3,10 @@ const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
-const mem_map = @import("mem_map.zig");
 
 const Self = @This();
 
-const vram_size = mem_map.vram_high - mem_map.vram_low;
+const vram_size = def.vram_high - def.vram_low;
 
 const tile_size_x = 8;
 const tile_size_y = 8;
@@ -263,7 +262,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
         .fetch_high_obj => {
             self.fetcher_data.second_bitplane = memory[self.fetcher_data.tile_addr];
 
-            var pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, mem_map.obj_palettes_dmg);
+            var pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, def.obj_palettes_dmg);
             inline for(0..pixels.len) |i| {
                 const current_pixel: FifoData = self.object_fifo.readItem() orelse transparent_pixel;
                 pixels[i] = if(current_pixel.color_id == color_id_transparent) pixels[i] else current_pixel;
@@ -300,7 +299,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             const obj_tile_index: u8 = current_object.obj_tile_index - obj_tile_index_offset;
             const obj_height_tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
             const tile_addr_offset: u16 = obj_tile_index + obj_height_tile_offset;
-            const tile_addr: u16 = mem_map.tile_8000 + tile_addr_offset * tile_size_byte;
+            const tile_addr: u16 = def.tile_8000 + tile_addr_offset * tile_size_byte;
             const tile_line_addr: u16 = tile_addr + ((current_object.obj_tile_row % tile_size_y) * def.byte_per_line);
             self.fetcher_data.tile_addr = tile_line_addr;
         },
@@ -360,7 +359,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
 
 pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void {
     switch(req.address) {
-        mem_map.lcd_control => {
+        def.lcd_control => {
             const lcd_was_off: bool = !self.lcd_control.lcd_enable;
             req.apply(&self.lcd_control);
             if(req.isWrite()) {
@@ -377,28 +376,28 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
                 }
             }
         },
-        mem_map.lcd_stat => {
+        def.lcd_stat => {
             req.applyAllowedRW(&self.lcd_stat, 0xFF, 0xF8);
         },
-        mem_map.lcd_y => {
+        def.lcd_y => {
             req.applyAllowedRW(&self.lcd_y, 0xFF, 0x00);
         },
-        mem_map.lcd_y_compare => {
+        def.lcd_y_compare => {
             req.apply(&self.lcd_y_compare);
         },
-        mem_map.scroll_x => {
+        def.scroll_x => {
             req.apply(&self.scroll_x);
         },
-        mem_map.scroll_y => {
+        def.scroll_y => {
             req.apply(&self.scroll_y);
         },
-        mem_map.window_x => {
+        def.window_x => {
             req.apply(&self.window_x);
         },
-        mem_map.window_y => {
+        def.window_y => {
             req.apply(&self.window_y);
         },
-        mem_map.oam_low...(mem_map.oam_high - 1) => {
+        def.oam_low...(def.oam_high - 1) => {
             const mode_is_blocking: bool = self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw;
             // TODO: During DMA transfer the PPU must read 0xFF during oam_scan and draw. DMA has higher prio access to oam.
             // TODO: if don't block DMA oam requests, the entire rendering breaks for castlevania and the game becomes unplayable.
@@ -407,24 +406,24 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             if(mask == 0x00) {
                 std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
-            const oam_idx: u16 = req.address - mem_map.oam_low;
+            const oam_idx: u16 = req.address - def.oam_low;
             req.applyAllowedRW(&self.oam[oam_idx], mask, mask);
         },
-        mem_map.vram_low...(mem_map.vram_high - 1) => {
+        def.vram_low...(def.vram_high - 1) => {
             const mask: u8 = if(self.lcd_stat.mode == .draw) 0x00 else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("VRAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
-            //const vram_idx: u16 = req.address - mem_map.vram_low;
+            //const vram_idx: u16 = req.address - def.vram_low;
             req.applyAllowedRW(&memory[req.address], mask, mask);
         },
-        mem_map.bg_palette => {
+        def.bg_palette => {
             req.apply(&memory[req.address]);
         },
-        mem_map.obj_palette_0 => {
+        def.obj_palette_0 => {
             req.apply(&memory[req.address]);
         },
-        mem_map.obj_palette_1 => {
+        def.obj_palette_1 => {
             req.apply(&memory[req.address]);
         },
         else => {},
@@ -499,7 +498,7 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoDa
 
 fn fetchPushBg(self: *Self, memory: *[def.addr_space]u8) void {
     if(self.background_fifo.isEmpty()) { // push succeeded
-        const pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, mem_map.bg_palette);
+        const pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, def.bg_palette);
         self.background_fifo.write(&pixels);
         self.uop_fifo.write(self.current_bg_window_uops);
     } else { // push failed 
@@ -526,13 +525,13 @@ fn getTileMapTileAddr(self: *Self, memory: *[def.addr_space]u8, tilemap_addr_typ
     const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
     assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
 
-    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) mem_map.tile_map_9800 else mem_map.tile_map_9C00;
+    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) def.tile_map_9800 else def.tile_map_9C00;
     const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
 
-    const tile_base_addr: u16 = if(self.lcd_control.bg_window_tile_data == .tile_8800) mem_map.tile_8800 else mem_map.tile_8000;
+    const tile_base_addr: u16 = if(self.lcd_control.bg_window_tile_data == .tile_8800) def.tile_8800 else def.tile_8000;
     const tile_y = self.lcd_y +% scroll_y;
 
-    const signed_mode: bool = tile_base_addr == mem_map.tile_8800;
+    const signed_mode: bool = tile_base_addr == def.tile_8800;
     const tile_index: u16 = memory[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
 

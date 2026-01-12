@@ -3,7 +3,6 @@ const std = @import("std");
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
-const mem_map = @import("../mem_map.zig");
 
 const cpu_helper = @import("cpu_helper.zig");
 
@@ -18,10 +17,10 @@ pub fn runInterruptTests() !void {
     defer cpu.deinit(alloc);
 
     // CPU can write to IF.
-    try memory.put(mem_map.wram_low, 0x77); // LD (HL), A
+    try memory.put(def.wram_low, 0x77); // LD (HL), A
     cpu.interrupt_flag.value = 0b0000_0000;
-    cpu.registers.r16.pc = mem_map.wram_low;
-    cpu.registers.r16.hl = mem_map.interrupt_flag;
+    cpu.registers.r16.pc = def.wram_low;
+    cpu.registers.r16.hl = def.interrupt_flag;
     cpu.registers.r8.a = 0x1F;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
@@ -31,9 +30,9 @@ pub fn runInterruptTests() !void {
     };
 
     // IME is reset by DI.
-    try memory.put(mem_map.wram_low, 0xF3); // DI
+    try memory.put(def.wram_low, 0xF3); // DI
     cpu.interrupt_master_enable = true;
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
@@ -42,10 +41,10 @@ pub fn runInterruptTests() !void {
     };
 
     // IME is set by RETI
-    try memory.put(mem_map.wram_low, 0xD9); // RETI
+    try memory.put(def.wram_low, 0xD9); // RETI
     cpu.interrupt_master_enable = false;
-    cpu.registers.r16.pc = mem_map.wram_low;
-    cpu.registers.r16.sp = mem_map.wram_high;
+    cpu.registers.r16.pc = def.wram_low;
+    cpu.registers.r16.sp = def.wram_high;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 4 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
@@ -54,9 +53,9 @@ pub fn runInterruptTests() !void {
     };
 
     // IME is set by EI
-    try memory.put(mem_map.wram_low, 0xFB); // EI
+    try memory.put(def.wram_low, 0xFB); // EI
     cpu.interrupt_master_enable = false;
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu.interrupt_master_enable) catch |err| {
@@ -65,12 +64,12 @@ pub fn runInterruptTests() !void {
     };
 
     // Effect of EI is delayed.
-    try memory.put(mem_map.wram_low, 0xFB); // EI
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
+    try memory.put(def.wram_low, 0xFB); // EI
+    try memory.put(def.wram_low + 1, 0x04); // INC B
     cpu.interrupt_flag.value = 0b0001_0000;
     cpu.interrupt_enable.value = 0xFF;
     cpu.interrupt_master_enable = false;
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x04)) catch |err| {
@@ -87,7 +86,7 @@ pub fn runInterruptTests() !void {
     cpu.interrupt_flag.value = 0b0001_0000;
     cpu.interrupt_enable.value = 0xFF;
     cpu.interrupt_master_enable = true;
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(false, cpu.interrupt_master_enable) catch |err| {
@@ -96,11 +95,11 @@ pub fn runInterruptTests() !void {
     };
 
     // Interrupts are executed immediately and not delayed
-    try memory.put(mem_map.wram_low, 0x04); // INC B
+    try memory.put(def.wram_low, 0x04); // INC B
     cpu.interrupt_flag.value = 0b0000_0000;
     cpu.interrupt_enable.value = 0xFF;
     cpu.interrupt_master_enable = true;
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 2);
     cpu.interrupt_flag.value = 0b0001_0000;
@@ -115,7 +114,7 @@ pub fn runInterruptTests() !void {
     cpu.interrupt_flag.value = 0b0001_0000;
     cpu.interrupt_enable.value = 0xFF;
     cpu.interrupt_master_enable = true;
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle);
     std.testing.expectEqual(true, cpu_helper.isFullInstructionLoaded(&cpu, CPU.opcode_bank_default, 0x04)) catch |err| {
@@ -124,24 +123,24 @@ pub fn runInterruptTests() !void {
     };
 
     // The pc of the next instruction is saved to the stack by the ISR.
-    try memory.put(mem_map.wram_low, 0x04); // INC B
-    try memory.put(mem_map.wram_low + 1, 0x04); // INC B
-    try memory.put(mem_map.wram_low + 2, 0x04); // INC B
-    try memory.put(mem_map.wram_low + 3, 0x04); // INC B
+    try memory.put(def.wram_low, 0x04); // INC B
+    try memory.put(def.wram_low + 1, 0x04); // INC B
+    try memory.put(def.wram_low + 2, 0x04); // INC B
+    try memory.put(def.wram_low + 3, 0x04); // INC B
     cpu.interrupt_flag.value = 0b0000_0000;
     cpu.interrupt_enable.value = 0xFF;
     cpu.interrupt_master_enable = true;
-    cpu.registers.r16.pc = mem_map.wram_low;
-    cpu.registers.r16.sp = mem_map.hram_high;
+    cpu.registers.r16.pc = def.wram_low;
+    cpu.registers.r16.sp = def.hram_high;
     try cpu_helper.fetchInstruction(&cpu, &memory);
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle); // execute: wram_low
     cpu.interrupt_flag.value = 0b0001_0000;
     try cpu_helper.executeCPUFor(&cpu, &memory, 1 * def.t_cycles_per_m_cycle); // execute: wram_low + 1 
     try cpu_helper.executeCPUFor(&cpu, &memory, 5 * def.t_cycles_per_m_cycle); // execute: ISR
-    const pch: u16 = cpu.hram[(mem_map.hram_high - 1) - mem_map.hram_low]; 
-    const pcl: u16 = cpu.hram[(mem_map.hram_high - 2) - mem_map.hram_low]; 
+    const pch: u16 = cpu.hram[(def.hram_high - 1) - def.hram_low]; 
+    const pcl: u16 = cpu.hram[(def.hram_high - 2) - def.hram_low]; 
     const written_pc: u16 = pch << 8 | pcl;
-    const expected_pc: u16 = mem_map.wram_low + 2;
+    const expected_pc: u16 = def.wram_low + 2;
     std.testing.expectEqual(expected_pc, written_pc) catch |err| {
         std.debug.print("Failed: The pc of the next instruction is saved to the stack by the ISR..\n", .{});
         return err;
@@ -161,7 +160,7 @@ pub fn runInterruptTests() !void {
         .{ .name = "VBlank interrupt target: 0x40", .interupt_flag = 0b0000_0001, .expected_pc = 0x40 },
     };
     for(interruptTargetTests, 0..) |test_case, i| {
-        cpu.registers.r16.pc = mem_map.wram_low;
+        cpu.registers.r16.pc = def.wram_low;
         cpu.interrupt_flag.value = test_case.interupt_flag;
         cpu.interrupt_enable.value = 0xFF;
         cpu.interrupt_master_enable = true;

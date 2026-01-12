@@ -1,7 +1,8 @@
 # Next:
-- Move implementations into subfolder in src3.
+
 - Remove old src and rename src3 to src
     - This also means some cleanup in build.zig
+
 - Cart: implement and test (mooneye) mbc 1,2,5:
     - rom banks, highest rom bit, ram banks, mbc1 bank mode.
 - PPU: Check OAM Timing:
@@ -78,7 +79,38 @@
 - We should never let the audio device starve out of samples (how to detect that?)
 - We also should never waste any samples (i.e, the platform sound buffer is already full).
 
+
 # Soon:
+
+## Move implementations into subfolder in src3.
+- When I do this also try to use correct build modules and their corresponding tests.
+- This makes the test includes simpler!
+- How do other projects do this? flooh-chipz? Sameboy?
+- Folder structure:
+    main.zig
+    test.zig
+        platform/
+            shaders/
+            test/
+            config.zig
+            imgui.zig
+            platform.zig
+        core/
+            boot/
+            test/
+            apu.zig
+            cart.zig
+            core.zig
+            cpu.zig
+            defines.zig
+            memory.zig
+            mmio.zig
+            ppu.zig
+            ppu_void.zig
+        test/
+        util/
+            fifo.zig
+
 - Try to get a version of the emulator running in a browser via github.io? (or other website).
 - PPU Missing bg_window_enable for backgrounds.
 - Need to check why most games just dont work at all.

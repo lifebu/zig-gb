@@ -4,7 +4,6 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const APU = @import("../apu.zig");
 const Platform = @import("../platform.zig");
-const mem_map = @import("../mem_map.zig");
 
 const sokol = @import("sokol");
 

@@ -6,7 +6,6 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const def = @import("defines.zig");
-const mem_map = @import("mem_map.zig");
 
 const Self = @This();
 
@@ -110,7 +109,7 @@ pub fn cycle(self: *Self, _: *[def.addr_space]u8) struct{ bool, bool } {
 
 pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void {
     switch(req.address) {
-        mem_map.lcd_control => {
+        def.lcd_control => {
             req.apply(&self.lcd_control);
             if(req.isWrite()) {
                 if(!self.lcd_control.lcd_enable) {
@@ -119,48 +118,48 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
                 }
             }
         },
-        mem_map.lcd_stat => {
+        def.lcd_stat => {
             req.applyAllowedRW(&self.lcd_stat, 0xFF, 0xF8);
         },
-        mem_map.lcd_y => {
+        def.lcd_y => {
             req.applyAllowedRW(&self.lcd_y, 0xFF, 0x00);
         },
-        mem_map.lcd_y_compare => {
+        def.lcd_y_compare => {
             req.apply(&self.lcd_y_compare);
         },
-        mem_map.scroll_x => {
+        def.scroll_x => {
             req.apply(&memory[req.address]);
         },
-        mem_map.scroll_y => {
+        def.scroll_y => {
             req.apply(&memory[req.address]);
         },
-        mem_map.window_x => {
+        def.window_x => {
             req.apply(&memory[req.address]);
         },
-        mem_map.window_y => {
+        def.window_y => {
             req.apply(&memory[req.address]);
         },
-        mem_map.oam_low...(mem_map.oam_high - 1) => {
+        def.oam_low...(def.oam_high - 1) => {
             const mask: u8 = if(self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw) 0x00 else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
             req.applyAllowedRW(&memory[req.address], mask, mask);
         },
-        mem_map.vram_low...(mem_map.vram_high - 1) => {
+        def.vram_low...(def.vram_high - 1) => {
             const mask: u8 = if(self.lcd_stat.mode == .draw) 0x00 else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("VRAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
             req.applyAllowedRW(&memory[req.address], mask, mask);
         },
-        mem_map.bg_palette => {
+        def.bg_palette => {
             req.apply(&memory[req.address]);
         },
-        mem_map.obj_palette_0 => {
+        def.obj_palette_0 => {
             req.apply(&memory[req.address]);
         },
-        mem_map.obj_palette_1 => {
+        def.obj_palette_1 => {
             req.apply(&memory[req.address]);
         },
         else => {},

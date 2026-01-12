@@ -3,16 +3,15 @@ const std = @import("std");
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
-const mem_map = @import("../mem_map.zig");
 
 const cpu_helper = @import("cpu_helper.zig");
 
 pub fn init(cpu: *CPU, memory: *std.AutoHashMap(u16, u8), wram: []const u8) !void {
     memory.clearRetainingCapacity();
     for (wram, 0..) |value, idx| {
-        try memory.put(@intCast(mem_map.wram_low + idx), value);
+        try memory.put(@intCast(def.wram_low + idx), value);
     }
-    cpu.registers.r16.pc = mem_map.wram_low;
+    cpu.registers.r16.pc = def.wram_low;
     cpu.halt_again = false;
 }
 
