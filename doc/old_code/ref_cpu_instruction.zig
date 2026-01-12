@@ -1,3 +1,7 @@
+// This is some old code from the first version of the emulator.
+// Keeping this if I ever see a need to build a instruction-level cpu.
+// instruction-level: let the cpu run for one instruction and then the rest of the system catch up.
+
 const std = @import("std");
 
 const MemMap = @import("mem_map.zig");

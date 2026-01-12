@@ -1,30 +1,26 @@
 const std = @import("std");
 const builtin = @import("builtin");
-// TODO: https://github.com/Guigui220D/zig-sfml-wrapper has not been updated for 0.15, so removed for now.
-//const sfml = @import("sfml");
-
-const src_folder = "src3/";
 
 pub const CPUModel = enum { instruction, cycle };
 pub const PPUModel = enum { void, frame, cycle };
 pub const APUModel = enum { void, cycle };
 
 pub fn build(b: *std.Build) void {
-    // llvm backend required for vscode debug symbols.
-    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    // flags
+    // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
+    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
     const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.cycle;
     const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
     const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
 
     // exe
-    // TODO: Try to disable AVX-512, because Valgrind does not support it. Otherwise I need to run build with zig build -Dcpu=x86_64
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
     const exe = b.addExecutable(.{
         .name = "zig-gb",
         .root_module = b.createModule(.{
-            .root_source_file = b.path(src_folder ++ "main.zig"),
+            .root_source_file = b.path("src3/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -32,24 +28,12 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
+    // exe options
     const options = b.addOptions();
     options.addOption(CPUModel, "cpu_model", cpu_model);
     options.addOption(PPUModel, "ppu_model", ppu_model);
     options.addOption(APUModel, "apu_model", apu_model);
     exe.root_module.addOptions("build_options", options);
-
-
-    // TODO: Remove sfml once we moved completly to sokol.
-    if (std.mem.eql(u8, src_folder, "src/"))
-    {
-        // sfml
-        // const sfmlDep = b.dependency("sfml", .{}).module("sfml");
-        // exe.root_module.addImport("sfml", sfmlDep);
-
-        // sfmlDep.addIncludePath(b.path("csfml/include"));
-        // exe.addLibraryPath(b.path("csfml/lib/msvc"));
-        // sfml.link(exe);
-    }
 
     // sokol
     const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .with_sokol_imgui = true });
@@ -66,20 +50,18 @@ pub fn build(b: *std.Build) void {
     // run
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    if (b.args) |args| run_cmd.addArgs(args);
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
     // tests
     // TODO: Put this in it's own build script?
-    // TODO: Think about a beter test setup using modules.
+    // TODO: Think about a better test setup using modules.
     const exe_unit_tests = b.addTest(.{
         .name = "test",
         .root_module = b.createModule(.{
-            .root_source_file = b.path(src_folder ++ "test.zig"),
+            .root_source_file = b.path("src3/test.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -96,8 +78,8 @@ pub fn build(b: *std.Build) void {
 
 fn buildShader(b: *std.Build) void {
     const tool_dir = "tools/sokol-shdc/";
-    const shaders_in = src_folder ++ "shaders/";
-    const shaders_out = src_folder ++ "shaders/";
+    const shaders_in ="src3/shaders/";
+    const shaders_out = "src3/shaders/";
     const shaders = .{
         "gb.glsl",
     };
@@ -112,6 +94,7 @@ fn buildShader(b: *std.Build) void {
         std.log.warn("unsupported host platform, skipping shader compiler step", .{});
         return;
     }
+
     const sdhc_path = tool_dir ++ sdhc_platform.?;
     const sdhc_step = b.step("shaders", "Compile shaders using sokol-shdc");
     const shader_lang = "glsl430:metal_macos:hlsl5:glsl300es";

@@ -30,6 +30,16 @@
     - If there is you need to deallocate it first.
     - Also super annoying that I need to kill the rom path from the config so that it is not written to the file?
 
+## Clean up repository:
+- remove data/background.png
+- re-organize or remove unused docs.
+- remove ppu_static
+- How to get the test_data?
+    - SingleStepTests, blargg, other?
+    - I had to fix SingleStepTests so often, soooo keep?
+    - Use this as submodule? how about the binaries from this?
+        https://github.com/c-sp/game-boy-test-roms
+
 # Integrate Tracy Profiler!
 - the other zig emulator had tracy.
 - also zig itself uses tracy so I could check their integration as well.
@@ -190,6 +200,9 @@
 - Some of the data that I need to create with the uOps i could do with a memory arena scratch space (like the fetcher_data_low, fetcher_data_high).
 
 # Later:
+- Should I readd bgb mode (side by side)?
+    - spawn bgb with the same gb file and sleep for 500_000_000 nanoseconds.
+
 ## Modular subsystems implementations
 - PPU:
     - PPU_Frame: renders the entire scene once per frame (ported from src1).

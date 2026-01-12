@@ -1,9 +1,9 @@
+// This is some old code from the first version of the emulator.
+// Keeping this if I ever see a need to build a frame-level ppu.
+// frame-level: let the system run for one frame and the just draw the current state to create one output.
+
 const std = @import("std");
 const assert = std.debug.assert;
-
-const Def = @import("def.zig");
-const MemMap = @import("mem_map.zig");
-const MMU = @import("mmu.zig");
 
 const Self = @This();
 
@@ -105,129 +105,6 @@ lyCounter: u16 = 0,
 /// Last state of the STAT line. Used to simulate STAT Blocking.
 lastSTATLine: bool = false,
 pub const DOTS_PER_LINE: u16 = 456;
-
-pub fn onWrite(_: *Self, mmu: *MMU) void {
-    const write_record: MMU.WriteRecord = mmu.write_record orelse {
-        return;
-    };
-
-    switch(write_record.addr) {
-        MemMap.LCD_STAT => {
-            const lcd_stat: u8 = (write_record.val & 0xF8) | (write_record.old_val & 0x07);
-            mmu.write8_sys(MemMap.LCD_STAT, lcd_stat);
-        },
-        else => {
-            return;
-        }
-    }
-}
-
-
-pub fn step(self: *Self, mmu: *MMU, pixels: *[]Def.Color) void {
-    const lcdc: LCDC = @bitCast(mmu.read8_sys(MemMap.LCD_CONTROL));
-    if(!lcdc.lcd_enable) {
-        return;
-    }
-
-    self.updateState(mmu);
-
-    const lcd_stat: LCDStat = @bitCast(mmu.read8_sys(MemMap.LCD_STAT));
-    switch (lcd_stat.ppu_mode) {
-        .OAM_SCAN => {},
-        .DRAW => {
-            if(self.linePixelWait < 12) {
-                self.linePixelWait += 1;
-                return;
-            }
-
-            assert(self.currPixelX <= 160);
-            const lcdY: u8 = mmu.read8_sys(MemMap.LCD_Y);
-            self.drawPixel(mmu, self.currPixelX, lcdY, pixels);
-            self.currPixelX += 1;
-        },
-        .H_BLANK => {},
-        .V_BLANK => {},
-    }
-}
-
-fn updateState(self: *Self, mmu: *MMU) void {
-    var lcd_stat: LCDStat = @bitCast(mmu.read8_sys(MemMap.LCD_STAT));
-    var lcdY: u8 = mmu.read8_sys(MemMap.LCD_Y);
-
-    // Line counting
-    self.lyCounter += 1;
-    if(self.lyCounter >= DOTS_PER_LINE) {
-        self.lyCounter = 0;
-
-        lcdY += 1;
-        lcdY %= 154;
-        mmu.write8_sys(MemMap.LCD_Y, lcdY);
-
-        if(lcdY == 144) {
-            mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_VBLANK);
-        } 
-
-        const lyCompare = mmu.read8_sys(MemMap.LCD_Y_COMPARE);
-        lcd_stat.ly_is_lyc = lyCompare == lcdY;
-    }
-
-    var STATLine: bool = lcd_stat.lyc_select and lcd_stat.ly_is_lyc;
-
-    // Mode setting
-    const oldMode = lcd_stat.ppu_mode;
-    if(lcdY > 143) {
-        lcd_stat.ppu_mode = .V_BLANK;
-        STATLine = STATLine or lcd_stat.mode_1_select;
-    } else if (self.lyCounter <= 80) {
-        lcd_stat.ppu_mode = .OAM_SCAN;
-        STATLine = STATLine or lcd_stat.mode_2_select;
-    } else if (self.lyCounter > 80 and self.lyCounter <= 252) {
-        lcd_stat.ppu_mode = .DRAW;
-    } else if (self.lyCounter > 252) {
-        lcd_stat.ppu_mode = .H_BLANK;
-        STATLine = STATLine or lcd_stat.mode_0_select;
-        if(oldMode != lcd_stat.ppu_mode) {
-            self.objectsInCurrLine = 0;
-            self.currPixelX = 0;
-            self.linePixelWait = 0;
-        }
-    }
-
-    // TODO: If you disable the ppu, the permissions must be lifted!
-    switch(lcd_stat.ppu_mode) {
-        .OAM_SCAN => {
-            mmu.setPermission(.OAM);
-        },
-        .DRAW => {
-            mmu.setPermission(.VRAM);
-        },
-        .H_BLANK => {
-            mmu.clearPermission(.OAM);
-            mmu.clearPermission(.VRAM);
-        },
-        .V_BLANK => {
-        },
-    }
-
-    mmu.write8_sys(MemMap.LCD_STAT, @bitCast(lcd_stat));
-    
-    if(STATLine and !self.lastSTATLine) {
-        mmu.setFlag(MemMap.INTERRUPT_FLAG, MemMap.INTERRUPT_LCD);
-    }
-    self.lastSTATLine = STATLine;
-}
-
-fn getPalette(paletteByte: u8) [4]Def.Color {
-    //https://gbdev.io/pandocs/Palettes.html
-    const ColorID3: u8 = (paletteByte & (3 << 6)) >> 6;
-    const ColorID2: u8 = (paletteByte & (3 << 4)) >> 4;
-    const ColorID1: u8 = (paletteByte & (3 << 2)) >> 2;
-    const ColorID0: u8 = (paletteByte & (3 << 0)) >> 0;
-
-    return [4]Def.Color{ 
-        HARDWARE_COLORS[ColorID0], HARDWARE_COLORS[ColorID1], HARDWARE_COLORS[ColorID2], HARDWARE_COLORS[ColorID3]
-    };
-}
 
 fn drawPixel(_: *Self, mmu: *MMU, pixelX: u8, pixelY: u8, pixels: *[]Def.Color) void {
     const lcdc: LCDC = @bitCast(mmu.read8_sys(MemMap.LCD_CONTROL));
@@ -377,5 +254,3 @@ fn drawPixel(_: *Self, mmu: *MMU, pixelX: u8, pixelY: u8, pixels: *[]Def.Color) 
         }
     }
 }
-
-
