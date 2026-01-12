@@ -1,8 +1,4 @@
 # Next:
-
-- Remove old src and rename src3 to src
-    - This also means some cleanup in build.zig
-
 - Cart: implement and test (mooneye) mbc 1,2,5:
     - rom banks, highest rom bit, ram banks, mbc1 bank mode.
 - PPU: Check OAM Timing:
@@ -23,7 +19,6 @@
     - save as a .sav file.
 - APU: Try to pass the blargg apu tests.
 - PPU: Try to pass dmc Acid2!
-
 
 - Improve the string handling code for the rom and last_dir path.
     - It is super annoying that everywhere you want to overwrite the path you first have to make sure that there is not already a path.
