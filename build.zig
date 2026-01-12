@@ -15,6 +15,7 @@ pub fn build(b: *std.Build) void {
     const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.cycle;
     const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
     const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
+    const tracy_enabled = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
 
     // exe
     const exe = b.addExecutable(.{
@@ -33,6 +34,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(CPUModel, "cpu_model", cpu_model);
     options.addOption(PPUModel, "ppu_model", ppu_model);
     options.addOption(APUModel, "apu_model", apu_model);
+    options.addOption(bool, "tracy_enabled", tracy_enabled);
     exe.root_module.addOptions("build_options", options);
 
     // sokol
@@ -43,6 +45,15 @@ pub fn build(b: *std.Build) void {
     const cimgui = b.dependency("cimgui", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("cimgui", cimgui.module("cimgui"));
     sokol.artifact("sokol_clib").addIncludePath(cimgui.path("src"));
+
+    // tracy
+    const tracy = b.dependency("tracy", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("tracy", tracy.module("tracy"));
+    if(tracy_enabled) {
+        exe.root_module.addImport("tracy_impl", tracy.module("tracy_impl_enabled"));
+    } else {
+        exe.root_module.addImport("tracy_impl", tracy.module("tracy_impl_disabled"));
+    }
 
     // shader
     buildShader(b);

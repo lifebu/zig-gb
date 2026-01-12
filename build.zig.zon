@@ -13,6 +13,10 @@
             .url = "git+https://github.com/floooh/dcimgui.git#6c2c7f0452d9f44c95094c3f7dc2969c2c6a5e1a",
             .hash = "cimgui-0.1.0-44ClkQYjlQCl0iQX5wlquJ-mFZMqSxXA3hE2MG_3i1BT",
         },
+        .tracy = .{
+            .url = "git+https://codeberg.org/Games-by-Mason/tracy_zig.git#59fb0fcd87673c3e897c75371ccd63e7452807fd",
+            .hash = "tracy-0.0.0-R7l8BatJAQBbSjpfv7YHTyPK4AfRgyG0c--WxxFbL3S8",
+        },
     },
 
     .paths = .{

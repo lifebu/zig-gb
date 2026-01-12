@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const assert = std.debug.assert;
+const tracy = @import("tracy");
 
 const APU = @import("apu.zig");
 const Config = @import("config.zig");
@@ -55,6 +56,9 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: Config) void {
 
 // TODO: Should you be able to run the core for a set of cycles instead of an entire frame? Maybe for debug purposes? (Like rendering?)
 pub fn frame(self: *Self, input_state: def.InputState) void {
+    const zone = tracy.Zone.begin(.{ .name = "frame", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     var irq_joypad: bool = self.mmio.updateInputState(&input_state);
     // Note: GB runs at 59.73Hz. This software runs at 60Hz.
     // TODO: It would be better to just let the system run to the end of the next vblank. How to do that when the PPU is disabled?

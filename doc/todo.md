@@ -35,11 +35,6 @@
     - Use this as submodule? how about the binaries from this?
         https://github.com/c-sp/game-boy-test-roms
 
-# Integrate Tracy Profiler!
-- the other zig emulator had tracy.
-- also zig itself uses tracy so I could check their integration as well.
-- https://codeberg.org/Games-by-Mason/tracy_zig
-
 # Add a splash screen
 - documentation how to use a build step to generate the file:
     https://ziglang.org/learn/build-system/#embed-file
