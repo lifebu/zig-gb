@@ -4,6 +4,7 @@ const sokol = @import("sokol");
 
 const def = @import("defines.zig");
 const Config = @import("config.zig");
+const Fifo = @import("util/fifo.zig");
 const Imgui = @import("imgui.zig");
 const shader = @import("shaders/gb.glsl.zig");
 const shaderTypes = @import("shaders/shader_types.zig");
@@ -13,6 +14,10 @@ const Self = @This();
 
 // ui
 imgui: Imgui = .{},
+
+// time
+core_delta_buffer: Fifo.RingbufferFifo(f64, 60) = .{},
+user_delta_buffer: Fifo.RingbufferFifo(f64, 60) = .{},
 
 // gfx
 bind: sokol.gfx.Bindings = .{},
@@ -34,6 +39,9 @@ keybinds: def.Keybinds = .{},
 pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
     // ui
     self.imgui.init(config, imgui_cb);
+
+    // time
+    sokol.time.setup();
 
     // gfx
     const gfx_config = config.graphics;
@@ -135,7 +143,7 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: *Config) void {
     sokol.audio.shutdown();
 }
 
-pub fn frame(self: *Self, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo) void {
+pub fn frame(self: *Self, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo, core_delta_sample: ?u64) void {
     // ui
     sokol.imgui.newFrame(.{
         .width = sokol.app.width(),
@@ -145,10 +153,20 @@ pub fn frame(self: *Self, alloc: std.mem.Allocator, colorids: [def.overscan_reso
     });
     self.imgui.render(alloc);
 
+    // time
+    const core_delta: f64 = if(core_delta_sample) |value| sokol.time.sec(value) else 0.0166666;
+    self.core_delta_buffer.writeItemOverrideWhenFull(core_delta);
+    const smooth_core_delta: f64 = self.core_delta_buffer.average();
+
+    const user_delta: f64 = sokol.app.frameDuration();
+    self.user_delta_buffer.writeItemOverrideWhenFull(user_delta);
+    const smooth_user_delta: f64 = self.user_delta_buffer.average();
+
     // graphics
-    var window_title: [64]u8 = undefined;
-    const delta_ms: f64 = sokol.app.frameDuration();
-    const new_title = std.fmt.bufPrintZ(&window_title, "Zig GB Emulator. FPS: {d:.2}", .{1.0 / delta_ms}) catch unreachable;
+    var window_title: [128]u8 = undefined;
+    const new_title = std.fmt.bufPrintZ(&window_title, "Zig GB Emulator. FPS: user: {d:0>6.2}, core: {d:0>6.2}", .{
+        1.0 / smooth_user_delta, 1.0 / smooth_core_delta
+    }) catch unreachable;
     sokol.app.setWindowTitle(new_title);
 
     var img_data = sokol.gfx.ImageData{};

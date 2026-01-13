@@ -27,12 +27,18 @@ pub fn RingbufferFifo( comptime T: type, comptime capacity: usize) type {
             self.write_index = self.mask2(self.write_index + 1);
         }
 
-        /// Write single item. Will not write of the fifo is full.
+        /// Write single item. Will not write if the fifo is full.
         pub fn writeItemDiscardWhenFull(self: *Self, item: T) void {
             if(self.length() + 1 > self.buffer.len) {
                 return;
             }
 
+            self.buffer[self.mask(self.write_index)] = item;
+            self.write_index = self.mask2(self.write_index + 1);
+        }
+
+        // Write single item. Will overwrite the oldest element if full.
+        pub fn writeItemOverrideWhenFull(self: *Self, item: T) void {
             self.buffer[self.mask(self.write_index)] = item;
             self.write_index = self.mask2(self.write_index + 1);
         }
@@ -87,6 +93,15 @@ pub fn RingbufferFifo( comptime T: type, comptime capacity: usize) type {
             const wrap_offset = 2 * self.buffer.len * @intFromBool(self.write_index < self.read_index);
             const adjusted_write_index = self.write_index + wrap_offset;
             return adjusted_write_index - self.read_index;
+        }
+
+        // Returns the average value in the Fifo.
+        pub fn average(self: Self) T {
+            var sum: T = 0;
+            for(self.buffer) |elem| {
+                sum += elem;
+            }
+            return sum / self.buffer.len;
         }
 
         fn mask(self: Self, index: usize) usize {

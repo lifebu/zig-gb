@@ -78,10 +78,12 @@ fn imgui_cb(file_path: []const u8) void {
 
 export fn frame() void {
     if(state.core) |*loaded_core| {
+        const start: u64 = sokol.time.now();
         loaded_core.frame(state.platform.input_state);
-        state.platform.frame(state.alloc, loaded_core.ppu.colorIds, &loaded_core.apu.samples);
+        const core_delta: u64 = sokol.time.since(start);
+        state.platform.frame(state.alloc, loaded_core.ppu.colorIds, &loaded_core.apu.samples, core_delta);
     } else {
-        state.platform.frame(state.alloc, def.default_color_ids, null);
+        state.platform.frame(state.alloc, def.default_color_ids, null, null);
     }
 }
 
