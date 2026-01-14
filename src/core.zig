@@ -73,10 +73,10 @@ pub fn frame(self: *Self, input_state: def.InputState) void {
         self.cart.request(&request);
         self.mmio.request(&request);
         self.apu.request(&request);
-        self.ppu.request(&self.memory.memory, &request);
+        self.ppu.request(&request);
 
         const irq_serial, const irq_timer = self.mmio.cycle();
-        const irq_vblank, const irq_stat = self.ppu.cycle(&self.memory.memory);
+        const irq_vblank, const irq_stat = self.ppu.cycle();
         self.apu.cycle();
 
         self.cpu.pushInterrupts(irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad);

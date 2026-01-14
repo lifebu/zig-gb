@@ -100,12 +100,12 @@ const Object = packed struct {
 
 const FifoData = struct {
     color_id: u2,
-    palette_addr: u16,
+    palette_addr: []const u8,
     palette_index: u3, // CGB: 0-7, DMG: 0-1 
     obj_prio: u6, // CGB: OAM index, DMG: Unused
     bg_prio: ObjectPriority,
 };
-const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_addr = 0, .palette_index = 0 };
+const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_addr = &.{}, .palette_index = 0 };
 const BackgroundFifo = Fifo.RingbufferFifo(FifoData, tile_size_x);
 const ObjectFiFo = Fifo.RingbufferFifo(FifoData, tile_size_x);
 
@@ -169,6 +169,8 @@ window_x: u8 = 0,
 window_y: u8 = 0,
 
 vram: [vram_size]u8 = @splat(0),
+bg_palettes: [8]u8 = @splat(0), // DMG: one palette, CGB: 8 palettes
+obj_palettes: [8]u8 = @splat(0), // DMG: two palettes, CGB: 8 palettes
 
 current_bg_window_uops: []const MicroOp = undefined,
 uop_fifo: MicroOpFifo = .{}, 
@@ -194,8 +196,7 @@ pub fn init(self: *Self) void {
     self.* = .{};
 }
 
-// TODO: Remove dependency to the memory array.
-pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
+pub fn cycle(self: *Self) struct{ bool, bool } {
     var irq_stat: bool = false;
     var irq_vblank: bool = false;
 
@@ -253,7 +254,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
         .fetch_low_bg => {
             self.fetcher_data.first_bitplane = self.vram[self.fetcher_data.tile_addr];
             self.fetcher_data.tile_addr += 1;
-            tryPushPixel(self, memory);
+            tryPushPixel(self);
         },
         .fetch_low_obj => {
             self.fetcher_data.first_bitplane = self.vram[self.fetcher_data.tile_addr];
@@ -261,12 +262,12 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
         },
         .fetch_high_bg => {
             self.fetcher_data.second_bitplane = self.vram[self.fetcher_data.tile_addr];
-            fetchPushBg(self, memory);
+            fetchPushBg(self);
         },
         .fetch_high_obj => {
             self.fetcher_data.second_bitplane = self.vram[self.fetcher_data.tile_addr];
 
-            var pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, def.obj_palettes_dmg);
+            var pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, &self.obj_palettes);
             inline for(0..pixels.len) |i| {
                 const current_pixel: FifoData = self.object_fifo.readItem() orelse transparent_pixel;
                 pixels[i] = if(current_pixel.color_id == color_id_transparent) pixels[i] else current_pixel;
@@ -280,11 +281,11 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
                 checkLcdX(self);
             } else {
                 self.uop_fifo.write(self.current_bg_window_uops);
-                tryPushPixel(self, memory);
+                tryPushPixel(self);
             }
         },
         .fetch_push_bg => {
-            fetchPushBg(self, memory);
+            fetchPushBg(self);
         },
         .fetch_tile_bg => {
             const tilemap_addr_type: TileMapAddress = self.lcd_control.bg_map_area;
@@ -292,7 +293,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             self.fetcher_data = FetcherData{ 
                 .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, overscan_x_tile_offset, self.scroll_x, self.scroll_y),
             };
-            tryPushPixel(self, memory);
+            tryPushPixel(self);
         },
         .fetch_tile_obj => {
             const current_object: FetcherData = self.oam_line_list.readItem() orelse unreachable;
@@ -317,7 +318,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             self.fetcher_data = FetcherData{ 
                 .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
-            tryPushPixel(self, memory);
+            tryPushPixel(self);
         },
         .halt => {
             self.uop_fifo.writeItem(.halt);
@@ -325,7 +326,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
         .nop => {
         },
         .nop_draw => {
-            tryPushPixel(self, memory);
+            tryPushPixel(self);
         },
         .oam_check => {
             const object = Object.fromOAM(self, self.oam_scan_idx);
@@ -361,7 +362,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
     return .{ irq_vblank, irq_stat };
 }
 
-pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void {
+pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
         def.lcd_control => {
             const lcd_was_off: bool = !self.lcd_control.lcd_enable;
@@ -422,13 +423,13 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             req.applyAllowedRW(&self.vram[vram_idx], mask, mask);
         },
         def.bg_palette => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.bg_palettes[0]);
         },
         def.obj_palette_0 => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.obj_palettes[0]);
         },
         def.obj_palette_1 => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.obj_palettes[1]);
         },
         else => {},
     }
@@ -481,7 +482,7 @@ fn checkLcdX(self: *Self) void {
     }
 }
 
-fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoData {
+fn convert2bpp(fetcher_data: FetcherData, palette_addr: []const u8) [tile_size_x]FifoData {
     var first_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
     var second_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
 
@@ -500,15 +501,15 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: u16) [tile_size_x]FifoDa
     return result;
 }
 
-fn fetchPushBg(self: *Self, memory: *[def.addr_space]u8) void {
+fn fetchPushBg(self: *Self) void {
     if(self.background_fifo.isEmpty()) { // push succeeded
-        const pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, def.bg_palette);
+        const pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, &self.bg_palettes);
         self.background_fifo.write(&pixels);
         self.uop_fifo.write(self.current_bg_window_uops);
     } else { // push failed 
         self.uop_fifo.writeItem(.fetch_push_bg);
     }
-    tryPushPixel(self, memory);
+    tryPushPixel(self);
 }
 
 fn getPalette(paletteByte: u8) [def.color_depth]u2 {
@@ -562,7 +563,7 @@ fn nextObjectIsAtLcdX(self: *Self) bool {
     return object.obj_pos_x == self.lcd_overscan_x;
 }
 
-fn tryPushPixel(self: *Self, memory: *[def.addr_space]u8) void {
+fn tryPushPixel(self: *Self) void {
     if(self.background_fifo.isEmpty()) {
         return;
     }
@@ -573,8 +574,8 @@ fn tryPushPixel(self: *Self, memory: *[def.addr_space]u8) void {
     const bg_pixel: FifoData = self.background_fifo.readItem() orelse unreachable;
 
     const used_pixel: FifoData = mixBackgroundAndObject(bg_pixel, obj_pixel);
-    const palette_addr: u16 = used_pixel.palette_addr + used_pixel.palette_index;
-    const palette: [def.color_depth]u2 = getPalette(memory[palette_addr]);
+    const palette_packed: u8 = used_pixel.palette_addr[used_pixel.palette_index];
+    const palette: [def.color_depth]u2 = getPalette(palette_packed);
     const color_id: u2 = palette[used_pixel.color_id];
 
     const color_index: u16 = self.lcd_overscan_x + @as(u16, def.overscan_width) * self.lcd_y;

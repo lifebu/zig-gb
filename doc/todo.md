@@ -11,12 +11,6 @@
     => During DMA Transfer the PPU cannot access OAM and will read FF from OAM during that time.
     => Save the last requestor in the PPU. If it is DMA change what values we read from OAM.
 - PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
-- Savegames:
-    - only iff: a cart has ram + battery 
-    - savagames are just dumps of the cart ram.
-    - loading a rom: load a savegame.
-    - loading another rom or shutdown: create a savegame.
-    - save as a .sav file.
 - APU: Try to pass the blargg apu tests.
 - PPU: Try to pass dmc Acid2!
 
@@ -115,8 +109,6 @@
 - PPU Missing bg_window_enable for backgrounds.
 - Need to check why most games just dont work at all.
     - Some of them try to access illegal memory (metroid2) (0xFFEE).
-- Memory: see memory.md
-    - PPU: Palettes and VRAM.
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.
         - 1st: Check memory request.

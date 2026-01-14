@@ -31,10 +31,6 @@ byte: u8 = 0,
 
 dma: u8 = 0,
 
-// mmu
-// TODO: remove this giant memory block.
-memory: [def.addr_space]u8 = @splat(0),
-
 // wram
 work_ram: [work_ram_size]u8 = @splat(0),
 
