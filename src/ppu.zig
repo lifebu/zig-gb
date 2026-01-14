@@ -7,6 +7,10 @@ const Fifo = @import("util/fifo.zig");
 const Self = @This();
 
 const vram_size = def.vram_high - def.vram_low;
+const vram_tile_map_9800 = def.tile_map_9800 - def.vram_low;
+const vram_tile_map_9C00 = def.tile_map_9C00 - def.vram_low;
+const vram_tile_8000 = def.tile_8000 - def.vram_low;
+const vram_tile_8800 = def.tile_8800 - def.vram_low;
 
 const tile_size_x = 8;
 const tile_size_y = 8;
@@ -247,20 +251,20 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             advanceBlank(self, blank.len);
         },
         .fetch_low_bg => {
-            self.fetcher_data.first_bitplane = memory[self.fetcher_data.tile_addr];
+            self.fetcher_data.first_bitplane = self.vram[self.fetcher_data.tile_addr];
             self.fetcher_data.tile_addr += 1;
             tryPushPixel(self, memory);
         },
         .fetch_low_obj => {
-            self.fetcher_data.first_bitplane = memory[self.fetcher_data.tile_addr];
+            self.fetcher_data.first_bitplane = self.vram[self.fetcher_data.tile_addr];
             self.fetcher_data.tile_addr += 1;
         },
         .fetch_high_bg => {
-            self.fetcher_data.second_bitplane = memory[self.fetcher_data.tile_addr];
+            self.fetcher_data.second_bitplane = self.vram[self.fetcher_data.tile_addr];
             fetchPushBg(self, memory);
         },
         .fetch_high_obj => {
-            self.fetcher_data.second_bitplane = memory[self.fetcher_data.tile_addr];
+            self.fetcher_data.second_bitplane = self.vram[self.fetcher_data.tile_addr];
 
             var pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, def.obj_palettes_dmg);
             inline for(0..pixels.len) |i| {
@@ -286,7 +290,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             const tilemap_addr_type: TileMapAddress = self.lcd_control.bg_map_area;
             const overscan_x_tile_offset: u5 = tile_map_size_x - 1;
             self.fetcher_data = FetcherData{ 
-                .tile_addr = getTileMapTileAddr(self, memory, tilemap_addr_type, overscan_x_tile_offset, self.scroll_x, self.scroll_y),
+                .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, overscan_x_tile_offset, self.scroll_x, self.scroll_y),
             };
             tryPushPixel(self, memory);
         },
@@ -299,7 +303,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             const obj_tile_index: u8 = current_object.obj_tile_index - obj_tile_index_offset;
             const obj_height_tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
             const tile_addr_offset: u16 = obj_tile_index + obj_height_tile_offset;
-            const tile_addr: u16 = def.tile_8000 + tile_addr_offset * tile_size_byte;
+            const tile_addr: u16 = vram_tile_8000 + tile_addr_offset * tile_size_byte;
             const tile_line_addr: u16 = tile_addr + ((current_object.obj_tile_row % tile_size_y) * def.byte_per_line);
             self.fetcher_data.tile_addr = tile_line_addr;
         },
@@ -311,7 +315,7 @@ pub fn cycle(self: *Self, memory: *[def.addr_space]u8) struct{ bool, bool } {
             const scroll_x: u16 = tile_map_pixel_size_x - win_overscan_x; 
             const scroll_y: u16 = tile_map_pixel_size_y - win_y;
             self.fetcher_data = FetcherData{ 
-                .tile_addr = getTileMapTileAddr(self, memory, tilemap_addr_type, 0, scroll_x, scroll_y),
+                .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
             tryPushPixel(self, memory);
         },
@@ -414,8 +418,8 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             if(mask == 0x00) {
                 std.log.warn("VRAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
-            //const vram_idx: u16 = req.address - def.vram_low;
-            req.applyAllowedRW(&memory[req.address], mask, mask);
+            const vram_idx: u16 = req.address - def.vram_low;
+            req.applyAllowedRW(&self.vram[vram_idx], mask, mask);
         },
         def.bg_palette => {
             req.apply(&memory[req.address]);
@@ -516,7 +520,7 @@ fn getPalette(paletteByte: u8) [def.color_depth]u2 {
     return [def.color_depth]u2{ color_id0, color_id1, color_id2, color_id3 };
 }
 
-fn getTileMapTileAddr(self: *Self, memory: *[def.addr_space]u8, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
+fn getTileMapTileAddr(self: *Self, tilemap_addr_type: TileMapAddress, tile_x_offset: u5, scroll_x: u16, scroll_y: u16) u16 {
     const fifo_pixel_count: u3 = @intCast(self.background_fifo.length());
     const pixel_x: u16 = @as(u16, self.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
     const pixel_y: u16 = @as(u16, self.lcd_y) + scroll_y; 
@@ -525,14 +529,14 @@ fn getTileMapTileAddr(self: *Self, memory: *[def.addr_space]u8, tilemap_addr_typ
     const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
     assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
 
-    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) def.tile_map_9800 else def.tile_map_9C00;
+    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) vram_tile_map_9800 else vram_tile_map_9C00;
     const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
 
-    const tile_base_addr: u16 = if(self.lcd_control.bg_window_tile_data == .tile_8800) def.tile_8800 else def.tile_8000;
+    const tile_base_addr: u16 = if(self.lcd_control.bg_window_tile_data == .tile_8800) vram_tile_8800 else vram_tile_8000;
     const tile_y = self.lcd_y +% scroll_y;
 
-    const signed_mode: bool = tile_base_addr == def.tile_8800;
-    const tile_index: u16 = memory[tilemap_addr];
+    const signed_mode: bool = tile_base_addr == vram_tile_8800;
+    const tile_index: u16 = self.vram[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
 
     const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
