@@ -40,7 +40,6 @@ const TileMapAddress = enum(u1) {
     map_9C00,
 };
 const LcdControl = packed struct {
-    // TODO: Add support to disable background with this.
     bg_window_enable: bool = false,
     obj_enable: bool = false,
     obj_size: enum(u1) {
@@ -162,6 +161,7 @@ lcd_control: LcdControl = .{},
 lcd_stat: LcdStat = .{},
 lcd_y_compare: u8 = 0,
 lcd_y: u8 = 0, 
+last_stat_irq: bool = false,
 
 scroll_x: u8 = 0,
 scroll_y: u8 = 0,
@@ -252,7 +252,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             advanceBlank(self, blank.len);
         },
         .fetch_low_bg => {
-            self.fetcher_data.first_bitplane = self.vram[self.fetcher_data.tile_addr];
+            self.fetcher_data.first_bitplane = if(self.lcd_control.bg_window_enable) self.vram[self.fetcher_data.tile_addr] else 0;
             self.fetcher_data.tile_addr += 1;
             tryPushPixel(self);
         },
@@ -261,7 +261,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             self.fetcher_data.tile_addr += 1;
         },
         .fetch_high_bg => {
-            self.fetcher_data.second_bitplane = self.vram[self.fetcher_data.tile_addr];
+            self.fetcher_data.second_bitplane = if(self.lcd_control.bg_window_enable) self.vram[self.fetcher_data.tile_addr] else 0;
             fetchPushBg(self);
         },
         .fetch_high_obj => {
@@ -359,7 +359,11 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
     const lyc_stat: bool = self.lcd_stat.lyc_select and self.lcd_stat.ly_is_lyc;
     irq_stat |= lyc_stat;
 
-    return .{ irq_vblank, irq_stat };
+    // STAT blocking
+    const irq_result: bool = irq_stat and !self.last_stat_irq;
+    self.last_stat_irq = irq_stat;
+
+    return .{ irq_vblank, irq_result };
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
@@ -372,6 +376,7 @@ pub fn request(self: *Self, req: *def.Request) void {
                     self.lcd_stat.mode = .h_blank;
                     self.colorIds = @splat(0);
                     self.lcd_y = 0;
+                    self.last_stat_irq = false;
 
                     self.uop_fifo.clear();
                     self.background_fifo.clear();
@@ -474,7 +479,7 @@ fn checkLcdX(self: *Self) void {
         self.background_fifo.clear();
         self.line_penalty += self.scroll_x % 8;
     // Found Object
-    } else if((self.lcd_control.obj_enable or true) and has_next_object) {
+    } else if(self.lcd_control.obj_enable and has_next_object) {
         self.uop_fifo.clear();
         self.uop_fifo.write(&draw_object_tile);
         const fifo_length: i9 = @intCast(self.background_fifo.length()); 

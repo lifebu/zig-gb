@@ -106,9 +106,6 @@
             fifo.zig
 
 - Try to get a version of the emulator running in a browser via github.io? (or other website).
-- PPU Missing bg_window_enable for backgrounds.
-- Need to check why most games just dont work at all.
-    - Some of them try to access illegal memory (metroid2) (0xFFEE).
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.
         - 1st: Check memory request.
