@@ -153,8 +153,15 @@ pub fn request(self: *Self, req: *def.Request) void {
         // TODO: Write to savefile every time we disable the ram bank?
 
     } else if (isInRange(self.ranges.rom_bank, req.address) and req.isWrite()) {
+        // TODO: This truncation for each mbc gives further evidence that I should split this better?
+        const register_sized: u8 = switch(self.features.mapper) {
+            .mbc_1 => @as(u5, @truncate(req.value.write)),
+            .mbc_3 => @as(u7, @truncate(req.value.write)),
+            .mbc_5, .no_mbc => req.value.write,
+            .unsupported => unreachable,
+        };
         const mask: u9 = @intCast(self.rom_banks.len - 1);
-        self.rom_bank_high = @truncate(@max(self.ranges.min_bank, req.value.write) & mask);
+        self.rom_bank_high = @truncate(@max(self.ranges.min_bank, register_sized) & mask);
 
     } else if (isInRange(self.ranges.rom_bank_msb, req.address) and req.isWrite()) {
         self.rom_bank_highest_bit = @truncate(req.value.write);
@@ -162,17 +169,14 @@ pub fn request(self: *Self, req: *def.Request) void {
     } else if (isInRange(self.ranges.ram_bank, req.address) and req.isWrite()) {
         // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
         // Depending on what you write you can access different registers.
-        if(self.ram_banks.len == 0 or self.ram_banks.len == 1) {
-            return;
+        if(self.ram_banks.len > 1) {
+            const mask: u9 = @intCast(self.ram_banks.len - 1);
+            self.ram_bank = @truncate(req.value.write & mask);
         }
-        const mask: u9 = @intCast(self.ram_banks.len - 1);
-        self.ram_bank = @truncate(req.value.write & mask);
 
     } else if (isInRange(self.ranges.bank_mode, req.address) and req.isWrite()) {
-        // TODO: Implement banking mode for mbc_1.
+        // TODO: Implement banking mode for mbc_1 when alternative wiring is used.
         self.bank_mode = @truncate(req.value.write);
-        std.debug.print("MBC1 Bankmode not supported!\n", .{});
-        unreachable;
 
     } else if (isInRange(self.ranges.rtc, req.address) and req.isWrite()) {
         // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
@@ -200,7 +204,9 @@ pub fn request(self: *Self, req: *def.Request) void {
             }
             const allowed: u8 = if(self.ram_enable) 0xFF else 0x00;
             const ram_idx: u16 = req.address - def.cart_ram_low;
-            req.applyAllowedRW(&self.ram_banks[self.ram_bank][ram_idx], allowed, allowed);
+            const mbc1_bank_idx: u16 = if(self.bank_mode == 1) self.ram_bank else 0;
+            const bank_idx: u16 = if(self.features.mapper == .mbc_1) mbc1_bank_idx else self.ram_bank;
+            req.applyAllowedRW(&self.ram_banks[bank_idx][ram_idx], allowed, allowed);
         },
         else => {},
     }
@@ -255,6 +261,10 @@ pub fn loadFile(self: *Self, rom_path: []const u8, alloc: std.mem.Allocator) voi
         std.log.warn("Cart Header and Ram size do not match. Would be ignored by real gameboy.", .{});
     }
     assert(self.features.mapper != .unsupported);
+    if(self.features.mapper == .mbc_1 and rom.len >= (512 * 1024)) {
+        std.debug.print("MBC1 Rom with more than 512kByte is not supported (alternative wiring)\n", .{});
+        unreachable;
+    }
 
     // savegame
     const save_path: []const u8 = getSavePath(alloc, rom_path);
