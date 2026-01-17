@@ -10,7 +10,6 @@
     https://gbdev.io/pandocs/Accessing_VRAM_and_OAM.html
     => During DMA Transfer the PPU cannot access OAM and will read FF from OAM during that time.
     => Save the last requestor in the PPU. If it is DMA change what values we read from OAM.
-- PPU: When we enter HBlank. the line counter is advanced. It should happen when hblank ends.
 - APU: Try to pass the blargg apu tests.
 - PPU: Try to pass dmc Acid2!
 

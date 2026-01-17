@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const assert = std.debug.assert;
 const sokol = @import("sokol");
 
@@ -123,7 +124,7 @@ pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
     };
 
     // audio
-    self.volume = config.audio.volume;
+    self.volume = if (build_options.enable_audio) config.audio.volume else 0.0;
     self.is_stereo = config.audio.stereo_audio;
     sokol.audio.setup(.{
         .logger = .{ .func = sokol.log.func },

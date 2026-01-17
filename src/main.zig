@@ -81,7 +81,7 @@ export fn frame() void {
         const start: u64 = sokol.time.now();
         loaded_core.frame(state.platform.input_state);
         const core_delta: u64 = sokol.time.since(start);
-        state.platform.frame(state.alloc, loaded_core.ppu.colorIds, &loaded_core.apu.samples, core_delta);
+        state.platform.frame(state.alloc, loaded_core.ppu.front_buffer, &loaded_core.apu.samples, core_delta);
     } else {
         state.platform.frame(state.alloc, def.default_color_ids, null, null);
     }

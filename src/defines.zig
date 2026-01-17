@@ -229,6 +229,7 @@ pub const byte_per_line = 2;
 // system
 pub const system_freq = 4 * 1_024 * 1_024;
 pub const t_cycles_in_60fps = system_freq / 60;
+// Note: GB: 59.73Hz, Platform: 60Hz
 pub const t_cycles_per_frame = 70_224;
 pub const t_cycles_per_m_cycle = 4;
 pub const config_path = "config.zon";

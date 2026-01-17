@@ -12,6 +12,7 @@ pub fn build(b: *std.Build) void {
     // flags
     // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
     const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
+    const enable_audio = b.option(bool, "enable-audio", "Enables the audio output") orelse (optimize != .Debug);
     const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.cycle;
     const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
     const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
@@ -35,6 +36,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(PPUModel, "ppu_model", ppu_model);
     options.addOption(APUModel, "apu_model", apu_model);
     options.addOption(bool, "tracy_enabled", tracy_enabled);
+    options.addOption(bool, "enable_audio", enable_audio);
     exe.root_module.addOptions("build_options", options);
 
     // sokol

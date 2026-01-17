@@ -60,10 +60,9 @@ pub fn frame(self: *Self, input_state: def.InputState) void {
     defer zone.end();
 
     var irq_joypad: bool = self.mmio.updateInputState(&input_state);
-    // Note: GB runs at 59.73Hz. This software runs at 60Hz.
-    // TODO: It would be better to just let the system run to the end of the next vblank. How to do that when the PPU is disabled?
-    const cycles_per_frame = 70224; 
-    for(0..cycles_per_frame) |_| {
+
+    var cycle_count: u32 = 0;
+    while(cycle_count <= def.t_cycles_per_frame) : (cycle_count += 1) {
         var request: def.Request = .{};
         self.cpu.cycle(&request);
         self.cpu.request(&request);

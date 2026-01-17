@@ -188,7 +188,8 @@ fetcher_data: FetcherData = .{},
 
 // TODO: Make this array of u2 instead?
 // TODO: rename to color_ids (naming convention)
-colorIds: [def.overscan_resolution]u8 = def.default_color_ids,
+back_buffer: [def.overscan_resolution]u8 = def.default_color_ids,
+front_buffer: [def.overscan_resolution]u8 = def.default_color_ids,
 
 
 pub fn init(self: *Self) void {
@@ -247,6 +248,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             if (self.lcd_stat.mode != .v_blank) {
                 irq_vblank = true;
                 irq_stat |= self.lcd_stat.mode_1_select;
+                self.front_buffer = self.back_buffer;
             }
             self.lcd_stat.mode = .v_blank;
             self.lcd_y = (self.lcd_y + 1) % max_lcd_y;
@@ -372,7 +374,8 @@ pub fn request(self: *Self, req: *def.Request) void {
             if(req.isWrite()) {
                 if(!self.lcd_control.lcd_enable) {
                     self.lcd_stat.mode = .h_blank;
-                    self.colorIds = @splat(0);
+                    self.back_buffer = def.default_color_ids;
+                    self.front_buffer = def.default_color_ids;
                     self.lcd_y = 0;
                     self.last_stat_irq = false;
 
@@ -410,7 +413,8 @@ pub fn request(self: *Self, req: *def.Request) void {
             // TODO: During DMA transfer the PPU must read 0xFF during oam_scan and draw. DMA has higher prio access to oam.
             // TODO: if don't block DMA oam requests, the entire rendering breaks for castlevania and the game becomes unplayable.
             // But this fixes oam updating to late for links awakening.
-            const mask: u8 = if(mode_is_blocking and req.requestor == .cpu) 0x00 else 0xFF;
+            // TODO: Add the vram blocking again, when the timing is better.
+            const mask: u8 = if(mode_is_blocking and req.requestor == .cpu) 0xFF else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
@@ -418,7 +422,8 @@ pub fn request(self: *Self, req: *def.Request) void {
             req.applyAllowedRW(&self.oam[oam_idx], mask, mask);
         },
         def.vram_low...(def.vram_high - 1) => {
-            const mask: u8 = if(self.lcd_stat.mode == .draw) 0x00 else 0xFF;
+            // TODO: Add the vram blocking again, when the timing is better.
+            const mask: u8 = if(self.lcd_stat.mode == .draw) 0xFF else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("VRAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
@@ -582,7 +587,7 @@ fn tryPushPixel(self: *Self) void {
     const color_id: u2 = palette[used_pixel.color_id];
 
     const color_index: u16 = self.lcd_overscan_x + @as(u16, def.overscan_width) * self.lcd_y;
-    self.colorIds[color_index] = color_id;
+    self.back_buffer[color_index] = color_id;
     self.lcd_overscan_x += 1;
     checkLcdX(self);
 }
