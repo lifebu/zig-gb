@@ -141,7 +141,6 @@ const MicroOp = enum {
     fetch_tile_bg,
     fetch_tile_obj,
     fetch_tile_window,
-    halt,
     nop,
     nop_draw,
     oam_check,
@@ -241,6 +240,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
                 irq_stat |= self.lcd_stat.mode_2_select;
             }
             self.lcd_stat.mode = .oam_scan;
+            self.lcd_y = (self.lcd_y + 1) % max_lcd_y;
             advanceOAMScan(self);
         },
         .advance_vblank => {
@@ -249,6 +249,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
                 irq_stat |= self.lcd_stat.mode_1_select;
             }
             self.lcd_stat.mode = .v_blank;
+            self.lcd_y = (self.lcd_y + 1) % max_lcd_y;
             advanceBlank(self, blank.len);
         },
         .fetch_low_bg => {
@@ -319,9 +320,6 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
                 .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
             tryPushPixel(self);
-        },
-        .halt => {
-            self.uop_fifo.writeItem(.halt);
         },
         .nop => {
         },
@@ -441,9 +439,9 @@ pub fn request(self: *Self, req: *def.Request) void {
 }
 
 fn advanceBlank(self: *Self, length: usize) void {
-    self.lcd_y = (self.lcd_y + 1) % max_lcd_y;
     self.uop_fifo.write(blank[0..length]);
-    const advance: MicroOp = if(self.lcd_y >= def.resolution_height) .advance_vblank else .advance_oam_scan;
+    const next_lcdy = (self.lcd_y + 1) % max_lcd_y;
+    const advance: MicroOp = if(next_lcdy >= def.resolution_height) .advance_vblank else .advance_oam_scan;
     self.uop_fifo.writeItem(advance);
 }
 

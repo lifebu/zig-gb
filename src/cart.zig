@@ -131,7 +131,7 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8) void 
     defer alloc.free(save_path);
 
     if(self.features.has_battery and self.features.has_ram) {
-        const save_file: std.fs.File = std.fs.cwd().openFile(save_path, .{ .mode = .write_only }) catch unreachable;
+        const save_file: std.fs.File = std.fs.cwd().createFile(save_path, .{}) catch unreachable;
         defer save_file.close();
 
         for(self.ram_banks) |bank| {
@@ -261,7 +261,7 @@ pub fn loadFile(self: *Self, rom_path: []const u8, alloc: std.mem.Allocator) voi
         std.log.warn("Cart Header and Ram size do not match. Would be ignored by real gameboy.", .{});
     }
     assert(self.features.mapper != .unsupported);
-    if(self.features.mapper == .mbc_1 and rom.len >= (512 * 1024)) {
+    if(self.features.mapper == .mbc_1 and rom.len > (512 * 1024)) {
         std.debug.print("MBC1 Rom with more than 512kByte is not supported (alternative wiring)\n", .{});
         unreachable;
     }
