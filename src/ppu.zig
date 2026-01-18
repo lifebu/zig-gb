@@ -6,7 +6,6 @@ const Fifo = @import("util/fifo.zig");
 
 const Self = @This();
 
-const vram_size = def.vram_high - def.vram_low;
 const vram_tile_map_9800 = def.tile_map_9800 - def.vram_low;
 const vram_tile_map_9C00 = def.tile_map_9C00 - def.vram_low;
 const vram_tile_8000 = def.tile_8000 - def.vram_low;
@@ -167,7 +166,7 @@ scroll_y: u8 = 0,
 window_x: u8 = 0,
 window_y: u8 = 0,
 
-vram: [vram_size]u8 = @splat(0),
+vram: [def.vram_size]u8 = @splat(0),
 bg_palettes: [8]u8 = @splat(0), // DMG: one palette, CGB: 8 palettes
 obj_palettes: [8]u8 = @splat(0), // DMG: two palettes, CGB: 8 palettes
 

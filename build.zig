@@ -80,9 +80,14 @@ pub fn build(b: *std.Build) void {
         }),
         .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
     });
+    // TODO: Really annoying to have all the dependencies to everything in the tests.
     exe_unit_tests.root_module.addImport("sokol", sokol.module("sokol"));
     exe_unit_tests.root_module.addImport("cimgui", cimgui.module("cimgui"));
+    exe_unit_tests.root_module.addImport("tracy", tracy.module("tracy"));
     b.installArtifact(exe_unit_tests);
+
+    // TODO: Not that nice that tests need to use the build options to use core.zig
+    exe_unit_tests.root_module.addOptions("build_options", options);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");

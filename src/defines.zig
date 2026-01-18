@@ -102,6 +102,7 @@ pub const cart_ram_high: u16    = 0xC000;
 
 pub const wram_low: u16         = 0xC000;
 pub const wram_high: u16        = 0xE000;
+pub const vram_size: u16        = vram_high - vram_low;
 
 pub const echo_low: u16         = 0xE000;
 pub const echo_high: u16        = 0xFE00;

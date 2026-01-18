@@ -44,6 +44,51 @@
     https://github.com/c-sp/game-boy-test-roms
     => This has a list of required outputs and a shell script that uses rgbds to compile them.
     => Also has release verions you can download.
+    - All tests that use screenshots need a specific palette.
+        - DMG: #00_00_00, #55_55_55, #AA_AA_AA, #FF_FF_FF
+    - Config File for all tests (zon):
+        - Subsystems:
+            Which subsystems are getting tested by this.
+            If a subsystem is not needed it will use a void version.
+        - Supported Revisions:
+            - DMG, CGB, SGB, Any
+            - Filename: Auto detect revision from filename
+            Do I need the exact dmg cpu revisions?
+        - Exit Condition:
+            - None
+            - Breakpoint: LD B, B.
+            ?- ScreenShot: When a certain image has been reached
+        - Timeout:
+            Maximum number of seconds or cycles this test should run.
+            Can be used if we have no exit condition.
+            - Cycles
+            - Seconds
+            - Frames
+        - Test Result Pass/Fail:
+            - Fibonacci: On Success: B = 3, C = 5, D = 8, E = 13, H = 21, L = 34
+            - Screenshot.
+            - Memory Locations.
+        - Test Result Context:
+            - Memory Locations.
+            - Screenshot: Once the test has finished let PPU run once and generate an output screenshot.
+            - Text Parsing:
+                - blargg: also prints text to screen.
+                - gambatte: prints result on the screen.
+    - Make this test runner suite c-ABI compatible for other projects?
+    - Rework my test system and prepare for a better testing enviroment
+        - Custom testrunner?
+        - I want a multithreaded testrunner!
+        - This would be a good opportunity to learn about the new io interface in zig 0.16.0.
+    - Maybe I can auto generate the test.zig file?
+        - go through every x.test.zig file and find tests and generate a top-level test.zig file?
+        - can also use some custom code for this. It can also generate a test for each test rom test file.
+        - have a test_generator.zig for this. that generates the test.zig file from the src/tests folder.
+        - test name must be a compile time string: https://ziggit.dev/t/generating-tests-at-comptime/6473
+        - Or like the ziggit above I use one comptime block in test.zig that generates the individual tests for me?
+        - The generated names should have a clear naming scheme usefull for filtering tests:
+            Subystem_{Unit/Rom}_{File}
+            CPU_Unit_Halt
+            CPU_Rom_blargg/cpu_instrs/individual/01-special.gb
 - Interrupt Sources Test:
     - VBlanK, Stat
 
@@ -148,8 +193,6 @@
 - Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
     - Cycle count.
     - MCycle pins. 
-- Rework my test system and prepare for a better testing enviroment
-    - Custom testrunner?
 - Interrupt Sources:
     - Serial.
 - APU

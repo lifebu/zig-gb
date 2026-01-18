@@ -54,7 +54,6 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: Config) void {
     self.cart.deinit(alloc, config.files.rom.?);
 }
 
-// TODO: Should you be able to run the core for a set of cycles instead of an entire frame? Maybe for debug purposes? (Like rendering?)
 pub fn frame(self: *Self, input_state: def.InputState) void {
     const zone = tracy.Zone.begin(.{ .name = "frame", .src = @src(), .color = .alice_blue });
     defer zone.end();
@@ -63,23 +62,27 @@ pub fn frame(self: *Self, input_state: def.InputState) void {
 
     var cycle_count: u32 = 0;
     while(cycle_count <= def.t_cycles_per_frame) : (cycle_count += 1) {
-        var request: def.Request = .{};
-        self.cpu.cycle(&request);
-        self.cpu.request(&request);
-        self.memory.cycle(&request);
-        
-        self.memory.request(&request);
-        self.cart.request(&request);
-        self.mmio.request(&request);
-        self.apu.request(&request);
-        self.ppu.request(&request);
-
-        const irq_serial, const irq_timer = self.mmio.cycle();
-        const irq_vblank, const irq_stat = self.ppu.cycle();
-        self.apu.cycle();
-
-        self.cpu.pushInterrupts(irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad);
-        irq_joypad = false; // TODO: Not the nicest, okay for now.
-        request.logAndReject();
+        self.cyle(&irq_joypad);
     }
+}
+
+pub fn cyle(self: *Self, irq_joypad: *bool) void {
+    var request: def.Request = .{};
+    self.cpu.cycle(&request);
+    self.cpu.request(&request);
+    self.memory.cycle(&request);
+
+    self.memory.request(&request);
+    self.cart.request(&request);
+    self.mmio.request(&request);
+    self.apu.request(&request);
+    self.ppu.request(&request);
+
+    const irq_serial, const irq_timer = self.mmio.cycle();
+    const irq_vblank, const irq_stat = self.ppu.cycle();
+    self.apu.cycle();
+
+    self.cpu.pushInterrupts(irq_vblank, irq_stat, irq_timer, irq_serial, irq_joypad.*);
+    irq_joypad.* = false; // TODO: Not the nicest, okay for now.
+    request.logAndReject();
 }

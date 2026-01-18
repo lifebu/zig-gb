@@ -9,6 +9,7 @@ const memory_test = @import("tests/memory.test.zig");
 const mmio_test = @import("tests/mmio.test.zig");
 const ppu_test = @import("tests/ppu.test.zig");
 const singlestep_test = @import("tests/singlestep.test.zig");
+const test_roms = @import("tests/test_roms.test.zig");
 
 // TODO: How to setup tests correctly that you can run all the tests and specific tests easily?
 // TODO: Move tests into it's own module so that we don't have it loitering in the src folder!
@@ -54,7 +55,7 @@ test "InputTest" {
     try mmio_test.runInputTests();
 }
 
-// test "PPU_InterruptTest" {te
+// test "PPU_InterruptTest" {
 //     try ppu_test.runInterruptTests();
 // }
 
@@ -64,4 +65,9 @@ test "Request" {
 
 test "TimerTest" {
     try mmio_test.runTimerTest();
+}
+
+// TODO: How to dynamically create individual tests for each test rom?
+test "TestRomTest" {
+    try test_roms.runTestRomsTests();
 }
