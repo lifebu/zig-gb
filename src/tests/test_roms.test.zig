@@ -2,6 +2,7 @@ const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
 const APU = @import("../apu.zig");
+const APUVoid = @import("../apu_void.zig");
 const Config = @import("../config.zig");
 const Core = @import("../core.zig");
 const CPU = @import("../cpu.zig");
@@ -190,7 +191,7 @@ pub fn runTestRomsTests() !void {
         defer alloc.free(configs);
 
         for(configs) |config| {
-            const CoreType = Core.Core(APU, CPU, PPUVoid);
+            const CoreType = Core.Core(APUVoid, CPU, PPUVoid);
             // TODO: Also pass subsystems to core or config.
             var core: CoreType = .{};
             core.init(alloc, config);
