@@ -192,6 +192,7 @@ pub const interrupt_joypad: u8  = 0x10;
 
 // vram
 pub const vram_size = vram_high - vram_low;
+pub const oam_size_byte = oam_high - oam_low;
 
 pub const tile_map_9800 = 0x9800;
 pub const tile_map_9C00 = 0x9C00;
@@ -212,6 +213,7 @@ pub const tile_map_size_y = 32;
 pub const tile_map_size_byte = tile_map_size_x * tile_map_size_y;
 pub const tile_map_pixel_size_x = tile_map_size_x * tile_size_x;
 pub const tile_map_pixel_size_y = tile_map_size_y * tile_size_y;
+
 
 // system
 pub const GBModel = enum  { dmg };

@@ -9,7 +9,6 @@ const Self = @This();
 const color_id_transparent = 0;
 const obj_size_byte = 4;
 const oam_size = 40;
-const oam_size_byte = oam_size * obj_size_byte;
 const obj_per_line = 10;
 const obj_double_height = def.tile_size_y * 2;
 
@@ -160,7 +159,7 @@ uop_fifo: MicroOpFifo = .{},
 draw_cycles: u9 = 0,
 line_penalty: u9 = 0,
 
-oam: [oam_size_byte]u8 = @splat(0),
+oam: [def.oam_size_byte]u8 = @splat(0),
 oam_scan_idx: u6 = 0,
 oam_line_list: ObjectLineFifo = .{},
 

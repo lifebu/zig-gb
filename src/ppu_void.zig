@@ -53,18 +53,32 @@ lcd_control: LcdControl = .{},
 lcd_stat: LcdStat = .{},
 lcd_y_compare: u8 = 0,
 lcd_y: u8 = 0, 
+last_stat_irq: bool = false,
+
+scroll_x: u8 = 0,
+scroll_y: u8 = 0,
+window_x: u8 = 0,
+window_y: u8 = 0,
+
+vram: [def.vram_size]u8 = @splat(0),
+bg_palettes: [8]u8 = @splat(0), // DMG: one palette, CGB: 8 palettes
+obj_palettes: [8]u8 = @splat(0), // DMG: two palettes, CGB: 8 palettes
 
 ly_counter: u16 = 0,
+draw_cycles: u9 = 0,
+line_penalty: u9 = 0,
+
+oam: [def.oam_size_byte]u8 = @splat(0),
 
 // TODO: Make this array of u2 instead?
 // TODO: rename to color_ids (naming convention)
-colorIds: [def.overscan_resolution]u8 = def.default_color_ids,
+front_buffer: [def.overscan_resolution]u8 = def.default_color_ids,
 
 pub fn init(self: *Self) void {
     self.* = .{};
 }
 
-pub fn cycle(self: *Self, _: *[def.addr_space]u8) struct{ bool, bool } {
+pub fn cycle(self: *Self) struct{ bool, bool } {
     var irq_stat: bool = false;
     var irq_vblank: bool = false;
 
@@ -107,7 +121,7 @@ pub fn cycle(self: *Self, _: *[def.addr_space]u8) struct{ bool, bool } {
     return .{ irq_vblank, irq_stat };
 }
 
-pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void {
+pub fn request(self: *Self, req: *def.Request) void {
     switch(req.address) {
         def.lcd_control => {
             req.apply(&self.lcd_control);
@@ -128,39 +142,42 @@ pub fn request(self: *Self, memory: *[def.addr_space]u8, req: *def.Request) void
             req.apply(&self.lcd_y_compare);
         },
         def.scroll_x => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.scroll_x);
         },
         def.scroll_y => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.scroll_y);
         },
         def.window_x => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.window_x);
         },
         def.window_y => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.window_y);
         },
         def.oam_low...(def.oam_high - 1) => {
-            const mask: u8 = if(self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw) 0x00 else 0xFF;
+            const mode_is_blocking: bool = self.lcd_stat.mode == .oam_scan or self.lcd_stat.mode == .draw;
+            const mask: u8 = if(mode_is_blocking and req.requestor == .cpu) 0xFF else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("OAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
-            req.applyAllowedRW(&memory[req.address], mask, mask);
+            const oam_idx: u16 = req.address - def.oam_low;
+            req.applyAllowedRW(&self.oam[oam_idx], mask, mask);
         },
         def.vram_low...(def.vram_high - 1) => {
-            const mask: u8 = if(self.lcd_stat.mode == .draw) 0x00 else 0xFF;
+            const mask: u8 = if(self.lcd_stat.mode == .draw) 0xFF else 0xFF;
             if(mask == 0x00) {
                 std.log.warn("VRAM access denied: visual glitches will occur (Mode: {}, Line: {}). {f}", .{ self.lcd_stat.mode, self.lcd_y, req });
             }
-            req.applyAllowedRW(&memory[req.address], mask, mask);
+            const vram_idx: u16 = req.address - def.vram_low;
+            req.applyAllowedRW(&self.vram[vram_idx], mask, mask);
         },
         def.bg_palette => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.bg_palettes[0]);
         },
         def.obj_palette_0 => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.obj_palettes[0]);
         },
         def.obj_palette_1 => {
-            req.apply(&memory[req.address]);
+            req.apply(&self.obj_palettes[1]);
         },
         else => {},
     }

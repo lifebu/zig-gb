@@ -1,9 +1,13 @@
 const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
+const APU = @import("../apu.zig");
 const Config = @import("../config.zig");
 const Core = @import("../core.zig");
+const CPU = @import("../cpu.zig");
 const def = @import("../defines.zig");
+const PPU = @import("../ppu.zig");
+const PPUVoid = @import("../ppu_void.zig");
 
 const cpu_breakpoint_op = 0x40; // LD B, B
 const test_palette: def.Palette = .{ 
@@ -85,7 +89,7 @@ const RomTestConfig = struct {
         // TODO: Using an externally generated trace of a given format and compare each state of the emulator to that.
         trace: []const u8,
     },
-    fail_ctx: union(enum) {
+    context: union(enum) {
         // TODO: Try to remove none as we get more support for different test suites.
         none: void,
         memory: []ResultMemory,
@@ -121,13 +125,13 @@ const RomTestConfig = struct {
             else => @panic("Unknown type of path in test rom config!"),
         };
     }
-    pub fn exitConditionHit(self: Self, core: *const Core) bool {
+    pub fn exitConditionHit(self: Self, core: anytype) bool {
         return switch (self.exit) {
             .none => false,
             .breakpoint => core.cpu.registers.r8.ir == cpu_breakpoint_op,
         };
     }
-    pub fn passed(self: Self, core: *const Core, context: []const u8) bool {
+    pub fn passed(self: Self, core: anytype, context: []const u8) bool {
         return switch(self.pass) {
             .memory => @panic("memory passing not yet supported"),
             .trace => @panic("memory passing not yet supported"),
@@ -142,8 +146,8 @@ const RomTestConfig = struct {
         };
     }
     // TODO: How to do that for the other cases? What is their output?
-    pub fn getContext(self: Self, alloc: std.mem.Allocator, core: *const Core) ![]const u8 {
-        return switch(self.fail_ctx) {
+    pub fn getContext(self: Self, alloc: std.mem.Allocator, core: anytype) ![]const u8 {
+        return switch(self.context) {
             .none => "",
             .memory => "",
             .screenshot => "",
@@ -166,13 +170,13 @@ const blargg_path = "playground/game-boy-test-roms/blargg/";
 //  => For directory also define if it is just this directoy or all subdirectories.
 const rom_test_configs: [2]RomTestConfig = .{
     .{ .path = mooneye_path ++ "acceptance/div_timing.gb", 
-        .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .fail_ctx = .{ .text_parsing = .mooneye } },
+        .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = blargg_path ++ "cpu_instrs/individual/01-special.gb", 
-        .systems = 0, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .fail_ctx = .{ .text_parsing = .blargg } },
+        .systems = 0, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     // .{ .path = mooneye_path ++ "acceptance/boot_div-S.gb", 
-    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .fail_ctx = .{ .text_parsing = .mooneye } },
+    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb", 
-    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .fail_ctx = .{ .text_parsing = .mooneye } },
+    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
 };
 
 pub fn runTestRomsTests() !void {
@@ -186,8 +190,9 @@ pub fn runTestRomsTests() !void {
         defer alloc.free(configs);
 
         for(configs) |config| {
+            const CoreType = Core.Core(APU, CPU, PPUVoid);
             // TODO: Also pass subsystems to core or config.
-            var core: Core = .{};
+            var core: CoreType = .{};
             core.init(alloc, config);
             defer core.deinit(alloc, config);
 
