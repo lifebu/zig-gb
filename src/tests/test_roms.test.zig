@@ -13,53 +13,43 @@ const test_palette: def.Palette = .{
     .color_3 = .{ 0xFF, 0xFF, 0xFF } 
 };
 
-// TODO: These should be imported.
-const tile_base_address = 0x8000;
-const tile_map_base_address = 0x9800;
-const tile_map_size_x = 32;
-const tile_map_size_y = 32;
-const tile_size_byte = 16;
+const ascii_low = 32;
+const ascii_high = 128;
+const ascii_len = ascii_high - ascii_low;
+const mooneye_char_low = 0x8200;
+const blargg_char_low = 0x8200;
 
-const mooneye_char_base_address = 0x8200;
-// TODO: This is basically the ascii table from 32-127 (printable characters).
-const mooneye_char_table = [96]u8{
-    ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', 
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
-    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
-    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', ' ',
-};
-// TODO: This function works but seems pretty complex for what it does => rewrite it.
-fn parseMoonEye(alloc: std.mem.Allocator, vram: [def.vram_size]u8) ![]const u8 {
+fn parseAscii(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_low: u16) ![]const u8 {
+    const char_high = char_low + (ascii_len * def.tile_size_byte);
+
     var writer: std.io.Writer.Allocating = .init(alloc);
     defer writer.deinit();
 
-    for(0..tile_map_size_y) |y| {
+    for(0..def.tile_map_size_y) |y| {
+        const y_cast: u16 = @intCast(y);
+
         var line_has_content: bool = false;
         var line_writer: std.io.Writer.Allocating = .init(alloc);
         defer line_writer.deinit();
 
-        const y_cast: u16 = @intCast(y);
-        for(0..tile_map_size_x) |x| {
+        for(0..def.tile_map_size_x) |x| {
             const x_cast: u16 = @intCast(x);
-            const tile_map_addr: u16 = tile_map_base_address + x_cast + (y_cast * tile_map_size_y);
-            const vram_idx: u16 = tile_map_addr - def.vram_low;
-            const tile_addr_offset: u16 = vram[vram_idx];
-            const tile_addr: u16 = tile_base_address + (tile_addr_offset * tile_size_byte);
-            const min: bool = tile_addr >= mooneye_char_base_address;
-            const max: bool = tile_addr < (mooneye_char_base_address + (mooneye_char_table.len * tile_size_byte));
-            const in_table: bool = min and max;
-            const table_idx: u16 = if(in_table) (tile_addr - mooneye_char_base_address) / tile_size_byte else 0;
-            const char: u8 = mooneye_char_table[table_idx];
-            try line_writer.writer.writeByte(char);
+            const tilemap_addr: u16 = def.vram_tile_map_9800 + x_cast + (y_cast * def.tile_map_size_y);
+
+            const tile_addr_offset: u16 = vram[tilemap_addr];
+            const tile_addr: u16 = def.tile_8000 + (tile_addr_offset * def.tile_size_byte);
+            const tile_addr_ascii = std.math.clamp(tile_addr, char_low, char_high);
+            const ascii: u8 = @intCast((tile_addr_ascii - char_low) / def.tile_size_byte);
+            const char: u8 = ascii + 32;
             line_has_content |= (char != ' ');
+
+            try line_writer.writer.writeByte(char);
         }
-        try line_writer.writer.writeByte('\n');
+
         if(line_has_content) {
+            try line_writer.writer.writeByte('\n');
             const line: []u8 = try line_writer.toOwnedSlice();
             defer alloc.free(line);
-
             _ = try writer.writer.write(line);
         }
     }
@@ -80,6 +70,7 @@ const RomTestConfig = struct {
         none, breakpoint, // LD b,b
     },
     // TODO: How do we skip the boot rom?
+    // Currently wastes: 5.892.625 cycles or 84 Frames or 1,4 seconds
     timeout: union(enum) {
         cycle: usize,
         frame: usize,
@@ -87,6 +78,7 @@ const RomTestConfig = struct {
     },
     pass: union(enum) {
         fibonacci: void,
+        text: []const u8,
         // TODO: Binary of the screenshot? path of the screenshot? How to compare?
         screenshot: []const u8,
         memory: []ResultMemory,
@@ -112,10 +104,10 @@ const RomTestConfig = struct {
             .sec => |value| value * def.t_cycles_in_60fps * 60,
         };
     }
-    // TODO: Generate multiple Configs for directories
     pub fn generateCoreConfig(self: Self, alloc: std.mem.Allocator) ![]Config {
         const path_stat = try std.fs.cwd().statFile(self.path);
         return switch(path_stat.kind) {
+            // TODO: Generate multiple Configs for directories
             .directory => @panic("directories not yet supported"),
             .file => file: {
                 const result: []Config = try alloc.alloc(Config, 1);
@@ -135,10 +127,13 @@ const RomTestConfig = struct {
             .breakpoint => core.cpu.registers.r8.ir == cpu_breakpoint_op,
         };
     }
-    pub fn passed(self: Self, core: *const Core) bool {
+    pub fn passed(self: Self, core: *const Core, context: []const u8) bool {
         return switch(self.pass) {
             .memory => @panic("memory passing not yet supported"),
             .trace => @panic("memory passing not yet supported"),
+            .text => |expected| txt: {
+                break: txt std.mem.containsAtLeast(u8, context, 1, expected);
+            },
             .fibonacci => fib: {
                 const r8 = core.cpu.registers.r8;
                 break: fib r8.b == 3 and r8.c == 5 and r8.d == 8 and r8.e == 13 and r8.h == 21 and r8.l == 34;
@@ -147,17 +142,16 @@ const RomTestConfig = struct {
         };
     }
     // TODO: How to do that for the other cases? What is their output?
-    pub fn getFailContext(self: Self, alloc: std.mem.Allocator, core: *const Core, did_pass: bool) ![]const u8 {
-        if(did_pass) return "";
+    pub fn getContext(self: Self, alloc: std.mem.Allocator, core: *const Core) ![]const u8 {
         return switch(self.fail_ctx) {
             .none => "",
             .memory => "",
             .screenshot => "",
             .text_parsing => |parse_type| parse: {
                 break: parse switch (parse_type) {
-                    .blargg => "",
+                    .blargg => try parseAscii(alloc, core.ppu.vram, blargg_char_low),
                     .gambatte => "",
-                    .mooneye => try parseMoonEye(alloc, core.ppu.vram),
+                    .mooneye => try parseAscii(alloc, core.ppu.vram, mooneye_char_low),
                 };
             },
         };
@@ -165,14 +159,18 @@ const RomTestConfig = struct {
 };
 // TODO: How do we filter for specific systems? Example: I am working on the cpu and I want to only run cpu test roms + my cpu unit tests.
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
+const blargg_path = "playground/game-boy-test-roms/blargg/";
 
 // TODO: How can I use a directory? All mooneye tests are the same for example.
 //  => But this also has exceptions.
 //  => For directory also define if it is just this directoy or all subdirectories.
-//  TODO: Is there a way to define 
-const rom_test_configs: [1]RomTestConfig = .{
+const rom_test_configs: [2]RomTestConfig = .{
     .{ .path = mooneye_path ++ "acceptance/div_timing.gb", 
         .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .fail_ctx = .{ .text_parsing = .mooneye } },
+    .{ .path = blargg_path ++ "cpu_instrs/individual/01-special.gb", 
+        .systems = 0, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .fail_ctx = .{ .text_parsing = .blargg } },
+    // .{ .path = mooneye_path ++ "acceptance/boot_div-S.gb", 
+    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .fail_ctx = .{ .text_parsing = .mooneye } },
     // .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb", 
     //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .fail_ctx = .{ .text_parsing = .mooneye } },
 };
@@ -205,120 +203,15 @@ pub fn runTestRomsTests() !void {
                 std.debug.print("Failed: {s}: {s}\n", .{ test_config.path, "rom has exit condition but it timed out." });
                 return err;
             };
-            const passed: bool = test_config.passed(&core);
-            const fail_ctx: []const u8 = try test_config.getFailContext(alloc, &core, passed);
-            defer alloc.free(fail_ctx);
+
+            const context: []const u8 = try test_config.getContext(alloc, &core);
+            defer alloc.free(context);
+            const passed: bool = test_config.passed(&core, context);
             std.testing.expectEqual(true, passed) catch |err| {
                 std.debug.print("Failed: {s}\n", .{ test_config.path });
-                std.debug.print("Context: {s}\n", .{ fail_ctx });
+                std.debug.print("Context: {s}\n", .{ context });
                 return err;
             };
         }
     }
 }
-
-// TODO: Just some old code keeping for reference for now.
-//
-// test "blargg" {
-//     const testRoms =  [_][]const u8{
-//         "test_data/blargg_roms/cpu_instrs/individual/01-special.gb", 
-//         // "test_data/blargg_roms/cpu_instrs/individual/02-interrupts.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/03-op sh,hl.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/04-op r,imm.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/05-op rp.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/06-ld r,r.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/07-jr,jp,call.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/08-misc instrs.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/09-op r,r.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/10-bit ops.gb", 
-//         "test_data/blargg_roms/cpu_instrs/individual/11-op a,(hl).gb", 
-//     }; 
-//
-//     const alloc = std.testing.allocator;
-//
-//     for (testRoms, 0..) |testRom, i| {
-//         std.debug.print("{d}: Testing: {s}\n", .{i, testRom});
-//         var cpu = try _cpu.CPU.init(alloc, testRom);
-//         defer cpu.deinit();
-//
-//         var lastPC: u16 = 0;
-//         while (lastPC != cpu.pc) {
-//             lastPC = cpu.pc;
-//             try cpu.frame();
-//         }
-//
-//         const output: std.ArrayList(u8) = try blargg.parseOutput(&cpu, alloc);
-//         defer output.deinit();
-//
-//         const passed: bool = blargg.hasPassed(&output);
-//         if (!passed) {
-//             std.debug.print("{s}\n", .{output.items});
-//         }
-//         try std.testing.expect(passed);
-//     }
-// }
-//
-//
-//
-// const std = @import("std");
-//
-// const CHAR_TABLE = [96]u8{
-//     ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', 
-//     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
-//     '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-//     'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
-//     '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-//     'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', ' ',
-// };
-//
-// // TODO: These should be imported.
-// const TILE_BASE_ADDRESS = 0x8000;
-// const TILE_MAP_BASE_ADDRESS = 0x9800;
-// const TILE_MAP_SIZE_X = 32;
-// const TILE_MAP_SIZE_Y = 32;
-// const TILE_SIZE_BYTE = 16;
-//
-// const WHITE_CHAR_BASE_ADDRESS = 0x8200;
-// const BLACK_CHAR_BASE_ADDRESS = 0x8A00;
-//
-// pub fn parseOutput(memory: *const []8, alloc: std.mem.Allocator) !std.ArrayList(u8) {
-//     std.debug.assert(memory.len == 0x10000);
-//
-//     var string = std.ArrayList(u8).init(alloc);
-//     errdefer string.deinit();
-//
-//     var y: u16 = 0;
-//     while (y < TILE_MAP_SIZE_Y) : (y += 1) {
-//         var lineIsEmpty = true;
-//         var line = try std.BoundedArray(u8, TILE_MAP_SIZE_X + 1).init(0);
-//
-//         var x: u16 = 0;
-//         while (x < TILE_MAP_SIZE_X) : (x += 1) {
-//             const tileMapAddress: u16 = TILE_MAP_BASE_ADDRESS + x + (y * TILE_MAP_SIZE_Y);
-//             const tileAddressOffset: u16 align(1) = memory.*[tileMapAddress];
-//             const tileAddress: u16 = TILE_BASE_ADDRESS + (tileAddressOffset * TILE_SIZE_BYTE);
-//
-//             const charBaseAddress: u16 = if (tileAddress >= BLACK_CHAR_BASE_ADDRESS) BLACK_CHAR_BASE_ADDRESS else WHITE_CHAR_BASE_ADDRESS;
-//             const relativeIndex: u16 = (tileAddress - charBaseAddress) / TILE_SIZE_BYTE;
-//
-//             const char: u8 = CHAR_TABLE[relativeIndex];
-//             if(lineIsEmpty and char != ' ') lineIsEmpty = false;
-//             try line.append(char);
-//         }
-//         
-//         if(lineIsEmpty) {
-//             continue;
-//         }
-//
-//         try line.append('\n');
-//         for (line.slice()) |char| {
-//             try string.append(char);
-//         }
-//     }
-//
-//     return string;
-// }
-//
-// pub fn hasPassed(output: *const std.ArrayList(u8)) bool {
-//     return std.mem.count(u8, output.*.items, "Passed") > 0;
-// }

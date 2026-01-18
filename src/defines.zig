@@ -102,7 +102,6 @@ pub const cart_ram_high: u16    = 0xC000;
 
 pub const wram_low: u16         = 0xC000;
 pub const wram_high: u16        = 0xE000;
-pub const vram_size: u16        = vram_high - vram_low;
 
 pub const echo_low: u16         = 0xE000;
 pub const echo_high: u16        = 0xFE00;
@@ -192,11 +191,27 @@ pub const interrupt_serial: u8  = 0x08;
 pub const interrupt_joypad: u8  = 0x10; 
 
 // vram
+pub const vram_size = vram_high - vram_low;
+
 pub const tile_map_9800 = 0x9800;
 pub const tile_map_9C00 = 0x9C00;
+pub const vram_tile_map_9800 = tile_map_9800 - vram_low;
+pub const vram_tile_map_9C00 = tile_map_9C00 - vram_low;
 
 pub const tile_8000 = 0x8000;
 pub const tile_8800 = 0x8800;
+pub const vram_tile_8000 = tile_8000 - vram_low;
+pub const vram_tile_8800 = tile_8800 - vram_low;
+
+pub const tile_size_x = 8;
+pub const tile_size_y = 8;
+pub const tile_size_byte = 16;
+
+pub const tile_map_size_x = 32;
+pub const tile_map_size_y = 32;
+pub const tile_map_size_byte = tile_map_size_x * tile_map_size_y;
+pub const tile_map_pixel_size_x = tile_map_size_x * tile_size_x;
+pub const tile_map_pixel_size_y = tile_map_size_y * tile_size_y;
 
 // system
 pub const GBModel = enum  { dmg };

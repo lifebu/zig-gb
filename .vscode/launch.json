@@ -9,9 +9,11 @@
             "args": [
                 //"playground/little_mermaid.gb",
                 //"playground/link_awake.gb",
-                "playground/pkmn_blu.gb",
+                //"playground/pkmn_blu.gb",
                 //"playground/tales_of_phantasia_narikiki_dungeon.gb",
                 //"playground/game-boy-test-roms/mooneye-test-suite/acceptance/if_ie_registers.gb",
+                //"playground/game-boy-test-roms/mooneye-test-suite/acceptance/ppu/stat_irq_blocking.gb",
+                //"playground/game-boy-test-roms/dmg-acid2/dmg-acid2.gb",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

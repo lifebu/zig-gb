@@ -6,27 +6,12 @@ const Fifo = @import("util/fifo.zig");
 
 const Self = @This();
 
-const vram_tile_map_9800 = def.tile_map_9800 - def.vram_low;
-const vram_tile_map_9C00 = def.tile_map_9C00 - def.vram_low;
-const vram_tile_8000 = def.tile_8000 - def.vram_low;
-const vram_tile_8800 = def.tile_8800 - def.vram_low;
-
-const tile_size_x = 8;
-const tile_size_y = 8;
-const tile_size_byte = 16;
 const color_id_transparent = 0;
-
-const tile_map_size_x = 32;
-const tile_map_size_y = 32;
-const tile_map_size_byte = tile_map_size_x * tile_map_size_y;
-const tile_map_pixel_size_x = tile_map_size_x * tile_size_x;
-const tile_map_pixel_size_y = tile_map_size_y * tile_size_y;
-
 const obj_size_byte = 4;
 const oam_size = 40;
 const oam_size_byte = oam_size * obj_size_byte;
 const obj_per_line = 10;
-const obj_double_height = tile_size_y * 2;
+const obj_double_height = def.tile_size_y * 2;
 
 const cycles_per_line = 456;
 const cycles_oam_scan = 80;
@@ -104,8 +89,8 @@ const FifoData = struct {
     bg_prio: ObjectPriority,
 };
 const transparent_pixel = FifoData{ .bg_prio = .obj_over_bg, .color_id = color_id_transparent, .obj_prio = 0, .palette_addr = &.{}, .palette_index = 0 };
-const BackgroundFifo = Fifo.RingbufferFifo(FifoData, tile_size_x);
-const ObjectFiFo = Fifo.RingbufferFifo(FifoData, tile_size_x);
+const BackgroundFifo = Fifo.RingbufferFifo(FifoData, def.tile_size_x);
+const ObjectFiFo = Fifo.RingbufferFifo(FifoData, def.tile_size_x);
 
 const FetcherData = struct {
     palette_index: u3 = 0,
@@ -269,7 +254,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
         .fetch_high_obj => {
             self.fetcher_data.second_bitplane = self.vram[self.fetcher_data.tile_addr];
 
-            var pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, &self.obj_palettes);
+            var pixels: [def.tile_size_x]FifoData = convert2bpp(self.fetcher_data, &self.obj_palettes);
             inline for(0..pixels.len) |i| {
                 const current_pixel: FifoData = self.object_fifo.readItem() orelse transparent_pixel;
                 pixels[i] = if(current_pixel.color_id == color_id_transparent) pixels[i] else current_pixel;
@@ -291,7 +276,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
         },
         .fetch_tile_bg => {
             const tilemap_addr_type: TileMapAddress = self.lcd_control.bg_map_area;
-            const overscan_x_tile_offset: u5 = tile_map_size_x - 1;
+            const overscan_x_tile_offset: u5 = def.tile_map_size_x - 1;
             self.fetcher_data = FetcherData{ 
                 .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, overscan_x_tile_offset, self.scroll_x, self.scroll_y),
             };
@@ -304,10 +289,10 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
             const obj_tile_index_offset: u8 = @as(u8, @intFromEnum(self.lcd_control.obj_size)) * (current_object.obj_tile_index % 2);
             const obj_tile_index: u8 = current_object.obj_tile_index - obj_tile_index_offset;
-            const obj_height_tile_offset: u2 = @intCast(current_object.obj_tile_row / tile_size_y);
+            const obj_height_tile_offset: u2 = @intCast(current_object.obj_tile_row / def.tile_size_y);
             const tile_addr_offset: u16 = obj_tile_index + obj_height_tile_offset;
-            const tile_addr: u16 = vram_tile_8000 + tile_addr_offset * tile_size_byte;
-            const tile_line_addr: u16 = tile_addr + ((current_object.obj_tile_row % tile_size_y) * def.byte_per_line);
+            const tile_addr: u16 = def.vram_tile_8000 + tile_addr_offset * def.tile_size_byte;
+            const tile_line_addr: u16 = tile_addr + ((current_object.obj_tile_row % def.tile_size_y) * def.byte_per_line);
             self.fetcher_data.tile_addr = tile_line_addr;
         },
         .fetch_tile_window => {
@@ -315,8 +300,8 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             const win_overscan_x: u16 = self.window_x + 1;
             const win_y: u16 = self.window_y;
             // Note: this works because we use modulo later to get the tile map address and tile line address.
-            const scroll_x: u16 = tile_map_pixel_size_x - win_overscan_x; 
-            const scroll_y: u16 = tile_map_pixel_size_y - win_y;
+            const scroll_x: u16 = def.tile_map_pixel_size_x - win_overscan_x; 
+            const scroll_y: u16 = def.tile_map_pixel_size_y - win_y;
             self.fetcher_data = FetcherData{ 
                 .tile_addr = getTileMapTileAddr(self, tilemap_addr_type, 0, scroll_x, scroll_y),
             };
@@ -329,7 +314,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
         },
         .oam_check => {
             const object = Object.fromOAM(self, self.oam_scan_idx);
-            const object_height: u8 = tile_size_y * (1 + @as(u8, @intFromEnum(self.lcd_control.obj_size)));
+            const object_height: u8 = def.tile_size_y * (1 + @as(u8, @intFromEnum(self.lcd_control.obj_size)));
             const obj_pixel_y: i16 = @as(i16, self.lcd_y) + obj_double_height - @as(i16, object.y_position);
             if(obj_pixel_y >= 0 and  obj_pixel_y < object_height) {
                 const object_flip: u8 = @intCast(if(object.flags.y_flip) object_height - 1 - obj_pixel_y  else obj_pixel_y);
@@ -456,7 +441,7 @@ fn advanceOAMScan(self: *Self) void {
 }
 
 fn checkLcdX(self: *Self) void {
-    const scroll_overscan_x: u8 = tile_size_x - (self.scroll_x % tile_size_x);
+    const scroll_overscan_x: u8 = def.tile_size_x - (self.scroll_x % def.tile_size_x);
 
     const win_overscan_x: u8 = self.window_x + 1;
     const win_pos_y: u8 = self.window_y;
@@ -489,12 +474,12 @@ fn checkLcdX(self: *Self) void {
     }
 }
 
-fn convert2bpp(fetcher_data: FetcherData, palette_addr: []const u8) [tile_size_x]FifoData {
+fn convert2bpp(fetcher_data: FetcherData, palette_addr: []const u8) [def.tile_size_x]FifoData {
     var first_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.first_bitplane) else fetcher_data.first_bitplane;
     var second_bitplane_var: u8 = if(fetcher_data.obj_flip_x) @bitReverse(fetcher_data.second_bitplane) else fetcher_data.second_bitplane;
 
-    var result: [tile_size_x]FifoData = undefined;
-    inline for(0..tile_size_x) |i| {
+    var result: [def.tile_size_x]FifoData = undefined;
+    inline for(0..def.tile_size_x) |i| {
         first_bitplane_var, const first_bit: u2 = @shlWithOverflow(first_bitplane_var, 1);
         second_bitplane_var, const second_bit: u2 = @shlWithOverflow(second_bitplane_var, 1);
         const color_id: u2 = first_bit + (second_bit << 1); // LSB first 
@@ -510,7 +495,7 @@ fn convert2bpp(fetcher_data: FetcherData, palette_addr: []const u8) [tile_size_x
 
 fn fetchPushBg(self: *Self) void {
     if(self.background_fifo.isEmpty()) { // push succeeded
-        const pixels: [tile_size_x]FifoData = convert2bpp(self.fetcher_data, &self.bg_palettes);
+        const pixels: [def.tile_size_x]FifoData = convert2bpp(self.fetcher_data, &self.bg_palettes);
         self.background_fifo.write(&pixels);
         self.uop_fifo.write(self.current_bg_window_uops);
     } else { // push failed 
@@ -533,22 +518,22 @@ fn getTileMapTileAddr(self: *Self, tilemap_addr_type: TileMapAddress, tile_x_off
     const pixel_x: u16 = @as(u16, self.lcd_overscan_x) + fifo_pixel_count + scroll_x; 
     const pixel_y: u16 = @as(u16, self.lcd_y) + scroll_y; 
 
-    const tilemap_x: u16 = ((pixel_x / tile_size_x) +% tile_x_offset) % tile_map_size_x;
-    const tilemap_y: u16 = (pixel_y / tile_size_y) % tile_map_size_y;
-    assert(tilemap_x < tile_map_size_x and tilemap_y < tile_map_size_y);
+    const tilemap_x: u16 = ((pixel_x / def.tile_size_x) +% tile_x_offset) % def.tile_map_size_x;
+    const tilemap_y: u16 = (pixel_y / def.tile_size_y) % def.tile_map_size_y;
+    assert(tilemap_x < def.tile_map_size_x and tilemap_y < def.tile_map_size_y);
 
-    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) vram_tile_map_9800 else vram_tile_map_9C00;
-    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * tile_map_size_y);
+    const tilemap_base_addr: u16 = if(tilemap_addr_type == .map_9800) def.vram_tile_map_9800 else def.vram_tile_map_9C00;
+    const tilemap_addr: u16 = tilemap_base_addr + tilemap_x + (tilemap_y * def.tile_map_size_y);
 
-    const tile_base_addr: u16 = if(self.lcd_control.bg_window_tile_data == .tile_8800) vram_tile_8800 else vram_tile_8000;
+    const tile_base_addr: u16 = if(self.lcd_control.bg_window_tile_data == .tile_8800) def.vram_tile_8800 else def.vram_tile_8000;
     const tile_y = self.lcd_y +% scroll_y;
 
-    const signed_mode: bool = tile_base_addr == vram_tile_8800;
+    const signed_mode: bool = tile_base_addr == def.vram_tile_8800;
     const tile_index: u16 = self.vram[tilemap_addr];
     const tile_addr_offset: u16 = if(signed_mode) (tile_index + 128) % 256 else tile_index;
 
-    const tile_addr: u16 = tile_base_addr + tile_addr_offset * tile_size_byte;
-    const tile_line_addr: u16 = tile_addr + ((tile_y % tile_size_y) * def.byte_per_line);
+    const tile_addr: u16 = tile_base_addr + tile_addr_offset * def.tile_size_byte;
+    const tile_line_addr: u16 = tile_addr + ((tile_y % def.tile_size_y) * def.byte_per_line);
 
     return tile_line_addr;
 } 
