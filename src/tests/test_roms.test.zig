@@ -1,4 +1,5 @@
 const std = @import("std");
+const test_options = @import("test_options");
 
 // TODO: Use modules for the tests to not use relative paths like this!
 const APU = @import("../apu.zig");
@@ -62,14 +63,21 @@ fn parseAscii(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_low: u16) 
     return try writer.toOwnedSlice();
 }
 
+const CoreType = switch(test_options.test_filter) {
+    .all => Core.Core(APU, CPU, PPU),
+    .cart => Core.Core(APUVoid, CPU, PPUVoid),
+    .cpu => Core.Core(APUVoid, CPU, PPUVoid),
+    .memory => Core.Core(APUVoid, CPU, PPUVoid),
+    .mmio => Core.Core(APUVoid, CPU, PPUVoid),
+    .ppu => Core.Core(APUVoid, CPU, PPU),
+    .apu => Core.Core(APU, CPU, PPUVoid),
+};
+
 const ResultMemory = struct { addr: u16, value: u8 };
 const RomTestConfig = struct {
     /// Note: Either file or directory
     path: []const u8,
-    // TODO: Have a way to specify which version of subsystems to use for tests. Not using the APU? Then use a void apu => Faster.
-    // TODO: Maybe Core is not a struct but a Generic (like ArrayList?) You can either specify the build-option version or a version where you specify the type for ppu, etc.
-    systems: u8,
-    // TODO: Auto detect model from filename? Do I need specific revisions? (DMG A, B, C)
+    system: test_options.@"build.TestFilter",
     model: def.GBModel,
     exit: enum {
         none, breakpoint, // LD b,b
@@ -109,7 +117,7 @@ const RomTestConfig = struct {
             .sec => |value| value * def.t_cycles_in_60fps * 60,
         };
     }
-    pub fn generateCoreConfig(self: Self, alloc: std.mem.Allocator) ![]Config {
+    pub fn generateCoreConfigs(self: Self, alloc: std.mem.Allocator) ![]Config {
         const path_stat = try std.fs.cwd().statFile(self.path);
         return switch(path_stat.kind) {
             // TODO: Generate multiple Configs for directories
@@ -162,7 +170,6 @@ const RomTestConfig = struct {
         };
     }
 };
-// TODO: How do we filter for specific systems? Example: I am working on the cpu and I want to only run cpu test roms + my cpu unit tests.
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 const blargg_path = "playground/game-boy-test-roms/blargg/";
 
@@ -170,29 +177,30 @@ const blargg_path = "playground/game-boy-test-roms/blargg/";
 //  => But this also has exceptions.
 //  => For directory also define if it is just this directoy or all subdirectories.
 const rom_test_configs: [2]RomTestConfig = .{
-    .{ .path = mooneye_path ++ "acceptance/div_timing.gb", 
-        .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/01-special.gb", 
-        .systems = 0, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    .{ .path = mooneye_path ++ "acceptance/div_timing.gb",
+        .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    .{ .path = blargg_path ++ "cpu_instrs/individual/01-special.gb",
+        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     // .{ .path = mooneye_path ++ "acceptance/boot_div-S.gb", 
-    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    //     .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb", 
-    //     .systems = 0, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    //     .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 100 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
 };
 
-pub fn runTestRomsTests() !void {
+pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
     const alloc = std.testing.allocator;
-
     var irq_joypad: bool = false;
 
     for (rom_test_configs) |test_config| {
+        if(filter != .all and test_config.system != filter) {
+            continue;
+        }
+
         const timeout_cycles: usize = test_config.getTimeoutCycles();
-        const configs: []Config = try test_config.generateCoreConfig(alloc);
+        const configs: []Config = try test_config.generateCoreConfigs(alloc);
         defer alloc.free(configs);
 
         for(configs) |config| {
-            const CoreType = Core.Core(APUVoid, CPU, PPUVoid);
-            // TODO: Also pass subsystems to core or config.
             var core: CoreType = .{};
             core.init(alloc, config);
             defer core.deinit(alloc, config);

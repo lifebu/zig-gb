@@ -1,22 +1,29 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+// exe
 pub const CPUModel = enum { instruction, cycle };
 pub const PPUModel = enum { void, frame, cycle };
 pub const APUModel = enum { void, cycle };
+
+// text
+pub const TestFilter = enum { all, cart, cpu, memory, mmio, ppu, apu };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // flags
+    // exe flags
     // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
-    const enable_llvm = b.option(bool, "enable-llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
-    const enable_audio = b.option(bool, "enable-audio", "Enables the audio output") orelse (optimize != .Debug);
+    const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
+    const enable_audio = b.option(bool, "enable_audio", "Enables the audio output") orelse (optimize != .Debug);
     const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.cycle;
     const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
     const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
     const tracy_enabled = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
+
+    // test flags
+    const test_filter = b.option(TestFilter, "test_filter", "Filters all tests to a specific subsystem.") orelse TestFilter.all;
 
     // exe
     const exe = b.addExecutable(.{
@@ -30,48 +37,39 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
-    // exe options
-    const options = b.addOptions();
-    options.addOption(CPUModel, "cpu_model", cpu_model);
-    options.addOption(PPUModel, "ppu_model", ppu_model);
-    options.addOption(APUModel, "apu_model", apu_model);
-    options.addOption(bool, "tracy_enabled", tracy_enabled);
-    options.addOption(bool, "enable_audio", enable_audio);
-    exe.root_module.addOptions("build_options", options);
+    const exe_options = b.addOptions();
+    exe_options.addOption(CPUModel, "cpu_model", cpu_model);
+    exe_options.addOption(PPUModel, "ppu_model", ppu_model);
+    exe_options.addOption(APUModel, "apu_model", apu_model);
+    exe_options.addOption(bool, "tracy_enabled", tracy_enabled);
+    exe_options.addOption(bool, "enable_audio", enable_audio);
+    exe.root_module.addOptions("build_options", exe_options);
 
-    // sokol
     const sokol = b.dependency("sokol", .{ .target = target, .optimize = optimize, .with_sokol_imgui = true });
     exe.root_module.addImport("sokol", sokol.module("sokol"));
+    addSokolShaderCompiler(b);
 
-    // cimgui
     const cimgui = b.dependency("cimgui", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("cimgui", cimgui.module("cimgui"));
     sokol.artifact("sokol_clib").addIncludePath(cimgui.path("src"));
 
-    // tracy
     const tracy = b.dependency("tracy", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("tracy", tracy.module("tracy"));
-    if(tracy_enabled) {
-        exe.root_module.addImport("tracy_impl", tracy.module("tracy_impl_enabled"));
-    } else {
-        exe.root_module.addImport("tracy_impl", tracy.module("tracy_impl_disabled"));
-    }
+    const tracy_impl_enabled: *std.Build.Module = tracy.module("tracy_impl_enabled");
+    const tracy_impl_disabled: *std.Build.Module = tracy.module("tracy_impl_disabled");
+    exe.root_module.addImport("tracy_impl", if(tracy_enabled) tracy_impl_enabled else tracy_impl_disabled);
 
-    // shader
-    buildShader(b);
-
-    // run
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
-
+    const run_exe = b.addRunArtifact(exe);
+    run_exe.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_exe.addArgs(args);
     const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    run_step.dependOn(&run_exe.step);
+
+
 
     // tests
-    // TODO: Put this in it's own build script?
     // TODO: Think about a better test setup using modules.
-    const exe_unit_tests = b.addTest(.{
+    const tests = b.addTest(.{
         .name = "test",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/test.zig"),
@@ -80,42 +78,42 @@ pub fn build(b: *std.Build) void {
         }),
         .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
     });
-    // TODO: Really annoying to have all the dependencies to everything in the tests.
-    exe_unit_tests.root_module.addImport("sokol", sokol.module("sokol"));
-    exe_unit_tests.root_module.addImport("cimgui", cimgui.module("cimgui"));
-    exe_unit_tests.root_module.addImport("tracy", tracy.module("tracy"));
-    b.installArtifact(exe_unit_tests);
+    b.installArtifact(tests);
 
-    // TODO: Not that nice that tests need to use the build options to use core.zig
-    exe_unit_tests.root_module.addOptions("build_options", options);
+    const test_options = b.addOptions();
+    test_options.addOption(TestFilter, "test_filter", test_filter);
+    tests.root_module.addOptions("test_options", test_options);
 
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_exe_unit_tests.step);
+    tests.root_module.addImport("sokol", sokol.module("sokol"));
+    tests.root_module.addImport("cimgui", cimgui.module("cimgui"));
+    tests.root_module.addImport("tracy", tracy.module("tracy"));
+    tests.root_module.addImport("tracy_impl", tracy_impl_disabled);
+
+    const run_tests = b.addRunArtifact(tests);
+    const tests_step = b.step("test", "Run unit tests");
+    tests_step.dependOn(&run_tests.step);
 }
 
-fn buildShader(b: *std.Build) void {
+fn addSokolShaderCompiler(b: *std.Build) void {
     const tool_dir = "tools/sokol-shdc/";
     const shaders_in ="src/shaders/";
     const shaders_out = "src/shaders/";
-    const shaders = .{
-        "gb.glsl",
-    };
+
+    const shader_lang = "glsl430:metal_macos:hlsl5:glsl300es";
+    const shaders = .{ "gb.glsl" };
     
-    const sdhc_platform: ?[:0]const u8 = comptime switch(builtin.os.tag) {
+    const shdc_platform: [:0]const u8 = comptime switch(builtin.os.tag) {
         .windows => "win32/sokol-shdc.exe",
         .linux => if (builtin.cpu.arch.isX86()) "linux/sokol-shdc" else "linux_arm64/sokol-shdc",
         .macos => if (builtin.cpu.arch.isX86()) "osx/sokol-shdc" else "osx_arm64/sokol-shdc",
-        else => null,
+        else => {
+            std.log.warn("shader compiler is unsupported on host platform {}.", .{ @tagName(builtin.os.tag) });
+            return;
+        },
     };
-    if(sdhc_platform == null) {
-        std.log.warn("unsupported host platform, skipping shader compiler step", .{});
-        return;
-    }
 
-    const sdhc_path = tool_dir ++ sdhc_platform.?;
+    const sdhc_path = tool_dir ++ shdc_platform;
     const sdhc_step = b.step("shaders", "Compile shaders using sokol-shdc");
-    const shader_lang = "glsl430:metal_macos:hlsl5:glsl300es";
     inline for (shaders) |shader| {
         const cmd = b.addSystemCommand(&.{ sdhc_path, 
             "-i", shaders_in ++ shader, 
