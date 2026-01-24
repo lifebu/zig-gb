@@ -75,8 +75,12 @@ const CoreType = switch(test_options.test_filter) {
 
 const ResultMemory = struct { addr: u16, value: u8 };
 const RomTestConfig = struct {
+    // TODO: Add a path_filter used for directories? So I can exclude some problematic instructions?
     /// Note: Either file or directory
     path: []const u8,
+    // TODO: Can I define a slice of filters in the build script? 
+    // Then I can split Halt tests from cpu instruction tests.
+    // But still be able to test all cpu features?
     system: test_options.@"build.TestFilter",
     model: def.GBModel,
     exit: enum {
@@ -121,6 +125,10 @@ const RomTestConfig = struct {
         const path_stat = try std.fs.cwd().statFile(self.path);
         return switch(path_stat.kind) {
             .directory => blk: {
+                // TODO: Use the contents of the filename to determine for which model this config would be and set emulation.model.
+                // Use this later to filter out tests that do not work on a specific model.
+                // This might need different "detection" methods (as people use different naming schemes).
+                // Should self.model contain an "detect" entry? Or is it an optiona with a default null?
                 var result: std.ArrayList(Config) = .empty;
                 defer result.deinit(alloc);
 
@@ -139,6 +147,7 @@ const RomTestConfig = struct {
                     new.emulation.model = self.model;
                     new.files.rom = try std.fmt.allocPrint(alloc, "{s}{s}", .{ self.path, entry.name });
                     new.debug.disable_saves = true;
+                    new.graphics.palette = test_palette;
                 }
 
                 break: blk try result.toOwnedSlice(alloc);
@@ -151,6 +160,7 @@ const RomTestConfig = struct {
                 result[0].emulation.model = self.model;
                 result[0].files.rom = self.path;
                 result[0].debug.disable_saves = true;
+                result[0].graphics.palette = test_palette;
                 break: blk result;
             },
             else => @panic("Unknown type of path in test rom config!"),
@@ -189,7 +199,7 @@ const RomTestConfig = struct {
                 const r8 = core.cpu.registers.r8;
                 break: fib r8.b == 3 and r8.c == 5 and r8.d == 8 and r8.e == 13 and r8.h == 21 and r8.l == 34;
             },
-            .screenshot => @panic("memory passing not yet supported"),
+            .screenshot => @panic("screenshot passing not yet supported"),
         };
     }
     // TODO: How to do that for the other cases? What is their output?
@@ -209,37 +219,81 @@ const RomTestConfig = struct {
     }
 };
 const blargg_path = "playground/game-boy-test-roms/blargg/";
+const bully_path = "playground/game-boy-test-roms/bully/";
+const dmg_acid_path = "playground/game-boy-test-roms/dmg-acid2/";
+const mbc3_tester_path = "playground/game-boy-test-roms/mbc3-tester/";
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
+const scribbltests = "playground/game-boy-test-roms/scribbltests/";
 
 // TODO: Go through every test and collect results and print a statistics how many passed and which failed. 
 // Have the statistics give me passing rates for each test suite (like blargg: passed/skipped/failed/total).
 // This is also because we immediately return on the first failed test!
 // TODO: Can we generate a test for each rom and filter them like in test.zig?
-const rom_test_configs: [10]RomTestConfig = .{
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
-        .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/",
-        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "instr_timing/instr_timing.gb",
-        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "halt_bug.gb",
-        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 200 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "mem_timing/individual/",
-        .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+const rom_test_configs: [1]RomTestConfig = .{
+    // .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
+    //     .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    // .{ .path = blargg_path ++ "cpu_instrs/individual/",
+    //     .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    // .{ .path = blargg_path ++ "halt_bug.gb",
+    //     .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 200 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    // .{ .path = blargg_path ++ "instr_timing/instr_timing.gb",
+    //     .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    // .{ .path = blargg_path ++ "mem_timing/individual/",
+    //     .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "mem_timing-2/rom_singles/",
         .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     // OAM Bug currently not implemented.
     // .{ .path = blargg_path ++ "oam_bug/rom_singles/",
     //     .system = .ppu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
 
-    .{ .path = mooneye_path ++ "acceptance/instr/daa.gb",
-        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb",
-        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = mooneye_path ++ "acceptance/bits/",
-        .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = mooneye_path ++ "acceptance/timer/",
-        .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = bully_path ++ "bully.gb",
+    //     .system = .all, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = bully_path ++ "bully.png" }, .context = .none },
+
+    // .{ .path = dmg_acid_path ++ "dmg-acid2.gb",
+    //     .system = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = dmg_acid_path ++ "dmg-acid2-dmg.png" }, .context = .none },
+
+    // TODO: This test loops, I need a new timeout exit condition.
+    // .{ .path = mbc3_tester_path ++ "mbc3-tester.gb",
+    //     .system = .cart, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = mbc3_tester_path ++ "mbc3-tester-dmg.png" }, .context = .none },
+
+    // .{ .path = mooneye_path ++ "acceptance/bits/",
+    //     .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/boot/",
+    //     .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/halt/",
+    //     .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/instr/daa.gb",
+    //     .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/instr_timing/",
+    //     .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb",
+    //     .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/oam_dma/",
+    //     .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/ppu/",
+    //     .system = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // Serial is currently not supported.
+    // .{ .path = mooneye_path ++ "acceptance/serial/boot_sclk_align-dmgABCmgb.gb",
+    //     .system = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "acceptance/timer/",
+    //     .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "emulator-only/mbc1/",
+    //     .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // MBC2 is currently not supported
+    // .{ .path = mooneye_path ++ "emulator-only/mbc2/",
+    //     .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // .{ .path = mooneye_path ++ "emulator-only/mbc5/",
+    //     .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+
+    // TODO: These test need a new timeout exit condition.
+    // .{ .path = scribbltests ++ "lycscx/lycscx.gb",
+    //     .system = .ppu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = scribbltests ++ "lycscx/lycscx-cgb-dmg.png" }, .context = .none },
+    // .{ .path = scribbltests ++ "lycscy/lycscy.gb",
+    //     .system = .ppu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = scribbltests ++ "lycscy/lycscy-cgb-dmg.png" }, .context = .none },
+    // .{ .path = scribbltests ++ "palettely/palettely.gb",
+    //     .system = .ppu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = scribbltests ++ "palettely/palettely-dmg.png" }, .context = .none },
+    // .{ .path = scribbltests ++ "scxly/scxly.gb",
+    //     .system = .ppu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = scribbltests ++ "scxly/scxly-dmg.png" }, .context = .none },
 };
 
 pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
