@@ -198,7 +198,7 @@ pub fn request(self: *Self, req: *def.Request) void {
         },
         def.cart_ram_low...(def.cart_ram_high - 1) => {
             if(!self.features.has_ram or self.ram_banks.len == 0) {
-                std.log.err("Cart has no wram, but game tried to access to cart ram?. {f}", .{ req });
+                std.log.info("Cart has no wram, but game tried to access to cart ram?. {f}", .{ req });
                 req.reject();
                 return;
             }
@@ -257,7 +257,7 @@ pub fn loadFile(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8, dis
     });
     if((self.features.has_ram and self.ram_banks.len == 0) or 
         (!self.features.has_ram and self.ram_banks.len != 0)) {
-        std.log.warn("Cart Header and Ram size do not match. Would be ignored by real gameboy.", .{});
+        std.log.info("Cart Header and Ram size do not match. Would be ignored by real gameboy.", .{});
     }
     assert(self.features.mapper != .unsupported);
     if(self.features.mapper == .mbc_1 and rom.len > (512 * 1024)) {

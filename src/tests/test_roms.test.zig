@@ -212,15 +212,32 @@ const blargg_path = "playground/game-boy-test-roms/blargg/";
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 
 // TODO: Go through every test and collect results and print a statistics how many passed and which failed. 
-// Can we generate a test for each rom and filter them like in test.zig?
-const rom_test_configs: [4]RomTestConfig = .{
+// Have the statistics give me passing rates for each test suite (like blargg: passed/skipped/failed/total).
+// This is also because we immediately return on the first failed test!
+// TODO: Can we generate a test for each rom and filter them like in test.zig?
+const rom_test_configs: [10]RomTestConfig = .{
     .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
         .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "cpu_instrs/individual/",
         .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    .{ .path = blargg_path ++ "instr_timing/instr_timing.gb",
+        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    .{ .path = blargg_path ++ "halt_bug.gb",
+        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 200 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    .{ .path = blargg_path ++ "mem_timing/individual/",
+        .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    .{ .path = blargg_path ++ "mem_timing-2/rom_singles/",
+        .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    // OAM Bug currently not implemented.
+    // .{ .path = blargg_path ++ "oam_bug/rom_singles/",
+    //     .system = .ppu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
 
     .{ .path = mooneye_path ++ "acceptance/instr/daa.gb",
         .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb",
+        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    .{ .path = mooneye_path ++ "acceptance/bits/",
+        .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/timer/",
         .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
 };
@@ -265,7 +282,7 @@ pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
             }
 
             std.testing.expectEqual(true, exit_cond_hit or test_config.exit == .none) catch |err| {
-                std.debug.print("Failed: {s}: {s}\n", .{ test_config.path, "rom has exit condition but it timed out." });
+                std.debug.print("Failed: {s}: {s}\n", .{ config.files.rom.?, "rom has exit condition but it timed out." });
                 return err;
             };
 
