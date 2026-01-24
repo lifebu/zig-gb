@@ -83,7 +83,7 @@ pub const Request = struct {
         }
     }
     pub fn logAndReject(self: *Request) void {
-        if (self.isValid()) std.log.warn("r/w lost: {f}", .{ self });
+        if (self.isValid()) std.log.info("r/w lost: {f}", .{ self });
         self.reject();
     }
 };

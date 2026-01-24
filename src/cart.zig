@@ -126,11 +126,11 @@ pub fn init(self: *Self) void {
     self.* = .{};
 }
 
-pub fn deinit(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8) void {
+pub fn deinit(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
     const save_path: []const u8 = getSavePath(alloc, rom_path);
     defer alloc.free(save_path);
 
-    if(self.features.has_battery and self.features.has_ram) {
+    if(self.features.has_battery and self.features.has_ram and !disable_saves) {
         const save_file: std.fs.File = std.fs.cwd().createFile(save_path, .{}) catch unreachable;
         defer save_file.close();
 
@@ -212,8 +212,7 @@ pub fn request(self: *Self, req: *def.Request) void {
     }
 }
 
-// TODO: not a great solution to handle the loading and initializing of the emulator, okay for now.
-pub fn loadFile(self: *Self, rom_path: []const u8, alloc: std.mem.Allocator) void {
+pub fn loadFile(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
     // file
     const rom: []u8 = std.fs.cwd().readFileAlloc(alloc, rom_path, std.math.maxInt(u32)) catch unreachable;
     defer alloc.free(rom);
@@ -273,7 +272,7 @@ pub fn loadFile(self: *Self, rom_path: []const u8, alloc: std.mem.Allocator) voi
     const save_file: ?std.fs.File = std.fs.cwd().openFile(save_path, .{}) catch |err| blk: {
         switch(err) { error.FileNotFound => break: blk null, else => unreachable, }
     };
-    if(self.features.has_battery and self.features.has_ram and save_file != null) { // Savegame ram.
+    if(self.features.has_battery and self.features.has_ram and save_file != null and !disable_saves) { // Savegame ram.
         const save_content: []const u8 = save_file.?.readToEndAlloc(alloc, std.math.maxInt(u32)) catch unreachable;
         defer alloc.free(save_content);
 

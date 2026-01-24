@@ -30,14 +30,14 @@ pub fn Core(apu_type: type, cpu_type: type, ppu_type: type) type {
             self.mmio.init();
 
             assert(config.files.rom != null);
-            self.cart.loadFile(config.files.rom.?, alloc);
+            self.cart.loadFile(alloc, config.files.rom.?, config.debug.disable_saves);
         }
 
         pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: Config) void {
             self.cpu.deinit(alloc);
 
             assert(config.files.rom != null);
-            self.cart.deinit(alloc, config.files.rom.?);
+            self.cart.deinit(alloc, config.files.rom.?, config.debug.disable_saves);
         }
 
         pub fn frame(self: *Self, input_state: def.InputState) void {

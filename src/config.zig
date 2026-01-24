@@ -24,6 +24,7 @@ const Emulation = struct {
 };
 const Debug = struct {
     enable_gb_breakpoint: bool = false,
+    disable_saves: bool = false,
 };
 
 files: Files = .{},
