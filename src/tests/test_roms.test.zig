@@ -80,7 +80,7 @@ const RomTestConfig = struct {
     system: test_options.@"build.TestFilter",
     model: def.GBModel,
     exit: enum {
-        none, breakpoint, // LD b,b
+        none, blargg, breakpoint, // LD b,b
     },
     // TODO: How do we skip the boot rom?
     // Currently wastes: 5.892.625 cycles or 84 Frames or 1,4 seconds
@@ -156,9 +156,25 @@ const RomTestConfig = struct {
             else => @panic("Unknown type of path in test rom config!"),
         };
     }
-    pub fn exitConditionHit(self: Self, core: anytype) bool {
+    pub fn exitConditionHit(self: Self, alloc: std.mem.Allocator, core: anytype, last_ppu_lcd_y: *u8) !bool {
         return switch (self.exit) {
             .none => false,
+            .blargg => blk: {
+                const lcd_y: u8 = core.ppu.lcd_y;
+                if(lcd_y == 144 and last_ppu_lcd_y.* == 143) {
+                    const vram_text: []const u8 = try parseAscii(alloc, core.ppu.vram, blargg_char_low);
+                    defer alloc.free(vram_text);
+
+                    var iter = std.mem.splitBackwardsScalar(u8, vram_text, '\n');
+                    while(iter.next()) |line| {
+                        const has_passed: bool = std.mem.containsAtLeast(u8, line, 1, "Passed");
+                        const has_failed: bool = std.mem.containsAtLeast(u8, line, 1, "Failed");
+                        if(has_passed or has_failed) break: blk true;
+                    }
+                }
+                last_ppu_lcd_y.* = lcd_y;
+                break: blk false;
+            },
             .breakpoint => core.cpu.registers.r8.ir == cpu_breakpoint_op,
         };
     }
@@ -197,60 +213,14 @@ const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 
 // TODO: Go through every test and collect results and print a statistics how many passed and which failed. 
 // Can we generate a test for each rom and filter them like in test.zig?
-const rom_test_configs: [25]RomTestConfig = .{
-    // TODO: If I can find an exit condition for blargg tests I can use the directory approach with a large timeout (some blargg tests are way slower).
-    // Every time the ppu enters vblank call parseAscii(). Iterate over each line in reverse and check if any of that lines contain "Passed" or "Failed".
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/01-registers.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/02-len ctr.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .sec = 11 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/03-trigger.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .sec = 19 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/04-sweep.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/05-sweep details.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 180 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/06-overflow on trigger.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 180 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/07-len sweep period sync.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 120 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/08-len ctr during power.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 180 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/09-wave read while on.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 120 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/10-wave trigger while on.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/11-regs after power.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 180 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "dmg_sound/rom_singles/12-wave write while on.gb",
-        .system = .apu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-
-    .{ .path = blargg_path ++ "cpu_instrs/individual/01-special.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/02-interrupts.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 120 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/03-op sp,hl.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 240 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/04-op r,imm.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 250 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/05-op rp.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/06-ld r,r.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 120 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/07-jr,jp,call,ret,rst.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/08-misc instrs.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 120 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/09-op r,r.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 640 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/10-bit ops.gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 920 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
-    .{ .path = blargg_path ++ "cpu_instrs/individual/11-op a,(hl).gb",
-        .system = .cpu, .model = .dmg, .exit = .none, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+const rom_test_configs: [4]RomTestConfig = .{
+    .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
+        .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    .{ .path = blargg_path ++ "cpu_instrs/individual/",
+        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
 
     .{ .path = mooneye_path ++ "acceptance/instr/daa.gb",
         .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-
     .{ .path = mooneye_path ++ "acceptance/timer/",
         .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
 };
@@ -259,6 +229,9 @@ pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
     const alloc = std.testing.allocator;
     var irq_joypad: bool = false;
 
+    // TODO: consider using a temporary allocator (FixedBufferAllocator) for each test.
+    // Allocate the memory for each test upfront. We are loosing 3 seconds for all blargg tests for example.
+    // For each test_config or each core_config (can have multiple for directories).
     var hit_any_rom: bool = false;
     for (rom_test_configs) |test_config| {
         // TODO: Add a max test cycle count to the build options => don't do a test if it's cycle count is larger than that.
@@ -282,11 +255,12 @@ pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
             core.init(alloc, config);
             defer core.deinit(alloc, config);
 
+            var last_ppu_lcd_y: u8 = 0;
             var exit_cond_hit: bool = false;
             var cycle_count: u32 = 0;
             while(cycle_count <= timeout_cycles) : (cycle_count += 1) {
                 core.cyle(&irq_joypad);
-                exit_cond_hit = test_config.exitConditionHit(&core);
+                exit_cond_hit = try test_config.exitConditionHit(alloc, &core, &last_ppu_lcd_y);
                 if(exit_cond_hit) break;
             }
 
