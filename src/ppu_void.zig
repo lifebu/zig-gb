@@ -133,7 +133,7 @@ pub fn request(self: *Self, req: *def.Request) void {
             }
         },
         def.lcd_stat => {
-            req.applyAllowedRW(&self.lcd_stat, 0xFF, 0xF8);
+            req.applyAllowedRW(&self.lcd_stat, 0x7F, 0xF8);
         },
         def.lcd_y => {
             req.applyAllowedRW(&self.lcd_y, 0xFF, 0x00);

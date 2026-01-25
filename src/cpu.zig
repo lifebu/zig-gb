@@ -1137,7 +1137,8 @@ pub fn request(self: *Self, req: *def.Request) void {
             req.apply(&self.hram[hram_idx]);
         },
         def.interrupt_enable => {
-            req.applyAllowedRW(&self.interrupt_enable, 0x1F, 0x1F);
+            // Note: Highest 3 bits are unused, but still read-writeable => 0xFF instead of 0x1F.
+            req.applyAllowedRW(&self.interrupt_enable, 0xFF, 0xFF);
         },
         def.interrupt_flag => {
             req.applyAllowedRW(&self.interrupt_flag, 0x1F, 0x1F);

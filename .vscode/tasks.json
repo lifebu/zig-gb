@@ -4,7 +4,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "zig build -Dcpu=x86_64 -Doptimize=Debug -Denable-llvm=true",
+            "command": "zig build -Dcpu=x86_64 -Doptimize=Debug -Denable_llvm=true",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -14,7 +14,7 @@
         {
             "label": "build-test",
             "type": "shell",
-            "command": "zig test -Denable-llvm=true --test-no-exec -femit-bin=zig-out/bin/${fileBasenameNoExtension}-test ${file}",
+            "command": "zig test -Denable_llvm=true --test-no-exec -femit-bin=zig-out/bin/${fileBasenameNoExtension}-test ${file}",
         },
 
         // Profiling

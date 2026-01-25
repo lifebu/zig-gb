@@ -82,3 +82,8 @@ N- Build from source:
 - Would it make sense to generate one blob file with all roms inside with a header?
 - Just load this file once?
 - How can I detect file changes and only run the test generator once?
+
+# Audio tests:
+- blargg apu tests
+- samesuite apu tests (requires some gbc features).
+- gambatte sound tests.

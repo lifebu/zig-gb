@@ -266,6 +266,7 @@ const rom_test_configs: [16]RomTestConfig = .{
         .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
 };
 
+// TODO: I should add a way to filter the tests further. If I am working on one specific test I should be able to filter them by name for faster turnaround.
 pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
     const alloc = std.testing.allocator;
     var irq_joypad: bool = false;
