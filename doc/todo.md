@@ -1,6 +1,4 @@
 # Next:
-- Cart: implement and test (mooneye) mbc 1,2,5:
-    - rom banks, highest rom bit, ram banks, mbc1 bank mode.
 - PPU: Check OAM Timing:
     - A lot of games try to write to OAM during draw and oam_scan which is not allowed.
     https://www.reddit.com/r/EmuDev/comments/9o5pw8/gameboy_legend_of_zelda_dma_transfers/
@@ -22,11 +20,6 @@
 - remove data/background.png
 - re-organize or remove unused docs.
 - remove ppu_static
-- How to get the test_data?
-    - SingleStepTests, blargg, other?
-    - I had to fix SingleStepTests so often, soooo keep?
-    - Use this as submodule? how about the binaries from this?
-        https://github.com/c-sp/game-boy-test-roms
 
 # Add a splash screen
 - documentation how to use a build step to generate the file:
@@ -35,60 +28,11 @@
 - with a small logo. embed this in the code and remove data/background.png
 - convert image to gb palette: https://gameboy.prodigle.dev/
 - convert gb palette image to 2bpp: https://rgbds.gbdev.io/docs/v1.0.1/rgbgfx.1
-- create a function to parse and read a 2bpp file and convert it to [overscan_resolution]u8.
+- create a function to parse and read a 2bpp file and convert it to [160 * 144]u8.
 - use @embedFile() for the resulting file: splash.bin
 
 # Tests
-- Use GB Test suites and run them. Create all the harness to run and test their outputs (different approaches).
-    - List of GB Test Roms with expected outputs:
-    https://github.com/c-sp/game-boy-test-roms
-    => This has a list of required outputs and a shell script that uses rgbds to compile them.
-    => Also has release verions you can download.
-    - All tests that use screenshots need a specific palette.
-        - DMG: #00_00_00, #55_55_55, #AA_AA_AA, #FF_FF_FF
-    - Config File for all tests (zon):
-        - Subsystems:
-            Which subsystems are getting tested by this.
-            If a subsystem is not needed it will use a void version.
-        - Supported Revisions:
-            - DMG, CGB, SGB, Any
-            - Filename: Auto detect revision from filename
-            Do I need the exact dmg cpu revisions?
-        - Exit Condition:
-            - None
-            - Breakpoint: LD B, B.
-            ?- ScreenShot: When a certain image has been reached
-        - Timeout:
-            Maximum number of seconds or cycles this test should run.
-            Can be used if we have no exit condition.
-            - Cycles
-            - Seconds
-            - Frames
-        - Test Result Pass/Fail:
-            - Fibonacci: On Success: B = 3, C = 5, D = 8, E = 13, H = 21, L = 34
-            - Screenshot.
-            - Memory Locations.
-        - Test Result Context:
-            - Memory Locations.
-            - Screenshot: Once the test has finished let PPU run once and generate an output screenshot.
-            - Text Parsing:
-                - blargg: also prints text to screen.
-                - gambatte: prints result on the screen.
-    - Make this test runner suite c-ABI compatible for other projects?
-    - Rework my test system and prepare for a better testing enviroment
-        - Custom testrunner?
-        - I want a multithreaded testrunner!
-        - This would be a good opportunity to learn about the new io interface in zig 0.16.0.
-    - Maybe I can auto generate the test.zig file?
-        - go through every x.test.zig file and find tests and generate a top-level test.zig file?
-        - can also use some custom code for this. It can also generate a test for each test rom test file.
-        - have a test_generator.zig for this. that generates the test.zig file from the src/tests folder.
-        - test name must be a compile time string: https://ziggit.dev/t/generating-tests-at-comptime/6473
-        - Or like the ziggit above I use one comptime block in test.zig that generates the individual tests for me?
-        - The generated names should have a clear naming scheme usefull for filtering tests:
-            Subystem_{Unit/Rom}_{File}
-            CPU_Unit_Halt
-            CPU_Rom_blargg/cpu_instrs/individual/01-special.gb
+- see tests.md
 - Interrupt Sources Test:
     - VBlanK, Stat
 
@@ -177,8 +121,6 @@
 
 - go from functions with the state as first parameter, to "c++ objects" that load the state implicitly!
 - Really standardize the order of declarations and definitions (constants, functions, etc).
-- Cart:
-    - Add tests for different mbc!
 - Think about how the code for loading and initializing the emulator should work.
     - Loading from command line and using the imgui ui.
     - Initialization and Deinitialization logic for all subsystems.
@@ -190,7 +132,7 @@
     - And I can expand this for full savestate support.
 - Refactoring timer, input and dma. They are mostly copied from old source code.
 - STOP
-- Enable all testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
+- Enable all single-step testing (cycle count, memory pins, etc) and make sure basic test code is cleaned up.
     - Cycle count.
     - MCycle pins. 
 - Interrupt Sources:
@@ -262,26 +204,6 @@
         - I set the initial mode for the PPU to 0x80, but it should be 0x85!
         https://www.reddit.com/r/Gameboy/comments/a1c8h0/what_happens_when_a_gameboy_screen_is_disabled/
 
-## Testing
-- Cart: MBC, Header, ROM/RAM.
-    - MBC1: ROM+RAM+BAT.
-    - MBC3: ROM+TIMER(RTC)+RAM+BAT
-    - MBC5: ROM+RAM+BAT+RUMBLE
-- Test ROMS:
-    - Blargg (CPU)
-    - MealyBug (PPU)
-    - Mooneye (All)
-    - Acid2 (PPU)
-    - SameSuite (All)
-    - Double-halt-cancel: https://github.com/nitro2k01/little-things-gb/tree/main/double-halt-cancel
-    - windesync: https://github.com/nitro2k01/little-things-gb/tree/main/windesync-validate
-- PPU
-    - Static: MemoryDump + Picture => Compare them.
-    - Dynamic: MemoryDump + Picture + CPUWriteList (perCycle) => Compare them.
-        - Compare each written pixel.
-        - MemoryDump: When VBlank starts?
-        - CPUWriteList: Each Write to PPU accessible memory.
-
 ## Refactor
 - Asserts (Defensive Programming, Tigerbeetle).
     - Add a bunch of logs of a game does something it should not do (like accessing ROM during OAM DMA Transfer).
@@ -297,8 +219,6 @@
 
 - Platform
 - Platform Timing (window fps, vs gb fps).
-- Testsetup:
-    - Allow to run single test and all tests.
 - General Code Cleanup / Quality.
 
 ## Audio / APU
