@@ -19,14 +19,29 @@ const test_palette: def.Palette = .{
     .color_3 = .{ 0xFF, 0xFF, 0xFF } 
 };
 
-const ascii_low = 32;
-const ascii_high = 128;
-const ascii_len = ascii_high - ascii_low;
 const mooneye_char_low = 0x8200;
 const blargg_char_low = 0x8200;
+const ascii_table = [96]u8{
+    ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',',  '-', '.', '/', 
+    '0', '1', '2', '3', '4', '5', '6', '7',  '8', '9', ':', ';', '<',  '=', '>', '?',
+    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',  'H', 'I', 'J', 'K', 'L',  'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',  'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
+    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g',  'h', 'i', 'j', 'k', 'l',  'm', 'n', 'o',
+    'p', 'q', 'r', 's', 't', 'u', 'v', 'w',  'x', 'y', 'z', '{', '|',  '}', '~', ' ',
+};
 
-fn parseAscii(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_low: u16) ![]const u8 {
-    const char_high = char_low + (ascii_len * def.tile_size_byte);
+const mbc3_char_low = 0x8000;
+const mbc3_check = 'c';
+const mbc3_fail = 'f';
+const mbc3_table: [39]u8 = .{ 
+    ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+    'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
+    'V', 'W', 'X', 'Y', 'Z', mbc3_check, mbc3_fail,
+};
+
+fn parseChar(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_table: []const u8, char_low: u16) ![]const u8 {
+    const char_len: u16 = @intCast(char_table.len);
+    const char_high: u16 = char_low + (char_len * def.tile_size_byte);
 
     var writer: std.io.Writer.Allocating = .init(alloc);
     defer writer.deinit();
@@ -44,9 +59,9 @@ fn parseAscii(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_low: u16) 
 
             const tile_addr_offset: u16 = vram[tilemap_addr];
             const tile_addr: u16 = def.tile_8000 + (tile_addr_offset * def.tile_size_byte);
-            const tile_addr_ascii = std.math.clamp(tile_addr, char_low, char_high);
-            const ascii: u8 = @intCast((tile_addr_ascii - char_low) / def.tile_size_byte);
-            const char: u8 = ascii + 32;
+            const tile_addr_table: u16 = std.math.clamp(tile_addr, char_low, char_high);
+            const table_offset: u8 = @intCast((tile_addr_table - char_low) / def.tile_size_byte);
+            const char: u8 = char_table[table_offset];
             line_has_content |= (char != ' ');
 
             try line_writer.writer.writeByte(char);
@@ -83,7 +98,7 @@ const RomTestConfig = struct {
     system: test_options.@"build.TestFilter",
     model: def.GBModel,
     exit: enum {
-        none, blargg, breakpoint, // LD b,b
+        none, timeout, blargg, breakpoint, // LD b,b
     },
     // TODO: How do we skip the boot rom?
     // Currently wastes: 5.892.625 cycles or 84 Frames or 1,4 seconds
@@ -94,14 +109,15 @@ const RomTestConfig = struct {
     },
     pass: union(enum) {
         fibonacci: void,
-        text: []const u8,
+        mbc3: void,
         memory: []ResultMemory,
+        text: []const u8,
     },
     context: union(enum) {
         none: void,
         memory: []ResultMemory,
         text_parsing: enum {
-            blargg, gambatte, mooneye,
+            blargg, mbc3, gambatte, mooneye,
         },
     },
 
@@ -120,7 +136,7 @@ const RomTestConfig = struct {
                 // TODO: Use the contents of the filename to determine for which model this config would be and set emulation.model.
                 // Use this later to filter out tests that do not work on a specific model.
                 // This might need different "detection" methods (as people use different naming schemes).
-                // Should self.model contain an "detect" entry? Or is it an optiona with a default null?
+                // Add a new enum: model_detection for the detection method.
                 var result: std.ArrayList(Config) = .empty;
                 defer result.deinit(alloc);
 
@@ -158,13 +174,17 @@ const RomTestConfig = struct {
             else => @panic("Unknown type of path in test rom config!"),
         };
     }
-    pub fn exitConditionHit(self: Self, alloc: std.mem.Allocator, core: anytype, last_ppu_lcd_y: *u8) !bool {
+    pub fn exitConditionHit(self: Self, alloc: std.mem.Allocator, core: anytype, last_ppu_lcd_y: *u8, cycle_count: usize) !bool {
         return switch (self.exit) {
             .none => false,
+            .timeout => blk: {
+                const timeout_cycles: usize = self.getTimeoutCycles();
+                break: blk cycle_count >= timeout_cycles;
+            },
             .blargg => blk: {
                 const lcd_y: u8 = core.ppu.lcd_y;
                 if(lcd_y == 144 and last_ppu_lcd_y.* == 143) {
-                    const vram_text: []const u8 = try parseAscii(alloc, core.ppu.vram, blargg_char_low);
+                    const vram_text: []const u8 = try parseChar(alloc, core.ppu.vram, &ascii_table, blargg_char_low);
                     defer alloc.free(vram_text);
 
                     var iter = std.mem.splitBackwardsScalar(u8, vram_text, '\n');
@@ -182,13 +202,16 @@ const RomTestConfig = struct {
     }
     pub fn passed(self: Self, core: anytype, context: []const u8) bool {
         return switch(self.pass) {
-            .memory => @panic("memory passing not yet supported"),
-            .text => |expected| txt: {
-                break: txt std.mem.containsAtLeast(u8, context, 1, expected);
-            },
-            .fibonacci => fib: {
+            .fibonacci => blk: {
                 const r8 = core.cpu.registers.r8;
-                break: fib r8.b == 3 and r8.c == 5 and r8.d == 8 and r8.e == 13 and r8.h == 21 and r8.l == 34;
+                break: blk r8.b == 3 and r8.c == 5 and r8.d == 8 and r8.e == 13 and r8.h == 21 and r8.l == 34;
+            },
+            .mbc3 => blk: {
+                break: blk !std.mem.containsAtLeastScalar(u8, context, 1, mbc3_fail);
+            },
+            .memory => @panic("memory passing not yet supported"),
+            .text => |expected| blk: {
+                break: blk std.mem.containsAtLeast(u8, context, 1, expected);
             },
         };
     }
@@ -198,22 +221,23 @@ const RomTestConfig = struct {
             .memory => @panic("memory context not yet supported"),
             .text_parsing => |parse_type| parse: {
                 break: parse switch (parse_type) {
-                    .blargg => try parseAscii(alloc, core.ppu.vram, blargg_char_low),
+                    .blargg => try parseChar(alloc, core.ppu.vram, &ascii_table, blargg_char_low),
+                    .mbc3 => try parseChar(alloc, core.ppu.vram, &mbc3_table, mbc3_char_low),
                     .gambatte => "",
-                    .mooneye => try parseAscii(alloc, core.ppu.vram, mooneye_char_low),
+                    .mooneye => try parseChar(alloc, core.ppu.vram, &ascii_table, mooneye_char_low),
                 };
             },
         };
     }
 };
+
 const blargg_path = "playground/game-boy-test-roms/blargg/";
 const bully_path = "playground/game-boy-test-roms/bully/";
 const dmg_acid_path = "playground/game-boy-test-roms/dmg-acid2/";
 const mbc3_tester_path = "playground/game-boy-test-roms/mbc3-tester/";
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 const scribbltests = "playground/game-boy-test-roms/scribbltests/";
-
-const rom_test_configs: [16]RomTestConfig = .{
+const rom_test_configs: [17]RomTestConfig = .{
     .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
         .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "cpu_instrs/individual/",
@@ -230,10 +254,8 @@ const rom_test_configs: [16]RomTestConfig = .{
     // .{ .path = blargg_path ++ "oam_bug/rom_singles/",
     //     .system = .ppu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
 
-    // TODO: This test loops, I need a new timeout exit condition.
-    // TODO: This needs a new type of text parser.
-    // .{ .path = mbc3_tester_path ++ "mbc3-tester.gb",
-    //     .system = .cart, .model = .dmg, .exit = .none, .timeout = .{ .frame = 140 }, .pass = .{ .screenshot = mbc3_tester_path ++ "mbc3-tester-dmg.png" }, .context = .none },
+    .{ .path = mbc3_tester_path ++ "mbc3-tester.gb",
+        .system = .cart, .model = .dmg, .exit = .timeout, .timeout = .{ .frame = 120 }, .pass = .mbc3, .context = .{ .text_parsing = .mbc3 } },
 
     .{ .path = mooneye_path ++ "acceptance/bits/",
         .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
@@ -301,7 +323,7 @@ pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
             var cycle_count: u32 = 0;
             while(cycle_count <= timeout_cycles) : (cycle_count += 1) {
                 core.cyle(&irq_joypad);
-                exit_cond_hit = try test_config.exitConditionHit(alloc, &core, &last_ppu_lcd_y);
+                exit_cond_hit = try test_config.exitConditionHit(alloc, &core, &last_ppu_lcd_y, cycle_count);
                 if(exit_cond_hit) break;
             }
 

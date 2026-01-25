@@ -156,7 +156,7 @@ pub fn request(self: *Self, req: *def.Request) void {
         // TODO: This truncation for each mbc gives further evidence that I should split this better?
         const register_sized: u8 = switch(self.features.mapper) {
             .mbc_1 => @as(u5, @truncate(req.value.write)),
-            .mbc_3 => @as(u7, @truncate(req.value.write)),
+            .mbc_3 => @as(u8, @truncate(req.value.write)),
             .mbc_5, .no_mbc => req.value.write,
             .unsupported => unreachable,
         };
