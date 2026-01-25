@@ -49,7 +49,7 @@ pub fn render(self: *Self, alloc: std.mem.Allocator) void {
         }
 
         if(self.gb_dialog_open) {
-            ShowFileDialogue(self, alloc, "gb");
+            ShowFileDialogue(self, alloc, &.{ "gb", "gbc" });
         }
 
         imgui.igEndMainMenuBar();
@@ -62,7 +62,7 @@ fn dirLessThan(_: void, lhs: std.fs.Dir.Entry, rhs: std.fs.Dir.Entry) bool {
     }
     return std.mem.order(u8, lhs.name, rhs.name) == .lt;
 }
-pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: []const u8) void {
+pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extensions: []const []const u8) void {
     const menu_height = 18;
     imgui.igSetNextWindowPos(.{ .x = 0, .y = menu_height }, imgui.ImGuiCond_Once);
     imgui.igSetNextWindowSize(.{ .x = def.window_width, .y = def.window_height - menu_height }, imgui.ImGuiCond_Once);
@@ -102,8 +102,10 @@ pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extension: [
                 var sequence = std.mem.splitAny(u8, item.name, ".");
                 _ = sequence.next(); // skip filename
                 if(sequence.next()) |extension| {
-                    if(!std.mem.eql(u8, extension, file_extension)) {
-                        continue;
+                    for(file_extensions) |file_extension| {
+                        if(!std.mem.eql(u8, extension, file_extension)) {
+                            continue;
+                        }
                     }
                 } else { // has no extension.
                     continue;
