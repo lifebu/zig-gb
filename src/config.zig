@@ -12,7 +12,7 @@ const Files = struct {
 const Audio = struct {
     // TODO: Sample rate would be harder to do as apu needs that info as well.
     stereo_audio: bool = true,
-    volume: f32 = 0.15,
+    volume: f32 = 0.10,
 };
 const Graphics = struct {
     // TODO: This does not work right now. Need a way to change the resolution later in sokol.
@@ -20,7 +20,8 @@ const Graphics = struct {
     palette: def.Palette = .{},
 };
 const Emulation = struct {
-    model: def.GBModel = .dmg,  
+    model: def.GBModel = .dmg,
+    skip_boot_rom: bool = false,
 };
 const Debug = struct {
     enable_gb_breakpoint: bool = false,

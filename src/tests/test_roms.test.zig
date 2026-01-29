@@ -11,7 +11,7 @@ const def = @import("../defines.zig");
 const PPU = @import("../ppu.zig");
 const PPUVoid = @import("../ppu_void.zig");
 
-const cpu_breakpoint_op = 0x40; // LD B, B
+const cpu_breakpoint_op: u8 = 0x40; // LD B, B
 const test_palette: def.Palette = .{ 
     .color_0 = .{ 0x00, 0x00, 0x00 }, 
     .color_1 = .{ 0x55, 0x55, 0x55 }, 
@@ -19,9 +19,9 @@ const test_palette: def.Palette = .{
     .color_3 = .{ 0xFF, 0xFF, 0xFF } 
 };
 
-const mooneye_char_low = 0x8200;
-const blargg_char_low = 0x8200;
-const ascii_table = [96]u8{
+const mooneye_char_low: u16 = 0x8200;
+const blargg_char_low: u16 = 0x8200;
+const ascii_table: [96]u8 = .{
     ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',',  '-', '.', '/', 
     '0', '1', '2', '3', '4', '5', '6', '7',  '8', '9', ':', ';', '<',  '=', '>', '?',
     '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',  'H', 'I', 'J', 'K', 'L',  'M', 'N', 'O',
@@ -30,9 +30,9 @@ const ascii_table = [96]u8{
     'p', 'q', 'r', 's', 't', 'u', 'v', 'w',  'x', 'y', 'z', '{', '|',  '}', '~', ' ',
 };
 
-const mbc3_char_low = 0x8000;
-const mbc3_check = 'c';
-const mbc3_fail = 'f';
+const mbc3_char_low: u16 = 0x8000;
+const mbc3_check: u8 = 'c';
+const mbc3_fail: u8 = 'f';
 const mbc3_table: [39]u8 = .{ 
     ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
     'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
@@ -100,8 +100,6 @@ const RomTestConfig = struct {
     exit: enum {
         none, timeout, blargg, breakpoint, // LD b,b
     },
-    // TODO: How do we skip the boot rom?
-    // Currently wastes: 5.892.625 cycles or 84 Frames or 1,4 seconds
     timeout: union(enum) {
         cycle: usize,
         frame: usize,
@@ -146,15 +144,17 @@ const RomTestConfig = struct {
                     if(entry.kind != .file) {
                         continue;
                     }
-                    if(!std.mem.eql(u8, std.fs.path.extension(entry.name), ".gb")) {
+                    if(!std.mem.eql(u8, std.fs.path.extension(entry.name), ".gb") and 
+                       !std.mem.eql(u8, std.fs.path.extension(entry.name), ".gbc")) {
                         continue;
                     }
 
                     const new: *Config = try result.addOne(alloc);
                     new.* = .default;
-                    new.emulation.model = self.model;
-                    new.files.rom = try std.fmt.allocPrint(alloc, "{s}{s}", .{ self.path, entry.name });
                     new.debug.disable_saves = true;
+                    new.emulation.model = self.model;
+                    new.emulation.skip_boot_rom = true;
+                    new.files.rom = try std.fmt.allocPrint(alloc, "{s}{s}", .{ self.path, entry.name });
                     new.graphics.palette = test_palette;
                 }
 
@@ -165,9 +165,10 @@ const RomTestConfig = struct {
                 errdefer alloc.free(result);
 
                 result[0] = .default;
-                result[0].emulation.model = self.model;
-                result[0].files.rom = self.path;
                 result[0].debug.disable_saves = true;
+                result[0].emulation.model = self.model;
+                result[0].emulation.skip_boot_rom = true;
+                result[0].files.rom = self.path;
                 result[0].graphics.palette = test_palette;
                 break: blk result;
             },
@@ -237,7 +238,7 @@ const dmg_acid_path = "playground/game-boy-test-roms/dmg-acid2/";
 const mbc3_tester_path = "playground/game-boy-test-roms/mbc3-tester/";
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 const scribbltests = "playground/game-boy-test-roms/scribbltests/";
-const rom_test_configs: [17]RomTestConfig = .{
+const rom_test_configs: [15]RomTestConfig = .{
     .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
         .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "cpu_instrs/individual/",

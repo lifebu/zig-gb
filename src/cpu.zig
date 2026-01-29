@@ -806,8 +806,9 @@ interrupt_master_enable: bool = false,
 halt_again: bool = false,
 
 
-pub fn init(self: *Self, alloc: std.mem.Allocator) void {
+pub fn init(self: *Self, alloc: std.mem.Allocator, skip_boot_rom: bool) void {
     self.* = .{};
+    self.registers.r16.pc = if(skip_boot_rom) def.boot_rom_size else 0;
 
     opcode_banks = genOpcodeBanks(alloc);
     const opcode_bank = opcode_banks[opcode_bank_default];

@@ -35,8 +35,9 @@ dma: u8 = 0,
 work_ram: [work_ram_size]u8 = @splat(0),
 
 
-pub fn init(self: *Self, model: def.GBModel) void {
+pub fn init(self: *Self, model: def.GBModel, skip_boot_rom: bool) void {
     self.* = .{};
+    self.boot.finished = skip_boot_rom;
     switch (model) {
         .dmg => self.boot_rom = dmg_rom.*,
     }

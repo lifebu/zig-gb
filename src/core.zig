@@ -24,8 +24,8 @@ pub fn Core(apu_type: type, cpu_type: type, ppu_type: type) type {
             self.* = .{};
             self.apu.init();
             self.cart.init();
-            self.cpu.init(alloc);
-            self.memory.init(config.emulation.model);
+            self.cpu.init(alloc, config.emulation.skip_boot_rom);
+            self.memory.init(config.emulation.model, config.emulation.skip_boot_rom);
             self.ppu.init();
             self.mmio.init();
 

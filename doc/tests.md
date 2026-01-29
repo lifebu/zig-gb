@@ -63,6 +63,11 @@ N- Build from source:
 
 # custom test runner
 - Use a custom multithreaded test-runner with zig 0.16 io?
+- a MT testrunner would especially be nice if I also use a test generator with it.
+    => Each test rom that I actually want to run generates it's own unique unit test.
+    => I am generting the overarching test.zig file as a build step before compiling the tests.
+    => My Testrunner then runs them multithreaded.
+    => This automatically gives me statistics, as the test names are generated from the test suites (blargg) and file names!
 - I want to have a statistics for the different test suites how much i am currently passing.
 
 # Test Generator.

@@ -13,7 +13,7 @@ pub fn runInterruptTests() !void {
     defer memory.deinit();
 
     var cpu: CPU = .{};
-    cpu.init(alloc);
+    cpu.init(alloc, false);
     defer cpu.deinit(alloc);
 
     // CPU can write to IF.

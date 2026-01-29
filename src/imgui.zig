@@ -102,10 +102,12 @@ pub fn ShowFileDialogue(self: *Self, alloc: std.mem.Allocator, file_extensions: 
                 var sequence = std.mem.splitAny(u8, item.name, ".");
                 _ = sequence.next(); // skip filename
                 if(sequence.next()) |extension| {
+                    var matches_any: bool = false;
                     for(file_extensions) |file_extension| {
-                        if(!std.mem.eql(u8, extension, file_extension)) {
-                            continue;
-                        }
+                        matches_any |= std.mem.eql(u8, extension, file_extension);
+                    }
+                    if(!matches_any) {
+                        continue;
                     }
                 } else { // has no extension.
                     continue;

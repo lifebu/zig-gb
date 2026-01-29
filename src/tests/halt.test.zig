@@ -22,7 +22,7 @@ pub fn runHaltTests() !void {
     defer memory.deinit();
 
     var cpu: CPU = .{};
-    cpu.init(alloc);
+    cpu.init(alloc, false);
     defer cpu.deinit(alloc);
 
     // TODO: Can we combine the code from all of the cases?
