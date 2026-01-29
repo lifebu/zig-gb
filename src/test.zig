@@ -1,6 +1,6 @@
 const std = @import("std");
 const test_options = @import("test_options");
-const filter = test_options.test_filter;
+const category = test_options.test_category;
 
 const apu_sampling_test = @import("tests/apu_sampling.test.zig");
 const apu_test = @import("tests/apu.test.zig");
@@ -15,18 +15,18 @@ const test_roms = @import("tests/test_roms.test.zig");
 
 
 test "All_TestRomTest" {
-    try test_roms.runTestRomsTests(filter);
+    try test_roms.runTestRomsTests(category);
 }
 
 // test "APU_Channel" {
-//     if (filter != .all and filter != .apu) {
+//     if (category != .all and category != .apu) {
 //         return error.SkipZigTest;
 //     }
 //     try apu_test.runApuChannelTests();
 // }
 //
 // test "APU_Output" {
-//     if (filter != .all and filter != .apu) {
+//     if (category != .all and category != .apu) {
 //         return error.SkipZigTest;
 //     }
 //     const pre_calc: bool = false;
@@ -34,77 +34,77 @@ test "All_TestRomTest" {
 // }
 //
 // test "APU_Sampler" {
-//     if (filter != .all and filter != .apu) {
+//     if (category != .all and category != .apu) {
 //         return error.SkipZigTest;
 //     }
 //     try apu_sampling_test.runApuSamplingTests();
 // }
 
 test "Cart" {
-    if (filter != .all and filter != .cart) {
+    if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
     try cart_test.runCartTests();
 }
 
 test "CPU_Halt" {
-    if (filter != .all and filter != .cpu) {
+    if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
     try halt_test.runHaltTests();
 }
 
 test "CPU_InterruptTest" {
-    if (filter != .all and filter != .cpu) {
+    if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
     try interrupt_test.runInterruptTests();
 }
 
 // test "CPU_SingleStepTest" {
-//     if (filter != .all and filter != .cpu) {
+//     if (category != .all and category != .cpu) {
 //         return error.SkipZigTest;
 //     }
 //     try singlestep_test.runSingleStepTests();
 // }
 
 test "MMIO_DividerTest" {
-    if (filter != .all and filter != .mmio) {
+    if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
     try mmio_test.runDividerTests();
 }
 
 test "MMIO_InputTest" {
-    if (filter != .all and filter != .mmio) {
+    if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
     try mmio_test.runInputTests();
 }
 
 test "MMIO_TimerTest" {
-    if (filter != .all and filter != .mmio) {
+    if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
     try mmio_test.runTimerTest();
 }
 
 test "Memory_DMA" {
-    if (filter != .all and filter != .memory) {
+    if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
     try memory_test.runDMATest();
 }
 
 test "Memory_Request" {
-    if (filter != .all and filter != .memory) {
+    if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
     try memory_test.runRequestTest();
 }
 
 // test "PPU_InterruptTest" {
-//     if (filter != .all and filter != .ppu) {
+//     if (category != .all and category != .ppu) {
 //         return error.SkipZigTest;
 //     }
 //     try ppu_test.runInterruptTests();

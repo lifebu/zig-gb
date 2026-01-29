@@ -78,24 +78,23 @@ fn parseChar(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_table: []co
     return try writer.toOwnedSlice();
 }
 
-const CoreType = switch(test_options.test_filter) {
+const CoreType = switch(test_options.test_category) {
     .all => Core.Core(APU, CPU, PPU),
+    .apu => Core.Core(APU, CPU, PPUVoid),
     .cart => Core.Core(APUVoid, CPU, PPUVoid),
     .cpu => Core.Core(APUVoid, CPU, PPUVoid),
+    .instr => Core.Core(APUVoid, CPU, PPUVoid),
     .memory => Core.Core(APUVoid, CPU, PPUVoid),
     .mmio => Core.Core(APUVoid, CPU, PPUVoid),
     .ppu => Core.Core(APUVoid, CPU, PPU),
-    .apu => Core.Core(APU, CPU, PPUVoid),
 };
 
 const ResultMemory = struct { addr: u16, value: u8 };
 const RomTestConfig = struct {
-    // TODO: Add a path_filter used for directories? So I can exclude some problematic tests?
     path: []const u8,
-    // TODO: Can I define a slice of filters in the build script? 
-    // Then I can split Halt tests from cpu instruction tests.
-    // But still be able to test all cpu features?
-    system: test_options.@"build.TestFilter",
+    file_filter: []const []const u8 = &.{},
+    force_boot_rom: bool = false,
+    category: test_options.@"build.TestCategory",
     model: def.GBModel,
     exit: enum {
         none, timeout, blargg, breakpoint, // LD b,b
@@ -140,7 +139,7 @@ const RomTestConfig = struct {
 
                 const dir: std.fs.Dir = try std.fs.cwd().openDir(self.path, .{ .iterate = true });
                 var iter = dir.iterate();
-                while(iter.next() catch unreachable) |entry| {
+                outer: while(iter.next() catch unreachable) |entry| {
                     if(entry.kind != .file) {
                         continue;
                     }
@@ -148,12 +147,22 @@ const RomTestConfig = struct {
                        !std.mem.eql(u8, std.fs.path.extension(entry.name), ".gbc")) {
                         continue;
                     }
+                    for(self.file_filter) |filter| {
+                        if(std.mem.containsAtLeast(u8, entry.name, 1, filter)) {
+                            continue: outer;
+                        }
+                    }
+                    if(test_options.test_filter) |test_filter| {
+                        if(!std.mem.containsAtLeast(u8, entry.name, 1, test_filter)) {
+                            continue;
+                        }
+                    }
 
                     const new: *Config = try result.addOne(alloc);
                     new.* = .default;
                     new.debug.disable_saves = true;
                     new.emulation.model = self.model;
-                    new.emulation.skip_boot_rom = true;
+                    new.emulation.skip_boot_rom = !self.force_boot_rom;
                     new.files.rom = try std.fmt.allocPrint(alloc, "{s}{s}", .{ self.path, entry.name });
                     new.graphics.palette = test_palette;
                 }
@@ -161,14 +170,20 @@ const RomTestConfig = struct {
                 break: blk try result.toOwnedSlice(alloc);
             },
             .file => blk: {
+                if(test_options.test_filter) |test_filter| {
+                    if(!std.mem.containsAtLeast(u8, self.path, 1, test_filter)) {
+                        break: blk &.{};
+                    }
+                }
+
                 const result: []Config = try alloc.alloc(Config, 1);
                 errdefer alloc.free(result);
 
                 result[0] = .default;
                 result[0].debug.disable_saves = true;
                 result[0].emulation.model = self.model;
-                result[0].emulation.skip_boot_rom = true;
-                result[0].files.rom = self.path;
+                result[0].emulation.skip_boot_rom = !self.force_boot_rom;
+                result[0].files.rom = try alloc.dupe(u8, self.path);
                 result[0].graphics.palette = test_palette;
                 break: blk result;
             },
@@ -238,59 +253,59 @@ const dmg_acid_path = "playground/game-boy-test-roms/dmg-acid2/";
 const mbc3_tester_path = "playground/game-boy-test-roms/mbc3-tester/";
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 const scribbltests = "playground/game-boy-test-roms/scribbltests/";
-const rom_test_configs: [15]RomTestConfig = .{
+const rom_test_configs: [18]RomTestConfig = .{
     .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
-        .system = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+        .category = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "cpu_instrs/individual/",
-        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+        .category = .instr, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 1160 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "halt_bug.gb",
-        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 200 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+        .category = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 200 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "instr_timing/instr_timing.gb",
-        .system = .cpu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+        .category = .instr, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "mem_timing/individual/",
-        .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+        .category = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "mem_timing-2/rom_singles/",
-        .system = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+        .category = .memory, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 140 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     // OAM Bug currently not implemented.
     // .{ .path = blargg_path ++ "oam_bug/rom_singles/",
-    //     .system = .ppu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
+    //     .category = .ppu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
 
     .{ .path = mbc3_tester_path ++ "mbc3-tester.gb",
-        .system = .cart, .model = .dmg, .exit = .timeout, .timeout = .{ .frame = 120 }, .pass = .mbc3, .context = .{ .text_parsing = .mbc3 } },
+        .category = .cart, .model = .dmg, .exit = .timeout, .timeout = .{ .frame = 120 }, .pass = .mbc3, .context = .{ .text_parsing = .mbc3 } },
 
     .{ .path = mooneye_path ++ "acceptance/bits/",
-        .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/boot/",
-        .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = mooneye_path ++ "acceptance/halt/",
-        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // TODO: halt_ime1_timing2-GS.gb does not work without the boot rom, why?
+    .{ .path = mooneye_path ++ "acceptance/halt/", .force_boot_rom = true,
+        .category = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/instr/daa.gb",
-        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .instr, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/instr_timing/",
-        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .instr, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb",
-        .system = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/oam_dma/",
-        .system = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/ppu/",
-        .system = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // Serial is currently not supported.
     // .{ .path = mooneye_path ++ "acceptance/serial/boot_sclk_align-dmgABCmgb.gb",
-    //     .system = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    //     .category = .ppu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/timer/",
-        .system = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    // TODO: Need to filter out mbc1 tests with more than 512kByte (alternative wiring).
-    // .{ .path = mooneye_path ++ "emulator-only/mbc1/",
-    //     .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    // We don't support mbc1 roms with more than 512kByte (alternative wiring).
+    .{ .path = mooneye_path ++ "emulator-only/mbc1/", .file_filter = &.{ "multicart_rom_8Mb", "rom_1Mb", "rom_2Mb", "rom_4Mb", "rom_8Mb", "rom_16Mb"},
+        .category = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // MBC2 is currently not supported
     // .{ .path = mooneye_path ++ "emulator-only/mbc2/",
-    //     .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+    //     .category = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "emulator-only/mbc5/",
-        .system = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+        .category = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
 };
 
-// TODO: I should add a way to filter the tests further. If I am working on one specific test I should be able to filter them by name for faster turnaround.
-pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
+pub fn runTestRomsTests(category: test_options.@"build.TestCategory") !void {
     const alloc = std.testing.allocator;
     var irq_joypad: bool = false;
 
@@ -299,8 +314,7 @@ pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
     // For each test_config or each core_config (can have multiple for directories).
     var hit_any_rom: bool = false;
     for (rom_test_configs) |test_config| {
-        // TODO: Add a max test cycle count to the build options => don't do a test if it's cycle count is larger than that.
-        if(filter != .all and test_config.system != filter) {
+        if(category != .all and test_config.category != category) {
             continue;
         }
         hit_any_rom = true;
@@ -308,9 +322,7 @@ pub fn runTestRomsTests(filter: test_options.@"build.TestFilter") !void {
         const timeout_cycles: usize = test_config.getTimeoutCycles();
         const configs: []Config = try test_config.generateCoreConfigs(alloc);
         defer {
-            if(configs.len > 1) { // directory => need to clean up strings
-                for(configs) |config| if(config.files.rom) |rom| alloc.free(rom);
-            }
+            for(configs) |config| if(config.files.rom) |rom| alloc.free(rom);
             alloc.free(configs);
         }
 

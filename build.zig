@@ -7,7 +7,7 @@ pub const PPUModel = enum { void, frame, cycle };
 pub const APUModel = enum { void, cycle };
 
 // text
-pub const TestFilter = enum { all, cart, cpu, memory, mmio, ppu, apu };
+pub const TestCategory = enum { all, cart, instr, cpu, memory, mmio, ppu, apu };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -23,7 +23,8 @@ pub fn build(b: *std.Build) void {
     const tracy_enabled = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
 
     // test flags
-    const test_filter = b.option(TestFilter, "test_filter", "Filters all tests to a specific subsystem.") orelse TestFilter.all;
+    const test_category = b.option(TestCategory, "test_category", "Filters all tests to a specific subsystem.") orelse TestCategory.all;
+    const test_filter = b.option([]const u8, "test_filter", "Only do a test with this name");
 
     // exe
     const exe = b.addExecutable(.{
@@ -81,7 +82,8 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(tests);
 
     const test_options = b.addOptions();
-    test_options.addOption(TestFilter, "test_filter", test_filter);
+    test_options.addOption(TestCategory, "test_category", test_category);
+    test_options.addOption(?[]const u8, "test_filter", test_filter);
     tests.root_module.addOptions("test_options", test_options);
 
     tests.root_module.addImport("sokol", sokol.module("sokol"));
