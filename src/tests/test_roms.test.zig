@@ -19,6 +19,7 @@ const test_palette: def.Palette = .{
     .color_3 = .{ 0xFF, 0xFF, 0xFF } 
 };
 
+const bully_char_low: u16 = 0x9200;
 const mooneye_char_low: u16 = 0x8200;
 const blargg_char_low: u16 = 0x8200;
 const ascii_table: [96]u8 = .{
@@ -39,9 +40,11 @@ const mbc3_table: [39]u8 = .{
     'V', 'W', 'X', 'Y', 'Z', mbc3_check, mbc3_fail,
 };
 
-fn parseChar(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_table: []const u8, char_low: u16) ![]const u8 {
+fn parseChar(alloc: std.mem.Allocator, ppu: anytype, char_table: []const u8, char_low: u16) ![]const u8 {
     const char_len: u16 = @intCast(char_table.len);
     const char_high: u16 = char_low + (char_len * def.tile_size_byte);
+    const tilemap_base_addr: u16 = if(ppu.lcd_control.bg_map_area == .map_9800) def.vram_tile_map_9800 else def.vram_tile_map_9C00;
+    const tile_base_addr: u16 = if(ppu.lcd_control.bg_window_tile_data == .tile_8800) def.tile_8800 else def.tile_8000;
 
     var writer: std.io.Writer.Allocating = .init(alloc);
     defer writer.deinit();
@@ -55,10 +58,10 @@ fn parseChar(alloc: std.mem.Allocator, vram: [def.vram_size]u8, char_table: []co
 
         for(0..def.tile_map_size_x) |x| {
             const x_cast: u16 = @intCast(x);
-            const tilemap_addr: u16 = def.vram_tile_map_9800 + x_cast + (y_cast * def.tile_map_size_y);
+            const tilemap_addr: u16 = tilemap_base_addr + x_cast + (y_cast * def.tile_map_size_y);
 
-            const tile_addr_offset: u16 = vram[tilemap_addr];
-            const tile_addr: u16 = def.tile_8000 + (tile_addr_offset * def.tile_size_byte);
+            const tile_addr_offset: u16 = ppu.vram[tilemap_addr];
+            const tile_addr: u16 = tile_base_addr + (tile_addr_offset * def.tile_size_byte);
             const tile_addr_table: u16 = std.math.clamp(tile_addr, char_low, char_high);
             const table_offset: u8 = @intCast((tile_addr_table - char_low) / def.tile_size_byte);
             const char: u8 = char_table[table_offset];
@@ -114,7 +117,7 @@ const RomTestConfig = struct {
         none: void,
         memory: []ResultMemory,
         text_parsing: enum {
-            blargg, mbc3, gambatte, mooneye,
+            bully, blargg, mbc3, gambatte, mooneye,
         },
     },
 
@@ -200,7 +203,7 @@ const RomTestConfig = struct {
             .blargg => blk: {
                 const lcd_y: u8 = core.ppu.lcd_y;
                 if(lcd_y == 144 and last_ppu_lcd_y.* == 143) {
-                    const vram_text: []const u8 = try parseChar(alloc, core.ppu.vram, &ascii_table, blargg_char_low);
+                    const vram_text: []const u8 = try parseChar(alloc, core.ppu, &ascii_table, blargg_char_low);
                     defer alloc.free(vram_text);
 
                     var iter = std.mem.splitBackwardsScalar(u8, vram_text, '\n');
@@ -237,23 +240,30 @@ const RomTestConfig = struct {
             .memory => @panic("memory context not yet supported"),
             .text_parsing => |parse_type| parse: {
                 break: parse switch (parse_type) {
-                    .blargg => try parseChar(alloc, core.ppu.vram, &ascii_table, blargg_char_low),
-                    .mbc3 => try parseChar(alloc, core.ppu.vram, &mbc3_table, mbc3_char_low),
+                    .blargg => try parseChar(alloc, core.ppu, &ascii_table, blargg_char_low),
+                    .bully => try parseChar(alloc, core.ppu, &ascii_table, bully_char_low),
+                    .mbc3 => try parseChar(alloc, core.ppu, &mbc3_table, mbc3_char_low),
                     .gambatte => "",
-                    .mooneye => try parseChar(alloc, core.ppu.vram, &ascii_table, mooneye_char_low),
+                    .mooneye => try parseChar(alloc, core.ppu, &ascii_table, mooneye_char_low),
                 };
             },
         };
     }
 };
 
+const age_path = "playground/game-boy-test-roms/age-test-roms/";
 const blargg_path = "playground/game-boy-test-roms/blargg/";
 const bully_path = "playground/game-boy-test-roms/bully/";
 const dmg_acid_path = "playground/game-boy-test-roms/dmg-acid2/";
 const mbc3_tester_path = "playground/game-boy-test-roms/mbc3-tester/";
 const mooneye_path = "playground/game-boy-test-roms/mooneye-test-suite/";
 const scribbltests = "playground/game-boy-test-roms/scribbltests/";
+
 const rom_test_configs: [18]RomTestConfig = .{
+    // TODO: Add Age tests for halt => requires new type of text parsing
+    // .{ .path = age_path ++ "halt/",
+    //     .category = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .age } },
+
     .{ .path = blargg_path ++ "dmg_sound/rom_singles/",
         .category = .apu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
     .{ .path = blargg_path ++ "cpu_instrs/individual/",
@@ -270,6 +280,10 @@ const rom_test_configs: [18]RomTestConfig = .{
     // .{ .path = blargg_path ++ "oam_bug/rom_singles/",
     //     .category = .ppu, .model = .dmg, .exit = .blargg, .timeout = .{ .frame = 360 }, .pass = .{ .text = "Passed" }, .context = .{ .text_parsing = .blargg } },
 
+    // TODO: This does not work in the text? there is now output on the vram?
+    // .{ .path = bully_path ++ "bully.gb",
+    //     .category = .memory, .model = .dmg, .exit = .timeout, .timeout = .{ .frame = 120 }, .pass = .{ .text = "All tests OK!" }, .context = .{ .text_parsing = .bully } },
+
     .{ .path = mbc3_tester_path ++ "mbc3-tester.gb",
         .category = .cart, .model = .dmg, .exit = .timeout, .timeout = .{ .frame = 120 }, .pass = .mbc3, .context = .{ .text_parsing = .mbc3 } },
 
@@ -277,7 +291,7 @@ const rom_test_configs: [18]RomTestConfig = .{
         .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/boot/",
         .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    // TODO: halt_ime1_timing2-GS.gb does not work without the boot rom, why?
+    // halt_ime1_timing2-GS.gb does not work without the boot rom, why?
     .{ .path = mooneye_path ++ "acceptance/halt/", .force_boot_rom = true,
         .category = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/instr/daa.gb",
@@ -303,6 +317,8 @@ const rom_test_configs: [18]RomTestConfig = .{
     //     .category = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "emulator-only/mbc5/",
         .category = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
+
+    // TODO: Add support for same-suite tests, one test is for ei-di and halt delays.
 };
 
 pub fn runTestRomsTests(category: test_options.@"build.TestCategory") !void {

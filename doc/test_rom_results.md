@@ -4,6 +4,7 @@ p = passed, f = failed, ~ = depends
 
 # age-test-roms
 - made to complement other test suites.
+- mostly ppu, one set of halt tests.
 
 # Bully
 - https://github.com/Ashiepaws/BullyGB/wiki
