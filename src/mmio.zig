@@ -14,7 +14,7 @@ pub const TimerControl = packed struct(u8) {
 
 // serial
 pub const SerialControl = packed struct(u8) {
-    is_master_clock: bool = true,
+    is_master_clock: bool = false,
     use_high_speed: bool = false,
     _: u5 = 0,
     transfer_enable: bool = false,
@@ -40,7 +40,7 @@ timer_control: TimerControl = .{},
 timer_mod: u8 = 0,
 
 // serial
-serial_data: u8 = 0xFF,
+serial_data: u8 = 0x00,
 serial_control: SerialControl = .{},
 
 

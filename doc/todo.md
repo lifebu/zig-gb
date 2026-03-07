@@ -6,6 +6,9 @@
 - remove ppu_static
 - tests: put test data in src and bin format into test_data folder.
     - Clean up the .md files for how to run certain tests.
+    - Also use the same naming convention where possible
+        => Makes test filters for gameboy version specific tests easier!
+        - Use mooneyes naming scheme.
     => Longterm it would be nice to have this in it's own repository with all src being written for the same assembler.
 
 - PPU: Check OAM Timing:

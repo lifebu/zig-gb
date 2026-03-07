@@ -70,6 +70,11 @@ N- Build from source:
     => This automatically gives me statistics, as the test names are generated from the test suites (blargg) and file names!
 - I want to have a statistics for the different test suites how much i am currently passing.
 
+# Initial Value tests
+https://gbdev.io/pandocs/Power_Up_Sequence.html
+- Has some tables for initial values of the system after boot up sequence.
+- This could be a good test at some point.
+
 # Test Generator.
 - the above points could mean that it makes more sense to have a test generator zig script that I run once.
 - It preprocesses data so that the tasks can be faster and do certain steps better?
