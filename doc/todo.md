@@ -28,6 +28,11 @@
     - If there is you need to deallocate it first.
     - Also super annoying that I need to kill the rom path from the config so that it is not written to the file?
 
+# Initial values:
+- Use a system to set the registers to the correct initial value given model.
+- This is not required for normal operation, but required for some tests that relly on values being set by the boot rom.
+- This allows me to skip the boot rom for more tests :)
+
 # Add a splash screen
 - documentation how to use a build step to generate the file:
     https://ziglang.org/learn/build-system/#embed-file

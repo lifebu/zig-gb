@@ -29,7 +29,7 @@ const LcdControl = packed struct {
     bg_window_tile_data: enum(u1) {
         tile_8800,
         tile_8000,
-    } = .tile_8800,
+    } = .tile_8000,
     window_enable: bool = false,
     window_map_area: TileMapAddress = .map_9800,
     lcd_enable: bool = false,
