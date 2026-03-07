@@ -287,9 +287,11 @@ const rom_test_configs: [18]RomTestConfig = .{
     .{ .path = mbc3_tester_path ++ "mbc3-tester.gb",
         .category = .cart, .model = .dmg, .exit = .timeout, .timeout = .{ .frame = 120 }, .pass = .mbc3, .context = .{ .text_parsing = .mbc3 } },
 
-    .{ .path = mooneye_path ++ "acceptance/bits/",
+    .{ .path = mooneye_path ++ "acceptance/bits/", 
+        .file_filter = &.{ "-GS.gb" },
         .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = mooneye_path ++ "acceptance/boot/",
+    .{ .path = mooneye_path ++ "acceptance/boot/", .force_boot_rom = true,
+        .file_filter = &.{ "-dmg0.gb", "-S.gb", "-mgb.gb", "-sgb.gb", "-sgb2.gb" },
         .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 120 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // halt_ime1_timing2-GS.gb does not work without the boot rom, why?
     .{ .path = mooneye_path ++ "acceptance/halt/", .force_boot_rom = true,
@@ -298,7 +300,7 @@ const rom_test_configs: [18]RomTestConfig = .{
         .category = .instr, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/instr_timing/",
         .category = .instr, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
-    .{ .path = mooneye_path ++ "acceptance/interrupts/ie_push.gb",
+    .{ .path = mooneye_path ++ "acceptance/interrupts/",
         .category = .cpu, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 140 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     .{ .path = mooneye_path ++ "acceptance/oam_dma/",
         .category = .memory, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
@@ -310,7 +312,8 @@ const rom_test_configs: [18]RomTestConfig = .{
     .{ .path = mooneye_path ++ "acceptance/timer/",
         .category = .mmio, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // We don't support mbc1 roms with more than 512kByte (alternative wiring).
-    .{ .path = mooneye_path ++ "emulator-only/mbc1/", .file_filter = &.{ "multicart_rom_8Mb", "rom_1Mb", "rom_2Mb", "rom_4Mb", "rom_8Mb", "rom_16Mb"},
+    .{ .path = mooneye_path ++ "emulator-only/mbc1/", 
+        .file_filter = &.{ "multicart_rom_8Mb", "rom_1Mb", "rom_2Mb", "rom_4Mb", "rom_8Mb", "rom_16Mb"},
         .category = .cart, .model = .dmg, .exit = .breakpoint, .timeout = .{ .frame = 360 }, .pass = .fibonacci, .context = .{ .text_parsing = .mooneye } },
     // MBC2 is currently not supported
     // .{ .path = mooneye_path ++ "emulator-only/mbc2/",

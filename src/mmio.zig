@@ -25,7 +25,7 @@ pub const SerialControl = packed struct(u8) {
 dpad: u4 = 0xF,
 buttons: u4 = 0xF,
 
-joypad: u8 = 0xFF,
+joypad: u8 = 0xCF,
 
 // timer
 // TODO: Try to simplify this.
@@ -92,7 +92,7 @@ fn cycleTimer(self: *Self) bool {
 pub fn request(self: *Self, req: *def.Request) void {
     switch (req.address) {
         def.joypad => {
-            req.applyAllowedRW(&self.joypad, 0xCF, 0x30);
+            req.applyAllowedRW(&self.joypad, 0xFF, 0x30);
             if(req.isWrite()) {
                 self.joypad = createJoypad(self);
             }

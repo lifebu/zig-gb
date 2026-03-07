@@ -1,4 +1,13 @@
 # Next:
+
+## Clean up repository:
+- remove data/background.png
+- re-organize or remove unused docs.
+- remove ppu_static
+- tests: put test data in src and bin format into test_data folder.
+    - Clean up the .md files for how to run certain tests.
+    => Longterm it would be nice to have this in it's own repository with all src being written for the same assembler.
+
 - PPU: Check OAM Timing:
     - A lot of games try to write to OAM during draw and oam_scan which is not allowed.
     https://www.reddit.com/r/EmuDev/comments/9o5pw8/gameboy_legend_of_zelda_dma_transfers/
@@ -15,11 +24,6 @@
     - It is super annoying that everywhere you want to overwrite the path you first have to make sure that there is not already a path.
     - If there is you need to deallocate it first.
     - Also super annoying that I need to kill the rom path from the config so that it is not written to the file?
-
-## Clean up repository:
-- remove data/background.png
-- re-organize or remove unused docs.
-- remove ppu_static
 
 # Add a splash screen
 - documentation how to use a build step to generate the file:
