@@ -161,8 +161,14 @@ const RomTestConfig = struct {
                         }
                     }
                     if(test_options.test_exclude) |test_exclude| {
-                        if(std.mem.containsAtLeast(u8, entry.name, 1, test_exclude)) {
-                            continue;
+                        var test_exclude_iter = std.mem.splitScalar(u8, test_exclude, ',');
+                        const is_excluded: bool = while (test_exclude_iter.next()) |exclude| {
+                            if(std.mem.containsAtLeast(u8, entry.name, 1, exclude)) {
+                                break true;
+                            }
+                        } else false;
+                        if(is_excluded) {
+                            continue; 
                         }
                     }
 
@@ -184,7 +190,13 @@ const RomTestConfig = struct {
                     }
                 }
                 if(test_options.test_exclude) |test_exclude| {
-                    if(std.mem.containsAtLeast(u8, self.path, 1, test_exclude)) {
+                    var test_exclude_iter = std.mem.splitScalar(u8, test_exclude, ',');
+                    const is_excluded: bool = while (test_exclude_iter.next()) |exclude| {
+                        if(std.mem.containsAtLeast(u8, self.path, 1, exclude)) {
+                            break true;
+                        }
+                    } else false;
+                    if(is_excluded) {
                         break: blk &.{};
                     }
                 }

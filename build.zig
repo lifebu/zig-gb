@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) void {
     // test flags
     const test_category = b.option(TestCategory, "test_category", "Filters all tests to a specific subsystem.") orelse TestCategory.all;
     const test_filter = b.option([]const u8, "test_filter", "Only do a test with this name");
-    const test_exclude = b.option([]const u8, "test_exclude", "Exclude this test from the current run");
+    const test_exclude = b.option([]const u8, "test_exclude", "Exclude these tests from the current run (comma seperated list).");
 
     // exe
     const exe = b.addExecutable(.{

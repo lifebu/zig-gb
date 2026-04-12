@@ -3,6 +3,7 @@
     - Maybe I have a build step that scans the folders for test roms and generates a test rom zig file that includes all roms as test?
     - It gives the test the input of the generated data?
     - I can run this rarely, when needed?
+- Then create a custom test runnin that is multithreaded!
 - I currently break at the first failing test.
     - Run all test roms and see how many break.
     => This is because I don't have a test per file :/

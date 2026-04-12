@@ -49,9 +49,11 @@ zig build test -Dtest_filter=tma_write_reload
 ```
 Note: Do not include the `.gb` extension.
 
-### Exclude Specific Test by Name
+### Exclude Specific Tests by Name
 ```bash
 zig build test -Dtest_exclude=tma_write_reload
+# Or multiple tests separated by commas:
+zig build test -Dtest_exclude=tma_write_reload,tima_write_reloading
 ```
 Note: Do not include the `.gb` extension.
 
@@ -109,7 +111,6 @@ Document public APIs and constants that affect behavior.
 
 ### Useful Development Commands
 ```bash
-zig fmt src/           # Format code
 zig build -Dverbose=true  # Analyze build
 ```
 
@@ -142,3 +143,6 @@ src/
 - Uses custom build system in `build.zig` (not standard `build.zig.zon`)
 - Tests filtered by category at build time, not runtime
 - Tracy can be disabled with `-Dtracy=false` for faster builds
+
+## Important Notes
+- Do NOT run `zig fmt src/` - it creates too much noise in diffs
