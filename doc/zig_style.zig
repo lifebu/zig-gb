@@ -1,56 +1,63 @@
+// Zig Style Guide for zig-gb
 
-// Order:
-// Constants and Definitions.
-// Types
-// Functions (init/deinit). Core functions -> Helper. (Alphabetically)
+// File Names:
+// A file that only has one type: TypeName.zig
+// All other files: file_name.zig
 
-const namespace_name = @import("dir_name/file_name.zig"); // NameSpace = set of function and structs.
-const TypeName = @import("dir_name/TypeName.zig"); // TypeName = top-level fields (@This, struct).
-// snake_case_variable_name
-var global_var: i32 = undefined;
-const const_name = 42;
+// File Organization:
+// Imports: std -> external libs -> internal modules -> build options
+// Self = @This()
+// Constants -> Types -> Fields
+// Functions: init -> deinit -> core -> helper (alphabetical)
+
+// Naming:
+// CONSTANTS = snake_case, 
+// Types = PascalCase, 
+// functions = camelCase, 
+// functions returning types = PascalCase
+// fields = snake_case
+// Abbreviations: capital only first letter (Xml, Ui, Apu)
+
+const std = @import("std");
+const sokol = @import("sokol");
+const APU = @import("apu.zig");
+const build_options = @import("build_options");
+
+const Self = @This();
+
+const const_name: u16 = 42;
 const primitive_type_alias = f32;
 const string_alias = []u8;
 
-const StructName = struct {
-    field: i32,
+const StructName = struct { 
+    field: i32 
 };
-const StructAlias = StructName;
-const EnumName = enum {
-    ok,
-    not_ok,
+const EnumName = enum { 
+    ok, 
+    not_ok 
+};
+const PackedStruct = packed struct(u8) { 
+    lo: u4, 
+    hi: u4 
 };
 
-// Callable: camelCase
-fn functionName(param_name: TypeName) void {
-    var functionPointer = functionName;
-    functionPointer();
-    functionPointer = otherFunction;
-    functionPointer();
-}
-const functionAlias = functionName;
+field_name: i32 = 0,
 
-// Returns type: TitleCase.
-fn ListTemplateFunction(comptime ChildType: type, comptime fixed_size: usize) type {
-    return List(ChildType, fixed_size);
+pub fn init(self: *Self, io: std.Io, alloc: std.mem.Allocator) void {
+    self.* = .{};
 }
 
-fn ShortList(comptime T: type, comptime n: usize) type {
+pub fn deinit(_: *Self, io: std.Io, alloc: std.mem.Allocator) void {}
+
+pub fn publicFunction(self: *Self) void {}
+
+fn aHelperFunction(self: *Self) void {}
+
+fn bHelperFunction(self: *Self) void {}
+
+fn FunctionThatReturnsType(comptime T: type, comptime n: usize) type {
     return struct {
         field_name: [n]T,
         fn methodName() void {}
     };
 }
-
-// The word XML loses its casing when used in Zig identifiers.
-const xml_document = 
-    \\<?xml version="1.0" encoding="UTF-8"?>
-    \\<document>
-    \\</document>
-;
-const XmlParser = struct {
-    field: i32,
-};
-
-// The initials BE (Big Endian) are just another word in Zig identifiers names.
-fn readU32Be() u32 {}
