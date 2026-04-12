@@ -43,11 +43,17 @@ zig build test
 ```bash
 zig build test -Dtest_category=cart   # cart, cpu, memory, mmio, ppu, apu
 ```
-
 ### Run Specific Test by Name
 ```bash
-zig build test -Dtest_filter="Cart"
+zig build test -Dtest_filter=tma_write_reload
 ```
+Note: Do not include the `.gb` extension.
+
+### Exclude Specific Test by Name
+```bash
+zig build test -Dtest_exclude=tma_write_reload
+```
+Note: Do not include the `.gb` extension.
 
 ### Available Test Categories
 - `all` (default), `cart`, `cpu`, `memory`, `mmio`, `ppu`, `apu`
@@ -112,13 +118,13 @@ zig build -Dverbose=true  # Analyze build
 src/
 ├── main.zig          # Application entry
 ├── test.zig          # Test entry
-├── cpu.zig           # CPU implementation
-├── ppu.zig           # PPU implementation
-├── apu.zig           # APU implementation
-├── memory.zig        # Memory management
-├── cart.zig          # Cartridge handling
-├── mmio.zig          # MMIO registers
-├── core.zig          # Core emulator
+├── cpu.zig           # CPU: instructions, registers, interrupts, halt
+├── ppu.zig           # PPU: pixel rendering, LCD, sprites, palettes
+├── apu.zig           # APU: audio channels, wave, noise, envelope
+├── memory.zig        # Memory: boot rom, RAM, dma controller
+├── cart.zig          # Cartridge: cart-rom, cart-ram, mbc
+├── mmio.zig          # MMIO: timer, divider, serial, joypad
+├── core.zig          # Core emulator loop
 ├── config.zig        # Configuration
 ├── platform.zig      # Platform (sokol/app)
 ├── defines.zig       # Shared definitions

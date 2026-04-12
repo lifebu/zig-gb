@@ -25,6 +25,7 @@ pub fn build(b: *std.Build) void {
     // test flags
     const test_category = b.option(TestCategory, "test_category", "Filters all tests to a specific subsystem.") orelse TestCategory.all;
     const test_filter = b.option([]const u8, "test_filter", "Only do a test with this name");
+    const test_exclude = b.option([]const u8, "test_exclude", "Exclude this test from the current run");
 
     // exe
     const exe = b.addExecutable(.{
@@ -84,6 +85,7 @@ pub fn build(b: *std.Build) void {
     const test_options = b.addOptions();
     test_options.addOption(TestCategory, "test_category", test_category);
     test_options.addOption(?[]const u8, "test_filter", test_filter);
+    test_options.addOption(?[]const u8, "test_exclude", test_exclude);
     tests.root_module.addOptions("test_options", test_options);
 
     tests.root_module.addImport("sokol", sokol.module("sokol"));

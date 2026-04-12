@@ -160,6 +160,11 @@ const RomTestConfig = struct {
                             continue;
                         }
                     }
+                    if(test_options.test_exclude) |test_exclude| {
+                        if(std.mem.containsAtLeast(u8, entry.name, 1, test_exclude)) {
+                            continue;
+                        }
+                    }
 
                     const new: *Config = try result.addOne(alloc);
                     new.* = .default;
@@ -175,6 +180,11 @@ const RomTestConfig = struct {
             .file => blk: {
                 if(test_options.test_filter) |test_filter| {
                     if(!std.mem.containsAtLeast(u8, self.path, 1, test_filter)) {
+                        break: blk &.{};
+                    }
+                }
+                if(test_options.test_exclude) |test_exclude| {
+                    if(std.mem.containsAtLeast(u8, self.path, 1, test_exclude)) {
                         break: blk &.{};
                     }
                 }

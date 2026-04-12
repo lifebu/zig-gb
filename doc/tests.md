@@ -1,3 +1,19 @@
+# TODO
+- Changing which tests to run needs a recompile.
+    - Maybe I have a build step that scans the folders for test roms and generates a test rom zig file that includes all roms as test?
+    - It gives the test the input of the generated data?
+    - I can run this rarely, when needed?
+- I currently break at the first failing test.
+    - Run all test roms and see how many break.
+    => This is because I don't have a test per file :/
+- I am missing the source code + binary files for testing in the repository.
+    - Create a better folder structure for this. 
+- Better performance plz
+    - Each single file should be a test in the end!
+    - Run tests in parallel.
+- APU tests: I need to implement some GBC functions.
+- Gameboy model filtering.
+
 # Test suite
 - run all test roms that test a certain system automatically.
 - can filter for specific tests.
