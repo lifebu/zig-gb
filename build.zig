@@ -74,7 +74,7 @@ pub fn build(b: *std.Build) void {
     const test_generator = b.addExecutable(.{
         .name = "zig-gb",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/test_generator.zig"),
+            .root_source_file = b.path("build/test_generator.zig"),
             .target = target,
             .optimize = .Debug, // TODO: Change to ReleaseFast later!
         }),

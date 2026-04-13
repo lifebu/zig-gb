@@ -25,6 +25,7 @@
     - Configuration to add/remove tests (.zon file?)
 - Running the generator:
     - Should it be compiled or just imported by the build script?
+        - I am currently leaning towards imported (so that the build folder is for build scripts).
     - Should the test generator always be run before the test step? How long does it take?
         - Maybe this invalidates the caching that zig does and every time the tests run, they need to recompile even when the test.zig file has not changed?
 
