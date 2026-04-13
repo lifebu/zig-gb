@@ -6,6 +6,42 @@
 - re-organize or remove unused docs.
 - remove ppu_static
 
+## Move implementations into subfolder.
+- When I do this also try to use correct build modules and their corresponding tests.
+- How do other projects do this? flooh-chipz? Sameboy?
+- Folder structure:
+src/
+    main.zig
+    platform/
+        shaders/
+        test/
+        config.zig
+        imgui.zig
+        platform.zig
+    core/
+        boot/
+        test/
+        apu.zig
+        cart.zig
+        core.zig
+        cpu.zig
+        defines.zig
+        memory.zig
+        mmio.zig
+        ppu.zig
+        ppu_void.zig
+    util/
+        fifo.zig
+test/
+    test.zig (generated).
+    unit/
+        config.zon
+        *.test.zig
+    util/
+test_data/
+
+
+
 - PPU: Check OAM Timing:
     - A lot of games try to write to OAM during draw and oam_scan which is not allowed.
     https://www.reddit.com/r/EmuDev/comments/9o5pw8/gameboy_legend_of_zelda_dma_transfers/
@@ -70,36 +106,6 @@
 
 
 # Soon:
-
-## Move implementations into subfolder in src3.
-- When I do this also try to use correct build modules and their corresponding tests.
-- This makes the test includes simpler!
-- How do other projects do this? flooh-chipz? Sameboy?
-- Folder structure:
-    main.zig
-    test.zig
-        platform/
-            shaders/
-            test/
-            config.zig
-            imgui.zig
-            platform.zig
-        core/
-            boot/
-            test/
-            apu.zig
-            cart.zig
-            core.zig
-            cpu.zig
-            defines.zig
-            memory.zig
-            mmio.zig
-            ppu.zig
-            ppu_void.zig
-        test/
-        util/
-            fifo.zig
-
 - Try to get a version of the emulator running in a browser via github.io? (or other website).
 - Think about having all subsystems be their own micro op machine?
     - Are the subsystems machines where they have two steps for each microop.

@@ -23,6 +23,10 @@
 - Two elements:
     - Actual generation logic.
     - Configuration to add/remove tests (.zon file?)
+- Running the generator:
+    - Should it be compiled or just imported by the build script?
+    - Should the test generator always be run before the test step? How long does it take?
+        - Maybe this invalidates the caching that zig does and every time the tests run, they need to recompile even when the test.zig file has not changed?
 
 ### Unit Test Config
 - File: one *.test.zig file.
@@ -60,12 +64,14 @@
     - text parsing: blargg, mooneye, mbc3, bully and gambatte print on the screen.
 
 ## Folder Structure
-src/tests/
-    test_config.zon: Used by the test generator for unit tests in src/tests/*.test.zig
-    *.test.zig => unit tests
-    util/
-        cpu_helper.zig: Move it here!
-        rom_test_runtime.zig
+src/
+    test.zig (generated).
+    tests/
+        test_config.zon: Used by the test generator for unit tests in src/tests/*.test.zig
+        *.test.zig => unit tests
+        util/
+            cpu_helper.zig: Move it here!
+            rom_test_runtime.zig
 test_data/
     roms/
         test_config.zon: Used by the test genenerator for rom tests.

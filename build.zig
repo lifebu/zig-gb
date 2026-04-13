@@ -69,6 +69,26 @@ pub fn build(b: *std.Build) void {
 
 
 
+
+    // test generator.
+    const test_generator = b.addExecutable(.{
+        .name = "zig-gb",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/test_generator.zig"),
+            .target = target,
+            .optimize = .Debug, // TODO: Change to ReleaseFast later!
+        }),
+        .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
+    });
+    b.installArtifact(test_generator);
+
+    // TODO: Definition of this option should be accessible for all modules?
+    const test_generator_options = b.addOptions();
+    test_generator_options.addOption(TestCategory, "test_category", test_category);
+    test_generator.root_module.addOptions("test_options", test_generator_options);
+
+    const run_test_generator = b.addRunArtifact(test_generator);
+
     // tests
     // TODO: Think about a better test setup using modules.
     const tests = b.addTest(.{
@@ -95,6 +115,7 @@ pub fn build(b: *std.Build) void {
 
     const run_tests = b.addRunArtifact(tests);
     const tests_step = b.step("test", "Run unit tests");
+    tests_step.dependOn(&run_test_generator.step);
     tests_step.dependOn(&run_tests.step);
 }
 
