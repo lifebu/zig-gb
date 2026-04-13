@@ -1,15 +1,10 @@
 # Next:
+- Work on better tests (see todos in tests.md)
 
 ## Clean up repository:
 - remove data/background.png
 - re-organize or remove unused docs.
 - remove ppu_static
-- tests: put test data in src and bin format into test_data folder.
-    - Clean up the .md files for how to run certain tests.
-    - Also use the same naming convention where possible
-        => Makes test filters for gameboy version specific tests easier!
-        - Use mooneyes naming scheme.
-    => Longterm it would be nice to have this in it's own repository with all src being written for the same assembler.
 
 - PPU: Check OAM Timing:
     - A lot of games try to write to OAM during draw and oam_scan which is not allowed.

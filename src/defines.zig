@@ -260,7 +260,7 @@ pub const samples_per_frame = t_cycles_per_frame / t_cycles_per_sample;
 pub const Sample = struct {
     left: f32 = 0.0, right: f32 = 0.0,
 };
-pub const SampleFifo = Fifo.RingbufferFifo(Sample, samples_per_frame);
+pub const SampleFifo = Fifo.RingbufferFifo(Sample, samples_per_frame); // ~70
 
 // memory
 pub const addr_space = 0x1_0000;

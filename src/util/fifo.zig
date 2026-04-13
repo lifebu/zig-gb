@@ -2,13 +2,20 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 /// Fifo interface on top of a statically allocated ringbuffer.
-pub fn RingbufferFifo( comptime T: type, comptime capacity: usize) type {
+pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
     return struct {
         const Self = @This();
 
         buffer: [capacity]T = undefined,
         read_index: usize = 0,
         write_index: usize = 0,
+
+        // TODO: Investigate if we should move more of the struct initialization to decl-literals.
+        pub const empty: Self = .{ 
+            .buffer = undefined,
+            .read_index = 0,
+            .write_index = 0,
+        };
 
         /// Write slice. asserts capacity. 
         pub fn write(self: *Self, items: []const T) void {
