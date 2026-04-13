@@ -4,7 +4,7 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 
-const cpu_helper = @import("cpu_helper.zig");
+const cpu_helper = @import("util/cpu_helper.zig");
 
 pub fn init(cpu: *CPU, memory: *std.AutoHashMap(u16, u8), wram: []const u8) !void {
     memory.clearRetainingCapacity();

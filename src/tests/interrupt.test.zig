@@ -4,7 +4,7 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 
-const cpu_helper = @import("cpu_helper.zig");
+const cpu_helper = @import("util/cpu_helper.zig");
 
 pub fn runInterruptTests() !void {
     const alloc = std.testing.allocator;
