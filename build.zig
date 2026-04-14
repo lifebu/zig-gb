@@ -72,12 +72,13 @@ pub fn build(b: *std.Build) void {
 
     // test generator.
     const test_generator = b.addExecutable(.{
-        .name = "zig-gb",
+        .name = "test_generator",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("build/test_generator.zig"),
+            .root_source_file = b.path("src/test_generator.zig"),
             .target = target,
-            .optimize = .Debug, // TODO: Change to ReleaseFast later!
+            .optimize = .Debug, // TODO: Change to ReleaseFast later! 
         }),
+        // TODO: If I fix debugging vscode, I can default to never using llm, making this compilation in ReleaseFast way faster!
         .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
     });
     b.installArtifact(test_generator);
@@ -88,6 +89,8 @@ pub fn build(b: *std.Build) void {
     test_generator.root_module.addOptions("test_options", test_generator_options);
 
     const run_test_generator = b.addRunArtifact(test_generator);
+    const test_generator_step = b.step("test_generator", "Run test generator");
+    test_generator_step.dependOn(&run_test_generator.step);
 
     // tests
     // TODO: Think about a better test setup using modules.

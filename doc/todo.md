@@ -6,19 +6,20 @@
 - re-organize or remove unused docs.
 - remove ppu_static
 
-## Move implementations into subfolder.
+## Move src to better folder structure and build modules.
 - When I do this also try to use correct build modules and their corresponding tests.
+- Note: tests need some defines only found in the src folder. and test_generator also needs some general definitions.
 - How do other projects do this? flooh-chipz? Sameboy?
 - Folder structure:
 src/
-    main.zig
-    platform/
+    main.zig => exe
+    platform/ => module
         shaders/
         test/
         config.zig
         imgui.zig
         platform.zig
-    core/
+    core/ => module
         boot/
         test/
         apu.zig
@@ -30,12 +31,13 @@ src/
         mmio.zig
         ppu.zig
         ppu_void.zig
-    util/
+    util/ => module?
         fifo.zig
+build/
+    test_generator => module
 test/
-    test.zig (generated).
+    test.zig (generated) => exe
     unit/
-        config.zon
         *.test.zig
     util/
 test_data/

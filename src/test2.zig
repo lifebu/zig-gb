@@ -7,6 +7,9 @@ const std = @import("std");
 const test_options = @import("test_options");
 const category = test_options.test_category;
 
+const Config = @import("config.zig");
+const rom_test = @import("tests/util/rom_runner.zig");
+
 const cart_test = @import("tests/cart.test.zig");
 test "cart_runCartTests" {
     if (category != .all and category != .cart) {
@@ -66,5 +69,501 @@ test "mmio_runTimerTest" {
         return error.SkipZigTest;
     }
     try mmio_test.runTimerTest();
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "apu_test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb" {
+    if (category != .all and category != .apu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/01-special.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/01-special.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/01-special.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 1160 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "cpu_test_data/roms/blargg/halt_bug.gb" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/halt_bug.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 200 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/halt_bug.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "instr_test_data/roms/blargg/instr_timing/instr_timing.gb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/instr_timing/instr_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/instr_timing/instr_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "memory_test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "memory_test_data/roms/blargg/mem_timing/individual/02-write_timing.gb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing/individual/02-write_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/02-write_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "memory_test_data/roms/blargg/mem_timing/individual/01-read_timing.gb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing/individual/01-read_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/01-read_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .blargg;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .{ .text = "Passed" };
+    const context: rom_test.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
