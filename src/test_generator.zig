@@ -119,7 +119,7 @@ const rom_tests: [18]RomTestConfig = .{
     // TODO: Add support for same-suite tests, one test is for ei-di and halt delays.
 };
 
-const output_file_path = "src/test2.zig";
+const output_file_path = "src/tst.zig";
 const output_start = 
     \\/////////////////////////////////////////////////
     \\/// AUTO GENERATED FILE. DO NOT EDIT MANUALLY
@@ -186,7 +186,7 @@ const output_rom_context_text_parsing =
     \\
 ;
 const output_rom_core =
-    \\    const core_config: Config = rom_test.genCoreConfig(.{0s}, {1s}, "{2s}");
+    \\    const core_config: Config = rom_test.genCoreConfig(.{0s}, {1any}, "{2s}");
     \\
 ;
 const output_rom_test_end =
@@ -207,7 +207,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc: std.mem.Allocator = gpa.allocator();
 
-    var writer: std.io.Writer.Allocating = .init(alloc);
+    var writer: std.io.Writer.Allocating = try .initCapacity(alloc, 85_000); // Number from last runs.
     defer writer.deinit();
 
     try writer.writer.writeAll(output_start);
@@ -217,6 +217,7 @@ pub fn main() !void {
     var result: std.ArrayList(u8) = writer.toArrayList();
     defer result.deinit(alloc);
     std.fs.cwd().writeFile(.{ .data = result.items, .sub_path = output_file_path }) catch unreachable;
+    std.log.info("Memory usage: {B}", .{ result.items.len });
 }
 
 fn writeUnitTests(writer: *std.io.Writer) !void {
@@ -306,8 +307,7 @@ fn writeRomTests(writer: *std.io.Writer, alloc: std.mem.Allocator) !void {
                 .memory => unreachable, // Does not seem to be used right now?
                 .text_parsing => |value| try writer.print(output_rom_context_text_parsing, .{ @tagName(rom_test.context), @tagName(value) }),
             }
-            const bool_value: []const u8 = if(rom_test.force_boot_rom) "true" else "false";
-            try writer.print(output_rom_core, .{ @tagName(rom_test.model), bool_value, rom_file});
+            try writer.print(output_rom_core, .{ @tagName(rom_test.model), rom_test.force_boot_rom, rom_file});
             try writer.print(output_rom_test_end, .{});
         }
     }
