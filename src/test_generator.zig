@@ -200,7 +200,7 @@ pub fn main() !void {
     var timer: std.time.Timer = try .start();
     defer {
         const elapsed: f64 = @floatFromInt(timer.read());
-        std.log.info("Tests generated in: {d:.2}ms", .{ elapsed / std.time.ns_per_ms });
+        std.log.info("Generator: Total time: {d:.2}ms", .{ elapsed / std.time.ns_per_ms });
     }
 
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
@@ -218,7 +218,7 @@ pub fn main() !void {
     defer result.deinit(alloc);
 
     std.fs.cwd().writeFile(.{ .data = result.items, .sub_path = output_file_path }) catch unreachable;
-    std.log.info("Memory usage: {B}", .{ result.items.len });
+    std.log.info("Generator: Memory usage: {B}", .{ result.items.len });
 }
 
 fn writeUnitTests(writer: *std.io.Writer) !void {

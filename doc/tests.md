@@ -1,7 +1,5 @@
 # Next
 ## Test generator
-- Combine test_generator.zig code snippets for code generation!
-    - use "t" in format string for tag name.
 - Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
     - model_detection enum for the detection method?
@@ -10,8 +8,8 @@
 - Cleanup test category, filter and exclude.
     => Those should not be build commands for the test_generator!
 - Make CoreType something that can be changed at runtime.
-- Move from test2.zig to test.zig.
-- remove old test_roms.test.zig.
+- Move from test2.zig to tst.zig.
+    - remove old test_roms.test.zig.
 - changes to the test_options seem to trigger a build of the test generator?
     => Only thing used by both is the definition of the test_category.
 
