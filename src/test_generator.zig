@@ -244,37 +244,38 @@ fn isFileAllowed(rom_test: RomTestConfig, path: []const u8) bool {
 }
 
 fn findRomFilesInPath(rom_test: RomTestConfig, alloc: std.mem.Allocator) ![][]const u8 {
-    // TODO: Here I seem to make a lot of unecessary allocations?
-    var result: std.ArrayList([]const u8) = .empty;
+    var result: std.ArrayList([]const u8) = try .initCapacity(alloc, 15);
     defer result.deinit(alloc);
 
-    const relative_path = try std.fmt.allocPrint(alloc, "{s}{s}", .{ rom_test.getSuitePath(), rom_test.sub_path });
-    defer alloc.free(relative_path);
+    const suite_path: []const u8 = rom_test.getSuitePath();
+    var path_buffer: [128]u8 = undefined;
+    const relative_path: []const u8 = try std.fmt.bufPrint(&path_buffer, "{s}{s}", .{ suite_path, rom_test.sub_path });
 
     const path_stat = try std.fs.cwd().statFile(relative_path);
-    switch(path_stat.kind) {
+    switch (path_stat.kind) {
         .directory => {
             const dir: std.fs.Dir = try std.fs.cwd().openDir(relative_path, .{ .iterate = true });
             var iter = dir.iterate();
-            while(iter.next() catch unreachable) |entry| {
-                if(entry.kind != .file or !isFileAllowed(rom_test, entry.name)) {
+            while (iter.next() catch unreachable) |entry| {
+                if (entry.kind != .file or !isFileAllowed(rom_test, entry.name)) {
                     continue;
                 }
 
-                const full_path: []const u8 = try std.fmt.allocPrint(alloc, "{s}{s}", .{ relative_path, entry.name });
-                try result.append(alloc, full_path);
+                var full_path_buffer: [128]u8 = undefined;
+                const full_path = try std.fmt.bufPrint(&full_path_buffer, "{s}{s}", .{ relative_path, entry.name });
+                try result.append(alloc, try alloc.dupe(u8, full_path));
             }
         },
         .file => {
-            if(!isFileAllowed(rom_test, relative_path)) {
+            if (!isFileAllowed(rom_test, relative_path)) {
                 @panic("Not allowed rom file is configured in the test generator!");
             }
 
-            const full_path: []const u8 = try alloc.dupe(u8, relative_path);
-            try result.append(alloc, full_path);
+            try result.append(alloc, try alloc.dupe(u8, relative_path));
         },
         else => @panic("Unknown type of path in test rom config!"),
     }
+
     return try result.toOwnedSlice(alloc);
 }
 

@@ -1,10 +1,7 @@
 # Next
 ## Test generator
-- Reduce temp allocations in test_generator.zig
-    - findRomFilesInPath()!!!
-    - is bool_value a temp allcoation? 
 - Combine test_generator.zig code snippets for code generation!
-- use "t" in format string for tag name.
+    - use "t" in format string for tag name.
 - Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
     - model_detection enum for the detection method?
