@@ -30,7 +30,7 @@ test "All_TestRomTest" {
 //         return error.SkipZigTest;
 //     }
 //     const pre_calc: bool = false;
-//     try apu_sampling_test.runApuOutputTest(pre_calc);
+//     try apu_sampling_test.runApuOutputTests(pre_calc);
 // }
 //
 // test "APU_Sampler" {
@@ -86,21 +86,21 @@ test "MMIO_TimerTest" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    try mmio_test.runTimerTest();
+    try mmio_test.runTimerTests();
 }
 
 test "Memory_DMA" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    try memory_test.runDMATest();
+    try memory_test.runDMATests();
 }
 
 test "Memory_Request" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    try memory_test.runRequestTest();
+    try memory_test.runRequestTests();
 }
 
 // test "PPU_InterruptTest" {

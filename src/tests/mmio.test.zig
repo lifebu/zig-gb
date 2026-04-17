@@ -201,7 +201,7 @@ pub fn runDividerTests() !void {
     }
 }
 
-pub fn runTimerTest() !void {
+pub fn runTimerTests() !void {
     var mmio: MMIO = .{};
     var irq_timer: bool = false;
 

@@ -1,73 +1,23 @@
 # Next
 ## Test generator
-- A generator script that is run as a prerequisite build step before test
-    - Does zig always run this step? or only when needed?
-- It generates src/test.zig by scanning src/test/*.test.zig files.
-    - Should *.test.zig have a specific structure? Like specific functions to call?
-- What it needs to generate:
-    - The name of the test:
-        - Should include: system, test_suite, file_name
-    - which category this test belongs to:
-    - which model this test is for: All, DMG, GBC, etc.
-- What to generate:
-    - test.zig files: unit tests
-        - one function called run (that runs the test).
-        - test name is the file name.
-        - Which category it applies to is defined by a unit test config
-    - test roms:
-        - use the test_config.zog in the roms folder to generate these.
-        - Similar to test_roms.test.zig: TestRomConfig
-- test_rom.test.zig:
-    - Generation: For each test file it creates a emulator core config, CoreType (from a determined set of core combinations), and additional data (see: RomTestConfig)
-    - Execution Framework: Running test and core, exitCondition, passing and context => rom_test_runtime.zig.
-- Two elements:
-    - Actual generation logic.
-    - Configuration to add/remove tests (part of generator code).
-- Running the generator:
-    - Should it be compiled or just imported by the build script?
-        - I am currently leaning towards imported (so that the build folder is for build scripts).
-    - Should the test generator always be run before the test step? How long does it take?
-        - Maybe this invalidates the caching that zig does and every time the tests run, they need to recompile even when the test.zig file has not changed?
+- rename test2 to tst for shorter build name!
+- Initialize allocating writer with capacity! (calculate it)!
+- Reduce temp allocations in test_generator.zig
+    - findRomFilesInPath()!!!
+    - is bool_value a temp allcoation? 
+- Combine test_generator.zig code snippets for code generation!
 - Find a way to filter out specific tests that are incompatible with a specfic model.
-    - Auto detect it by name?
+    - Auto detect it by filename (different detection method per suite)?
+    - model_detection enum for the detection method?
+    - Maybe I can also manually set it for unit tests.
+    - Also allow tests to run on all gb versio version
 - Cleanup test category, filter and exclude.
     => Those should not be build commands for the test_generator!
-- Cleanup generator and rom_runner code in general!
-
-### Unit Test Config
-- File: one *.test.zig file.
-- Test category.
-
-### Rom Test Config
-- Files:
-    - path: Either a file or a directory.
-    - filter_files: some files to exclude.
-- Test:
-    - Category.
-- Core:
-    - Bootrom or not? (default no).
-- Subsystem:
-    - Which subsystems are getting tested by this.
-    - If a subsystem is not needed it will use a void version.
-- Model:
-    - DMG, CGB, SGB, Any
-    - Filename: Auto detect revision from filename
-    - Do I need the exact dmg cpu revisions?
-- Exit Condition:
-    - none, blargg (test parsing), breakpoint (ld b,b), timeout (where the timout is not an error).
-- Timeout:
-    - maximum number of time units until the test is abborted
-    - cycles, frames, seconds, sec
-- Pass/Fail:
-    - fibonacci: On Success: B = 3, C = 5, D = 8, E = 13, H = 21, L = 34
-    - mbc3: contains an f (for failure) in the PPU output.
-    - memory location.
-    - text: text on screen.
-- Context:
-    Gives you more information if you fail.
-    - none
-    - memory location.
-    - text parsing: blargg, mooneye, mbc3, bully and gambatte print on the screen.
+- Make CoreType something that can be changed at runtime.
+- Move from test2.zig to test.zig.
+- remove old test_roms.test.zig.
+- changes to the test_options seem to trigger a build of the test generator?
+    => Only thing used by both is the definition of the test_category.
 
 ## Folder Structure
 build/
@@ -80,7 +30,7 @@ src/
             cpu_helper.zig: Move it here!
             rom_test_runtime.zig
 test_data/
-    roms/
+    roms/ (~4510).
         readme.md: has links to the sources (with version!), methodologies, compilation, etc.
         suite/ (mooneye, etc)
             suite.md: original md file from source.
@@ -172,3 +122,50 @@ N- Build from source:
 https://gbdev.io/pandocs/Power_Up_Sequence.html
 - Has some tables for initial values of the system after boot up sequence.
 - This could be a good test at some point.
+
+# Docs
+## Test generator
+- Script that runs as a prerequisite build step before test
+- Generates src/test.zig by using a unit test config and rom test config part of it's code (static).
+- Generates for each test:
+    - name, category filter, gb model for test.
+- Filter out tests by category, test_filter, test_exclude and target gb model.
+
+### Unit Tests
+- Calls a run function. Based on a unit test config in code.
+- Config: UnitTestConfig
+    - filename, test-category, test_functions (generates a test per test function).
+
+### Rom Tests
+- Runner: util/rom_runner: actually runs the core and test parameters generated.
+    - Inputs: core config, CoreType, exitConditionk passing, context.
+- Config: RomTestConfig
+    - Files:
+        - path: Either a file or a directory.
+        - filter_files: some files to exclude.
+    - Test:
+        - Category.
+    - Core:
+        - Bootrom or not? (default no).
+    - Subsystem:
+        - Which subsystems are getting tested by this.
+        - If a subsystem is not needed it will use a void version.
+    - Model:
+        - DMG, CGB, SGB, Any
+        - Filename: Auto detect revision from filename
+        - Do I need the exact dmg cpu revisions?
+    - Exit Condition:
+        - none, blargg (test parsing), breakpoint (ld b,b), timeout (where the timout is not an error).
+    - Timeout:
+        - maximum number of time units until the test is abborted
+        - cycles, frames, seconds, sec
+    - Pass/Fail:
+        - fibonacci: On Success: B = 3, C = 5, D = 8, E = 13, H = 21, L = 34
+        - mbc3: contains an f (for failure) in the PPU output.
+        - memory location.
+        - text: text on screen.
+    - Context:
+        Gives you more information if you fail.
+        - none
+        - memory location.
+        - text parsing: blargg, mooneye, mbc3, bully and gambatte print on the screen.

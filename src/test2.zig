@@ -10,8 +10,9 @@ const category = test_options.test_category;
 const Config = @import("config.zig");
 const rom_test = @import("tests/util/rom_runner.zig");
 
+
 const cart_test = @import("tests/cart.test.zig");
-test "cart_runCartTests" {
+test "unit_cart_Cart" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
@@ -19,7 +20,7 @@ test "cart_runCartTests" {
 }
 
 const halt_test = @import("tests/halt.test.zig");
-test "cpu_runHaltTests" {
+test "unit_cpu_Halt" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
@@ -27,7 +28,7 @@ test "cpu_runHaltTests" {
 }
 
 const interrupt_test = @import("tests/interrupt.test.zig");
-test "cpu_runInterruptTests" {
+test "unit_cpu_Interrupt" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
@@ -35,47 +36,47 @@ test "cpu_runInterruptTests" {
 }
 
 const memory_test = @import("tests/memory.test.zig");
-test "memory_runDMATest" {
+test "unit_memory_DMA" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    try memory_test.runDMATest();
+    try memory_test.runDMATests();
 }
 
-test "memory_runRequestTest" {
+test "unit_memory_Request" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    try memory_test.runRequestTest();
+    try memory_test.runRequestTests();
 }
 
 const mmio_test = @import("tests/mmio.test.zig");
-test "mmio_runDividerTests" {
+test "unit_mmio_Divider" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
     try mmio_test.runDividerTests();
 }
 
-test "mmio_runInputTests" {
+test "unit_mmio_Input" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
     try mmio_test.runInputTests();
 }
 
-test "mmio_runTimerTest" {
+test "unit_mmio_Timer" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    try mmio_test.runTimerTest();
+    try mmio_test.runTimerTests();
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_06-overflow on trigger" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb")) {
+    if (rom_test.isFiltered("06-overflow on trigger")) {
         return error.SkipZigTest;
     }
 
@@ -87,11 +88,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb"
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_07-len sweep period sync" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb")) {
+    if (rom_test.isFiltered("07-len sweep period sync")) {
         return error.SkipZigTest;
     }
 
@@ -103,11 +104,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.g
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_03-trigger" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb")) {
+    if (rom_test.isFiltered("03-trigger")) {
         return error.SkipZigTest;
     }
 
@@ -119,11 +120,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_11-regs after power" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb")) {
+    if (rom_test.isFiltered("11-regs after power")) {
         return error.SkipZigTest;
     }
 
@@ -135,11 +136,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_01-registers" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb")) {
+    if (rom_test.isFiltered("01-registers")) {
         return error.SkipZigTest;
     }
 
@@ -151,11 +152,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_02-len ctr" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb")) {
+    if (rom_test.isFiltered("02-len ctr")) {
         return error.SkipZigTest;
     }
 
@@ -167,11 +168,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_08-len ctr during power" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb")) {
+    if (rom_test.isFiltered("08-len ctr during power")) {
         return error.SkipZigTest;
     }
 
@@ -183,11 +184,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_09-wave read while on" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb")) {
+    if (rom_test.isFiltered("09-wave read while on")) {
         return error.SkipZigTest;
     }
 
@@ -199,11 +200,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb" 
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_04-sweep" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb")) {
+    if (rom_test.isFiltered("04-sweep")) {
         return error.SkipZigTest;
     }
 
@@ -215,11 +216,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_10-wave trigger while on" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb")) {
+    if (rom_test.isFiltered("10-wave trigger while on")) {
         return error.SkipZigTest;
     }
 
@@ -231,11 +232,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.g
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_05-sweep details" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb")) {
+    if (rom_test.isFiltered("05-sweep details")) {
         return error.SkipZigTest;
     }
 
@@ -247,11 +248,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "apu_test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb" {
+test "blargg_apu_dmg_sound/rom_singles/_12-wave write while on" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb")) {
+    if (rom_test.isFiltered("12-wave write while on")) {
         return error.SkipZigTest;
     }
 
@@ -263,11 +264,11 @@ test "apu_test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb"
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb" {
+test "blargg_instr_cpu_instrs/individual/_03-op sp,hl" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb")) {
+    if (rom_test.isFiltered("03-op sp,hl")) {
         return error.SkipZigTest;
     }
 
@@ -279,11 +280,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb" {
+test "blargg_instr_cpu_instrs/individual/_06-ld r,r" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb")) {
+    if (rom_test.isFiltered("06-ld r,r")) {
         return error.SkipZigTest;
     }
 
@@ -295,11 +296,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/01-special.gb" {
+test "blargg_instr_cpu_instrs/individual/_01-special" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/01-special.gb")) {
+    if (rom_test.isFiltered("01-special")) {
         return error.SkipZigTest;
     }
 
@@ -311,11 +312,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/01-special.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb" {
+test "blargg_instr_cpu_instrs/individual/_05-op rp" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb")) {
+    if (rom_test.isFiltered("05-op rp")) {
         return error.SkipZigTest;
     }
 
@@ -327,11 +328,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb" {
+test "blargg_instr_cpu_instrs/individual/_09-op r,r" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb")) {
+    if (rom_test.isFiltered("09-op r,r")) {
         return error.SkipZigTest;
     }
 
@@ -343,11 +344,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb" {
+test "blargg_instr_cpu_instrs/individual/_02-interrupts" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb")) {
+    if (rom_test.isFiltered("02-interrupts")) {
         return error.SkipZigTest;
     }
 
@@ -359,11 +360,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb" {
+test "blargg_instr_cpu_instrs/individual/_04-op r,imm" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb")) {
+    if (rom_test.isFiltered("04-op r,imm")) {
         return error.SkipZigTest;
     }
 
@@ -375,11 +376,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb" {
+test "blargg_instr_cpu_instrs/individual/_11-op a,(hl)" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb")) {
+    if (rom_test.isFiltered("11-op a,(hl)")) {
         return error.SkipZigTest;
     }
 
@@ -391,11 +392,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb" {
+test "blargg_instr_cpu_instrs/individual/_10-bit ops" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb")) {
+    if (rom_test.isFiltered("10-bit ops")) {
         return error.SkipZigTest;
     }
 
@@ -407,11 +408,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb" {
+test "blargg_instr_cpu_instrs/individual/_08-misc instrs" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb")) {
+    if (rom_test.isFiltered("08-misc instrs")) {
         return error.SkipZigTest;
     }
 
@@ -423,11 +424,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb" {
+test "blargg_instr_cpu_instrs/individual/_07-jr,jp,call,ret,rst" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb")) {
+    if (rom_test.isFiltered("07-jr,jp,call,ret,rst")) {
         return error.SkipZigTest;
     }
 
@@ -439,11 +440,11 @@ test "instr_test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "cpu_test_data/roms/blargg/halt_bug.gb" {
+test "blargg_cpu_halt_bug.gb_halt_bug" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/halt_bug.gb")) {
+    if (rom_test.isFiltered("halt_bug")) {
         return error.SkipZigTest;
     }
 
@@ -455,11 +456,11 @@ test "cpu_test_data/roms/blargg/halt_bug.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "instr_test_data/roms/blargg/instr_timing/instr_timing.gb" {
+test "blargg_instr_instr_timing/instr_timing.gb_instr_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/instr_timing/instr_timing.gb")) {
+    if (rom_test.isFiltered("instr_timing")) {
         return error.SkipZigTest;
     }
 
@@ -471,11 +472,11 @@ test "instr_test_data/roms/blargg/instr_timing/instr_timing.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "memory_test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb" {
+test "blargg_memory_mem_timing/individual/_03-modify_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb")) {
+    if (rom_test.isFiltered("03-modify_timing")) {
         return error.SkipZigTest;
     }
 
@@ -487,11 +488,11 @@ test "memory_test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "memory_test_data/roms/blargg/mem_timing/individual/02-write_timing.gb" {
+test "blargg_memory_mem_timing/individual/_02-write_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing/individual/02-write_timing.gb")) {
+    if (rom_test.isFiltered("02-write_timing")) {
         return error.SkipZigTest;
     }
 
@@ -503,11 +504,11 @@ test "memory_test_data/roms/blargg/mem_timing/individual/02-write_timing.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "memory_test_data/roms/blargg/mem_timing/individual/01-read_timing.gb" {
+test "blargg_memory_mem_timing/individual/_01-read_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing/individual/01-read_timing.gb")) {
+    if (rom_test.isFiltered("01-read_timing")) {
         return error.SkipZigTest;
     }
 
@@ -519,11 +520,11 @@ test "memory_test_data/roms/blargg/mem_timing/individual/01-read_timing.gb" {
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb" {
+test "blargg_memory_mem_timing-2/rom_singles/_03-modify_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb")) {
+    if (rom_test.isFiltered("03-modify_timing")) {
         return error.SkipZigTest;
     }
 
@@ -535,11 +536,11 @@ test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb"
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb" {
+test "blargg_memory_mem_timing-2/rom_singles/_02-write_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb")) {
+    if (rom_test.isFiltered("02-write_timing")) {
         return error.SkipZigTest;
     }
 
@@ -551,11 +552,11 @@ test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb" 
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
-test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb" {
+test "blargg_memory_mem_timing-2/rom_singles/_01-read_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb")) {
+    if (rom_test.isFiltered("01-read_timing")) {
         return error.SkipZigTest;
     }
 
@@ -564,6 +565,1286 @@ test "memory_test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb" {
     const pass: rom_test.Pass = .{ .text = "Passed" };
     const context: rom_test.Context = .{ .text_parsing = .blargg };
     const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mbc3_tester_cart_mbc3-tester.gb_mbc3-tester" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("mbc3-tester")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .timeout;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .mbc3;
+    const context: rom_test.Context = .{ .text_parsing = .mbc3 };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mbc3-tester/mbc3-tester.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/bits/_reg_f" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("reg_f")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/reg_f.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/bits/_mem_oam" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("mem_oam")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/mem_oam.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/boot/_boot_div-dmgABCmgb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("boot_div-dmgABCmgb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_div-dmgABCmgb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/boot/_boot_regs-dmgABC" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("boot_regs-dmgABC")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_regs-dmgABC.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/boot/_boot_hwio-dmgABCmgb" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("boot_hwio-dmgABCmgb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_hwio-dmgABCmgb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cpu_acceptance/halt/_halt_ime1_timing2-GS" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("halt_ime1_timing2-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing2-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cpu_acceptance/halt/_halt_ime1_timing" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("halt_ime1_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cpu_acceptance/halt/_halt_ime0_ei" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("halt_ime0_ei")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_ei.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cpu_acceptance/halt/_halt_ime0_nointr_timing" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("halt_ime0_nointr_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 120 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_nointr_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr/daa.gb_daa" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("daa")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr/daa.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_call_cc_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("call_cc_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_ret_cc_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ret_cc_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_cc_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_call_cc_timing2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("call_cc_timing2")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing2.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_div_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("div_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/div_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_jp_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("jp_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_add_sp_e_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("add_sp_e_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/add_sp_e_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_ei_sequence" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ei_sequence")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_sequence.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_jp_cc_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("jp_cc_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_cc_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_ld_hl_sp_e_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ld_hl_sp_e_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ld_hl_sp_e_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_di_timing-GS" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("di_timing-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/di_timing-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_pop_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("pop_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/pop_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_intr_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/intr_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_call_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("call_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_reti_intr_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("reti_intr_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_intr_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_push_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("push_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/push_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_rapid_di_ei" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rapid_di_ei")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rapid_di_ei.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_rst_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rst_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rst_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_reti_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("reti_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_ret_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ret_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_ei_timing" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ei_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_instr_acceptance/instr_timing/_call_timing2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("call_timing2")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing2.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cpu_acceptance/interrupts/_ie_push" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ie_push")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/ie_push.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cpu_acceptance/interrupts/_if_ie_registers" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("if_ie_registers")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/if_ie_registers.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/oam_dma/_oam_dma_restart" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("oam_dma_restart")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_restart.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/oam_dma/_oam_dma_start" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("oam_dma_start")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_start.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/oam_dma/_sources-GS" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("sources-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/sources-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/oam_dma/_basic" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("basic")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/basic.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/oam_dma/_reg_read" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("reg_read")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/reg_read.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_memory_acceptance/oam_dma/_oam_dma_timing" {
+    if (category != .all and category != .memory) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("oam_dma_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_intr_2_0_timing" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_2_0_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_0_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_stat_irq_blocking" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("stat_irq_blocking")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_irq_blocking.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_intr_1_2_timing-GS" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_1_2_timing-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_intr_2_oam_ok_timing" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_2_oam_ok_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_oam_ok_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_lcdon_write_timing-GS" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("lcdon_write_timing-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_2_mode0_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_lcdon_timing-GS" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("lcdon_timing-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_intr_2_mode3_timing" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_2_mode3_timing")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode3_timing.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_hblank_ly_scx_timing-GS" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("hblank_ly_scx_timing-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/hblank_ly_scx_timing-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_stat_lyc_onoff" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("stat_lyc_onoff")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_lyc_onoff.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_vblank_stat_intr-GS" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("vblank_stat_intr-GS")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing_sprites" {
+    if (category != .all and category != .ppu) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("intr_2_mode0_timing_sprites")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing_sprites.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tma_write_reloading" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tma_write_reloading")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tma_write_reloading.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim00" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim00")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_div_write" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("div_write")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/div_write.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim11" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim11")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_rapid_toggle" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rapid_toggle")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/rapid_toggle.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim00_div_trigger" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim00_div_trigger")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00_div_trigger.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim01_div_trigger" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim01_div_trigger")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01_div_trigger.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tima_write_reloading" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tima_write_reloading")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_write_reloading.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim01" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim01")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tima_reload" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tima_reload")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_reload.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim10" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim10")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim11_div_trigger" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim11_div_trigger")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11_div_trigger.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_mmio_acceptance/timer/_tim10_div_trigger" {
+    if (category != .all and category != .mmio) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("tim10_div_trigger")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10_div_trigger.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_ram_256kb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ram_256kb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_256kb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_ram_64kb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("ram_64kb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_64kb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_rom_512kb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_512kb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/rom_512kb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_bits_bank1" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("bits_bank1")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank1.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_bits_mode" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("bits_mode")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_mode.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_bits_ramg" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("bits_ramg")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_ramg.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc1/_bits_bank2" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("bits_bank2")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 360 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank2.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_32Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_32Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_32Mb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_512kb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_512kb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_512kb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_16Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_16Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_16Mb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_2Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_2Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_2Mb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_64Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_64Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_64Mb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_8Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_8Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_8Mb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_4Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_4Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_4Mb.gb");
+    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "mooneye_cart_emulator-only/mbc5/_rom_1Mb" {
+    if (category != .all and category != .cart) {
+        return error.SkipZigTest;
+    }
+    if (rom_test.isFiltered("rom_1Mb")) {
+        return error.SkipZigTest;
+    }
+
+    const exit: rom_test.ExitCondition = .breakpoint;
+    const timeout: rom_test.Timeout = .{ .frame = 140 };
+    const pass: rom_test.Pass = .fibonacci;
+    const context: rom_test.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_1Mb.gb");
     try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 

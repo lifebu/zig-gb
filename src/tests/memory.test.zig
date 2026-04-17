@@ -4,7 +4,7 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const Memory = @import("../memory.zig");
 
-pub fn runDMATest() !void {
+pub fn runDMATests() !void {
     var memory: Memory = .{};
 
     const start_addr: u16 = def.wram_low;
@@ -97,7 +97,7 @@ pub fn runDMATest() !void {
     };
 }
 
-pub fn runRequestTest() !void {
+pub fn runRequestTests() !void {
     var register: u8 = 0x00;
     var reader: u8 = 0x00;
     var request: def.Request = .{ .address = 0xFFFF, .value = .{ .write = 0xFF } };

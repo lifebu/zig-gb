@@ -218,12 +218,6 @@ pub fn isFiltered(path: []const u8) bool {
 pub fn run(run_config: RomRunConfig) !void {
     const alloc = std.testing.allocator;
     var irq_joypad: bool = false;
-
-    // TODO: Move to code generator. (including return error.SkipZigTest)
-    // if(category != .all and test_config.category != category) {
-    //     continue;
-    // }
-
     const timeout_cycles: usize = run_config.getTimeoutInCycles();
 
     var core: CoreType = .{};

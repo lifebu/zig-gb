@@ -192,7 +192,7 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
     }
 }
 
-pub fn runApuOutputTest(use_precalc: bool) !void {
+pub fn runApuOutputTests(use_precalc: bool) !void {
     var apu: APU = .{};
     var platform: Platform = .{};
     apu.init();
