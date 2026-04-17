@@ -212,10 +212,11 @@ pub fn main() !void {
 
     try writer.writer.writeAll(output_start);
     try writeUnitTests(&writer.writer);
-    try writeRomTests(&writer.writer, alloc);
+    try writeRomTests(&writer.writer);
 
     var result: std.ArrayList(u8) = writer.toArrayList();
     defer result.deinit(alloc);
+
     std.fs.cwd().writeFile(.{ .data = result.items, .sub_path = output_file_path }) catch unreachable;
     std.log.info("Memory usage: {B}", .{ result.items.len });
 }
@@ -243,73 +244,59 @@ fn isFileAllowed(rom_test: RomTestConfig, path: []const u8) bool {
     return true;
 }
 
-fn findRomFilesInPath(rom_test: RomTestConfig, alloc: std.mem.Allocator) ![][]const u8 {
-    var result: std.ArrayList([]const u8) = try .initCapacity(alloc, 15);
-    defer result.deinit(alloc);
+fn writeRomTests(writer: *std.io.Writer) !void {
+    for(rom_tests) |rom_test| {
+        const suite_path: []const u8 = rom_test.getSuitePath();
+        var path_buffer: [128]u8 = undefined;
+        const relative_path: []const u8 = try std.fmt.bufPrint(&path_buffer, "{s}{s}", .{ suite_path, rom_test.sub_path });
 
-    const suite_path: []const u8 = rom_test.getSuitePath();
-    var path_buffer: [128]u8 = undefined;
-    const relative_path: []const u8 = try std.fmt.bufPrint(&path_buffer, "{s}{s}", .{ suite_path, rom_test.sub_path });
+        const path_stat = try std.fs.cwd().statFile(relative_path);
+        switch (path_stat.kind) {
+            .directory => {
+                const dir: std.fs.Dir = try std.fs.cwd().openDir(relative_path, .{ .iterate = true });
+                var iter = dir.iterate();
+                while (iter.next() catch unreachable) |entry| {
+                    if (entry.kind != .file or !isFileAllowed(rom_test, entry.name)) {
+                        continue;
+                    }
 
-    const path_stat = try std.fs.cwd().statFile(relative_path);
-    switch (path_stat.kind) {
-        .directory => {
-            const dir: std.fs.Dir = try std.fs.cwd().openDir(relative_path, .{ .iterate = true });
-            var iter = dir.iterate();
-            while (iter.next() catch unreachable) |entry| {
-                if (entry.kind != .file or !isFileAllowed(rom_test, entry.name)) {
-                    continue;
+                    var full_path_buffer: [128]u8 = undefined;
+                    const full_path: []const u8 = try std.fmt.bufPrint(&full_path_buffer, "{s}{s}", .{ relative_path, entry.name });
+                    try writeOneRomTest(writer, rom_test, full_path);
+                }
+            },
+            .file => {
+                if (!isFileAllowed(rom_test, relative_path)) {
+                    @panic("Not allowed rom file is configured in the test generator!");
                 }
 
-                var full_path_buffer: [128]u8 = undefined;
-                const full_path = try std.fmt.bufPrint(&full_path_buffer, "{s}{s}", .{ relative_path, entry.name });
-                try result.append(alloc, try alloc.dupe(u8, full_path));
-            }
-        },
-        .file => {
-            if (!isFileAllowed(rom_test, relative_path)) {
-                @panic("Not allowed rom file is configured in the test generator!");
-            }
-
-            try result.append(alloc, try alloc.dupe(u8, relative_path));
-        },
-        else => @panic("Unknown type of path in test rom config!"),
+                try writeOneRomTest(writer, rom_test, relative_path);
+            },
+            else => @panic("Unknown type of path in test rom config!"),
+        }
     }
-
-    return try result.toOwnedSlice(alloc);
 }
 
+fn writeOneRomTest(writer: *std.io.Writer, rom_test: RomTestConfig, rom_file: []const u8) !void {
+    const file_name: []const u8 = std.fs.path.stem(rom_file);
 
-fn writeRomTests(writer: *std.io.Writer, alloc: std.mem.Allocator) !void {
-    for(rom_tests) |rom_test| {
-        const rom_files: [][]const u8 = try findRomFilesInPath(rom_test, alloc);
-        defer {
-            for(rom_files) |rom_file| { alloc.free(rom_file); }
-            alloc.free(rom_files);
-        }
-
-        for(rom_files) |rom_file| {
-            const file_name: []const u8 = std.fs.path.stem(rom_file);
-
-            try writer.print(output_rom_test_start, .{ @tagName(rom_test.suite), @tagName(rom_test.category), rom_test.sub_path, file_name, file_name });
-            try writer.print(output_rom_exit, .{ @tagName(rom_test.exit) });
-            switch (rom_test.timeout) {
-                .cycle => |value| try writer.print(output_rom_timeout, .{ @tagName(rom_test.timeout), value}),
-                .frame => |value| try writer.print(output_rom_timeout, .{ @tagName(rom_test.timeout), value}),
-                .sec => |value| try writer.print(output_rom_timeout, .{ @tagName(rom_test.timeout), value}),
-            }
-            switch (rom_test.pass) {
-                .fibonacci, .mbc3 => try writer.print(output_rom_pass_void, .{ @tagName(rom_test.pass) }),
-                .memory => unreachable, // Does not seem to be used right now?
-                .text => |value| try writer.print(output_rom_pass_text, .{ @tagName(rom_test.pass), value }),
-            }
-            switch (rom_test.context) {
-                .none, => try writer.print(output_rom_context_void, .{ @tagName(rom_test.context) }),
-                .memory => unreachable, // Does not seem to be used right now?
-                .text_parsing => |value| try writer.print(output_rom_context_text_parsing, .{ @tagName(rom_test.context), @tagName(value) }),
-            }
-            try writer.print(output_rom_core, .{ @tagName(rom_test.model), rom_test.force_boot_rom, rom_file});
-            try writer.print(output_rom_test_end, .{});
-        }
+    try writer.print(output_rom_test_start, .{ @tagName(rom_test.suite), @tagName(rom_test.category), rom_test.sub_path, file_name, file_name });
+    try writer.print(output_rom_exit, .{ @tagName(rom_test.exit) });
+    switch (rom_test.timeout) {
+        .cycle => |value| try writer.print(output_rom_timeout, .{ @tagName(rom_test.timeout), value}),
+        .frame => |value| try writer.print(output_rom_timeout, .{ @tagName(rom_test.timeout), value}),
+        .sec => |value| try writer.print(output_rom_timeout, .{ @tagName(rom_test.timeout), value}),
     }
+    switch (rom_test.pass) {
+        .fibonacci, .mbc3 => try writer.print(output_rom_pass_void, .{ @tagName(rom_test.pass) }),
+        .memory => unreachable, // Does not seem to be used right now?
+        .text => |value| try writer.print(output_rom_pass_text, .{ @tagName(rom_test.pass), value }),
+    }
+    switch (rom_test.context) {
+        .none, => try writer.print(output_rom_context_void, .{ @tagName(rom_test.context) }),
+        .memory => unreachable, // Does not seem to be used right now?
+        .text_parsing => |value| try writer.print(output_rom_context_text_parsing, .{ @tagName(rom_test.context), @tagName(value) }),
+    }
+    try writer.print(output_rom_core, .{ @tagName(rom_test.model), rom_test.force_boot_rom, rom_file});
+    try writer.print(output_rom_test_end, .{});
 }
