@@ -40,21 +40,23 @@ const mbc3_table: [39]u8 = .{
     'V', 'W', 'X', 'Y', 'Z', mbc3_check, mbc3_fail,
 };
 
-fn parseChar(alloc: std.mem.Allocator, ppu: anytype, char_table: []const u8, char_low: u16) ![]const u8 {
+const line_buffer_size: usize = def.tile_map_size_x + 1; // Newline => +1
+const parse_buffer_size: usize = line_buffer_size * def.tile_map_size_y;
+
+fn parseChar(ppu: anytype, char_table: []const u8, char_low: u16, buffer: []u8) ![]const u8 {
     const char_len: u16 = @intCast(char_table.len);
     const char_high: u16 = char_low + (char_len * def.tile_size_byte);
     const tilemap_base_addr: u16 = if(ppu.lcd_control.bg_map_area == .map_9800) def.vram_tile_map_9800 else def.vram_tile_map_9C00;
     const tile_base_addr: u16 = if(ppu.lcd_control.bg_window_tile_data == .tile_8800) def.tile_8800 else def.tile_8000;
 
-    var writer: std.io.Writer.Allocating = .init(alloc);
-    defer writer.deinit();
+    var writer: std.Io.Writer = .fixed(buffer);
 
     for(0..def.tile_map_size_y) |y| {
         const y_cast: u16 = @intCast(y);
 
         var line_has_content: bool = false;
-        var line_writer: std.io.Writer.Allocating = .init(alloc);
-        defer line_writer.deinit();
+        var line_buffer: [line_buffer_size]u8 = undefined;
+        var line_writer: std.Io.Writer = .fixed(&line_buffer);
 
         for(0..def.tile_map_size_x) |x| {
             const x_cast: u16 = @intCast(x);
@@ -67,18 +69,17 @@ fn parseChar(alloc: std.mem.Allocator, ppu: anytype, char_table: []const u8, cha
             const char: u8 = char_table[table_offset];
             line_has_content |= (char != ' ');
 
-            try line_writer.writer.writeByte(char);
+            try line_writer.writeByte(char);
         }
 
         if(line_has_content) {
-            try line_writer.writer.writeByte('\n');
-            const line: []u8 = try line_writer.toOwnedSlice();
-            defer alloc.free(line);
-            _ = try writer.writer.write(line);
+            try line_writer.writeByte('\n');
+            const line: []u8 = line_writer.buffered();
+            _ = try writer.write(line);
         }
     }
 
-    return try writer.toOwnedSlice();
+    return writer.buffered();
 }
 
 pub const ExitCondition = enum {
@@ -119,7 +120,7 @@ pub const RomRunConfig = struct {
             .sec => |value| value * def.t_cycles_in_60fps * 60,
         };
     }
-    pub fn hitExit(self: Self, alloc: std.mem.Allocator, core: anytype, last_ppu_lcd_y: *u8, cycle_count: usize) !bool {
+    pub fn hitExit(self: Self, core: anytype, last_ppu_lcd_y: *u8, cycle_count: usize, parse_buffer: []u8) !bool {
         return switch (self.exit) {
             .none => false,
             .timeout => blk: {
@@ -129,8 +130,7 @@ pub const RomRunConfig = struct {
             .blargg => blk: {
                 const lcd_y: u8 = core.ppu.lcd_y;
                 if(lcd_y == 144 and last_ppu_lcd_y.* == 143) {
-                    const vram_text: []const u8 = try parseChar(alloc, core.ppu, &ascii_table, blargg_char_low);
-                    defer alloc.free(vram_text);
+                    const vram_text: []const u8 = try parseChar(core.ppu, &ascii_table, blargg_char_low, parse_buffer);
 
                     var iter = std.mem.splitBackwardsScalar(u8, vram_text, '\n');
                     while(iter.next()) |line| {
@@ -160,17 +160,17 @@ pub const RomRunConfig = struct {
             },
         };
     }
-    pub fn getContext(self: Self, alloc: std.mem.Allocator, core: anytype) ![]const u8 {
+    pub fn getContext(self: Self, core: anytype, buffer: []u8) ![]const u8 {
         return switch(self.context) {
             .none => "",
             .memory => @panic("memory context not yet supported"),
             .text_parsing => |parse_type| parse: {
                 break: parse switch (parse_type) {
-                    .blargg => try parseChar(alloc, core.ppu, &ascii_table, blargg_char_low),
-                    .bully => try parseChar(alloc, core.ppu, &ascii_table, bully_char_low),
-                    .mbc3 => try parseChar(alloc, core.ppu, &mbc3_table, mbc3_char_low),
+                    .blargg => try parseChar(core.ppu, &ascii_table, blargg_char_low, buffer),
+                    .bully => try parseChar(core.ppu, &ascii_table, bully_char_low, buffer),
+                    .mbc3 => try parseChar(core.ppu, &mbc3_table, mbc3_char_low, buffer),
                     .gambatte => "",
-                    .mooneye => try parseChar(alloc, core.ppu, &ascii_table, mooneye_char_low),
+                    .mooneye => try parseChar(core.ppu, &ascii_table, mooneye_char_low, buffer),
                 };
             },
         };
@@ -217,6 +217,8 @@ pub fn isFiltered(path: []const u8) bool {
 
 pub fn run(run_config: RomRunConfig) !void {
     const alloc = std.testing.allocator;
+    var parse_buffer: [parse_buffer_size]u8 = undefined;
+
     var irq_joypad: bool = false;
     const timeout_cycles: usize = run_config.getTimeoutInCycles();
 
@@ -229,13 +231,11 @@ pub fn run(run_config: RomRunConfig) !void {
     var cycle_count: u32 = 0;
     while(cycle_count <= timeout_cycles) : (cycle_count += 1) {
         core.cyle(&irq_joypad);
-        exit_cond_hit = try run_config.hitExit(alloc, &core, &last_ppu_lcd_y, cycle_count);
+        exit_cond_hit = try run_config.hitExit(&core, &last_ppu_lcd_y, cycle_count, &parse_buffer);
         if(exit_cond_hit) break;
     }
 
-    const context: []const u8 = try run_config.getContext(alloc, &core);
-    defer alloc.free(context);
-
+    const context: []const u8 = try run_config.getContext(&core, &parse_buffer);
     std.testing.expectEqual(true, exit_cond_hit or run_config.exit == .none) catch |err| {
         std.debug.print("Failed: {s}: {s}\n", .{ run_config.core_config.files.rom.?, "rom has exit condition but it timed out." });
         std.debug.print("Context: {s}\n", .{ context });

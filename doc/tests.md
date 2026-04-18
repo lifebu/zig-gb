@@ -1,5 +1,9 @@
 # Next
 ## Test generator
+- rom_runner:
+    - hitExit() => Blagg parsing:
+        - Could improve the code by using ppu interrupts for vblank!
+    - Some cleanup pass on already existing data that gets recalculated?
 - Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
     - model_detection enum for the detection method?
@@ -12,6 +16,9 @@
     - remove old test_roms.test.zig.
 - changes to the test_options seem to trigger a build of the test generator?
     => Only thing used by both is the definition of the test_category.
+- How should release modes be used for tests?
+    - All tests could use ReleaseFast?
+    - If you filter for category or specific file it is Debug?
 
 ## Folder Structure
 build/

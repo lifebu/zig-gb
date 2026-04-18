@@ -198,27 +198,22 @@ const output_rom_test_end =
 
 pub fn main() !void {
     var timer: std.time.Timer = try .start();
-    defer {
-        const elapsed: f64 = @floatFromInt(timer.read());
-        std.log.info("Generator: Total time: {d:.2}ms", .{ elapsed / std.time.ns_per_ms });
-    }
 
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
-    defer _ = gpa.deinit();
-    const alloc: std.mem.Allocator = gpa.allocator();
+    var buffer: [85_000]u8 = undefined;
+    var writer: std.io.Writer = .fixed(&buffer);
 
-    var writer: std.io.Writer.Allocating = try .initCapacity(alloc, 85_000); // Number from last runs.
-    defer writer.deinit();
+    try writer.writeAll(output_start);
+    try writeUnitTests(&writer);
+    try writeRomTests(&writer);
 
-    try writer.writer.writeAll(output_start);
-    try writeUnitTests(&writer.writer);
-    try writeRomTests(&writer.writer);
+    const result: []u8 = writer.buffered();
+    std.fs.cwd().writeFile(.{ .data = result, .sub_path = output_file_path }) catch unreachable;
 
-    var result: std.ArrayList(u8) = writer.toArrayList();
-    defer result.deinit(alloc);
-
-    std.fs.cwd().writeFile(.{ .data = result.items, .sub_path = output_file_path }) catch unreachable;
-    std.log.info("Generator: Memory usage: {B}", .{ result.items.len });
+    const elapsed: f64 = @floatFromInt(timer.read());
+    const mem_used: f32 = @floatFromInt(result.len);
+    const mem_total: f32 = @floatFromInt(buffer.len);
+    std.log.info("Generator: Total time: {d:.2}ms", .{ elapsed / std.time.ns_per_ms });
+    std.log.info("Generator: Memory usage: {B} ({d:.2}%)", .{ result.len, (mem_used / mem_total) * 100.0 });
 }
 
 fn writeUnitTests(writer: *std.io.Writer) !void {
