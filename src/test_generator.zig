@@ -13,7 +13,7 @@ const UnitTestConfig = struct {
 };
 
 const unit_test_folder = "src/tests/";
-const unit_tests: [5]UnitTestConfig = .{
+const unit_tests: [6]UnitTestConfig = .{
     //.{ .file = "apu", .category = .apu , .test_functions = &.{ "ApuChannel" } },
     //.{ .file = "apu_sampling", .category = .apu, .test_functions = &.{ "ApuSampling", "ApuOutput" } },
     .{ .file = "cart", .category = .cart , .test_functions = &.{ "Cart" } },
@@ -22,7 +22,7 @@ const unit_tests: [5]UnitTestConfig = .{
     .{ .file = "memory", .category = .memory , .test_functions = &.{ "DMA", "Request" } },
     .{ .file = "mmio", .category = .mmio , .test_functions = &.{ "Divider", "Input", "Timer" } },
     //.{ .file = "ppu", .category = .ppu , .test_functions = &.{ "Interrupt" } },
-    //.{ .file = "singlestep_test", .category = .instruction , .test_functions = &.{ "SingleStep" } },
+    .{ .file = "singlestep", .category = .instr, .test_functions = &.{ "SingleStep" } },
 };
 
 // rom tests

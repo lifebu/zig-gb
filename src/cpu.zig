@@ -25,6 +25,22 @@ const RegisterFileID = enum(u4) {
     spl, sph,
     ir, dbus,
     f, a,
+
+    fn formatU16(rfid: RegisterFileID) []const u8 {
+        return switch(rfid) {
+            .c, .b => "bc",
+            .e, .d => "de",
+            .l, .h => "hl",
+            .z, .w => "wz",
+            .pcl, .pch => "pc",
+            .spl, .sph => "sp",
+            .ir, .dbus => "invalid",
+            .f, .a => "af",
+        };
+    }
+    fn formatU8(rfid: RegisterFileID) []const u8 {
+        return @tagName(rfid);
+    }
 };
 
 const FlagFileID = enum(u3) {
@@ -131,14 +147,39 @@ const MiscParams = packed struct(u15) {
 const MicroOpData = struct {
     operation: MicroOp,
     params: union(enum) {
-        none,
+        none: void,
         addr_idu: AddrIduParams,
         idu_adjust: IduAdjustParams,
-        dbus: DBusParams,
         alu: AluParams,
-        misc: MiscParams,
+        dbus: DBusParams,
         decode: DecodeParams,
+        misc: MiscParams,
     },
+
+    pub fn format(self: MicroOpData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print("{t}", .{ self.operation });
+        switch (self.params) {
+            .none => {},
+            .addr_idu => |param| try writer.print("({s}, {}, {s})", .{ param.addr.formatU16(), param.idu, param.idu_out.formatU16() }),
+            .idu_adjust => |param| try writer.print("({s}, flags: {})", .{ param.input.formatU8(), param.change_flags }),
+            .alu => |param| try writer.print("({s}, ({s}, {}), {t}, {s})", .{ param.input_1.formatU8(), param.input_2.rfid.formatU8(), param.input_2.value, param.ffid, param.output.formatU8() }),
+            .dbus => |param| try writer.print("({s}, {s})", .{ param.source.formatU8(), param.target.formatU8() }),
+            .decode => |param| try writer.print("({s})", .{ 
+                switch(param.bank_idx) { opcode_bank_default => "bank_default", opcode_bank_prefix => "bank_prefix",
+                    opcode_bank_pseudo => "bank_pseudo", else => "",
+                }
+            }),
+            .misc => |param| {
+                switch(self.operation) {
+                    .wz_writeback => try writer.print("({s})", .{ param.write_back.formatU16() }),
+                    .conditional_check => try writer.print("({t})", .{ param.cc }),
+                    .set_pc => try writer.print("({})", .{ param.rst_idx }),
+                    .change_ime => try writer.print("({})", .{ param.ime_value }),
+                    .halt => {}, else => {},
+                }
+            }, 
+        }
+    }
 };
 const MicroOpFifo = Fifo.RingbufferFifo(MicroOpData, longest_instruction_cycles);
 pub const MicroOpArray = std.ArrayList(MicroOpData);

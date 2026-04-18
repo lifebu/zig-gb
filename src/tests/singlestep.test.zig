@@ -94,6 +94,7 @@ fn testOutput(cpu: *const CPU, memory: *std.AutoHashMap(u16, u8), test_case: *co
 }
 
 fn printTestCase(cpuState: *const CPUState) void {
+    const hl: u16 = @as(u16, cpuState.l) | (@as(u16, cpuState.h) << 8); 
     std.debug.print("A: {X:0>2} F {X:0>2}: {s} {s} {s} {s} ", .{ cpuState.a, cpuState.f,
         if ((cpuState.f & 0x80) == 0x80) "Z" else "_",
         if ((cpuState.f & 0x40) == 0x40) "N" else "_",
@@ -102,13 +103,17 @@ fn printTestCase(cpuState: *const CPUState) void {
     });
     std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpuState.b, cpuState.c });
     std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpuState.d, cpuState.e });
-    std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpuState.h, cpuState.l });
-    std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpuState.sp, cpuState.pc });
+    std.debug.print("H: {X:0>2} L: {X:0>2}\n", .{ cpuState.h, cpuState.l });
+    std.debug.print("HL: {X:0>4} ({s}), SP: {X:0>4} ({s}) PC: {X:0>4} ({s})\n", .{ 
+        hl, def.getMemoryRangeName(hl), 
+        cpuState.sp, def.getMemoryRangeName(cpuState.sp), 
+        cpuState.pc, def.getMemoryRangeName(cpuState.sp) 
+    });
     for (cpuState.ram) |ramPair| {
         std.debug.assert(ramPair.len == 2);
         const address: u16 = ramPair[0];
         const value: u8 = @intCast(ramPair[1]);
-        std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
+        std.debug.print("Addr: {X:0>4} ({s}), val: {X:0>2}; ", .{ address, def.getMemoryRangeName(address), value });
     }
     std.debug.print("\n", .{});
 }
@@ -130,7 +135,7 @@ pub fn runSingleStepTests() !void {
 
     // Initialized once to only initialize the opcode banks once!
     var cpu: CPU = .{};
-    cpu.init(alloc);
+    cpu.init(alloc, false);
     defer cpu.deinit(alloc);
 
     var memory: std.AutoHashMap(u16, u8) = .init(alloc);
@@ -223,15 +228,19 @@ pub fn runSingleStepTests() !void {
                 });
                 std.debug.print("B: {X:0>2} C: {X:0>2} ", .{ cpu.registers.r8.b, cpu.registers.r8.c });
                 std.debug.print("D: {X:0>2} E: {X:0>2} ", .{ cpu.registers.r8.d, cpu.registers.r8.e });
-                std.debug.print("H: {X:0>2} L: {X:0>2} ", .{ cpu.registers.r8.h, cpu.registers.r8.l });
+                std.debug.print("H: {X:0>2} L: {X:0>2}\n", .{ cpu.registers.r8.h, cpu.registers.r8.l });
                 // Note: pc - 1, because we prefetch, the SingleStepTests don't implement that.
-                std.debug.print("SP: {X:0>4} PC: {X:0>4}\n", .{ cpu.registers.r16.sp, cpu.registers.r16.pc - 1 });
-                std.debug.print("WZ: {X:0>4}\n", .{ cpu.registers.r16.wz });
+                std.debug.print("HL: {X:0>4} ({s}), SP: {X:0>4} ({s}), PC: {X:0>4} ({s}), WZ: {X:0>4} ({s})\n", .{ 
+                    cpu.registers.r16.hl, def.getMemoryRangeName(cpu.registers.r16.hl),  
+                    cpu.registers.r16.sp, def.getMemoryRangeName(cpu.registers.r16.sp),  
+                    cpu.registers.r16.pc - 1, def.getMemoryRangeName(cpu.registers.r16.pc - 1),
+                    cpu.registers.r16.wz, def.getMemoryRangeName(cpu.registers.r16.wz),
+                });
                 for (test_case.final.ram) |ramPair| {
                     std.debug.assert(ramPair.len == 2);
                     const address: u16 = ramPair[0];
                     const value: u8 = memory.get(address).?;
-                    std.debug.print("Addr: {X:0>4} val: {X:0>2} ", .{ address, value });
+                    std.debug.print("Addr: {X:0>4} ({s}), val: {X:0>2}; ", .{ address, def.getMemoryRangeName(address), value });
                 }
                 std.debug.print("\n", .{});
                 std.debug.print("CPU had not enough uops: {any}\n", .{ not_enough_uops });
@@ -251,6 +260,23 @@ pub fn runSingleStepTests() !void {
                     //     mmu.request.getAddress(), mmu.request.data, mmu.request.print() 
                     // });
                 }
+
+                var bank_idx: u3 = CPU.opcode_bank_default;
+                var opcode: u16 = test_case.initial.ram[0][1];
+                if(opcode == 0xCB) {
+                    bank_idx = CPU.opcode_bank_prefix;
+                    opcode = test_case.initial.ram[1][1];
+                }
+                const micro_ops = CPU.opcode_banks[bank_idx][opcode];
+
+                std.debug.print("MicroOps Op: [{}][{X:0>2}]\n", .{ bank_idx, opcode });
+                for(micro_ops.items, 1..) |op, op_idx| {
+                    std.debug.print("{f}, ", .{ op });
+                    if ((op_idx % 4) == 0) {
+                        std.debug.print("\n", .{});
+                    }
+                }
+                std.debug.print("\n", .{});
 
                 return err;
             };

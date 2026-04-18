@@ -1,5 +1,6 @@
 # zig
 .zig-cache/
+zig-pkg/
 zig-out/
 
 # proprietary testdata
