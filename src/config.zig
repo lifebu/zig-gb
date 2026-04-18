@@ -48,7 +48,7 @@ pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {
     var diagnostics: std.zon.parse.Diagnostics = .{};
     defer diagnostics.deinit(alloc);
     self.* = std.zon.parse.fromSlice(Self, alloc, content0, &diagnostics, .{ .free_on_error = true }) catch |err| {
-        std.log.warn("Failed to parse config file, will use default: {f}.\n", .{diagnostics});
+        std.log.warn("Failed to parse config file, will use default: {f}.", .{diagnostics});
         return err;
     };
 }
@@ -75,6 +75,6 @@ pub fn parseArgs(state: *Self, alloc: std.mem.Allocator) !void {
     if (std.mem.eql(u8, file_extension, ".gb")) {
         state.files.rom = try alloc.dupe(u8, file_path);
     } else {
-        std.log.err("unknown type of file: {s}\n", .{ file_path });
+        std.log.err("unknown type of file: {s}", .{ file_path });
     }
 }

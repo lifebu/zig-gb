@@ -78,8 +78,8 @@ pub const Request = struct {
     }
     pub fn format(self: Request, writer: *std.io.Writer) std.io.Writer.Error!void {
         switch (self.value) {
-            .read => |read|   try writer.print("{s}: {X:0>4} -> {any:0>2}", .{ @tagName(self.requestor), self.address, read }),
-            .write => |write| try writer.print("{s}: {X:0>2} -> {X:0>4}", .{ @tagName(self.requestor), write, self.address }),
+            .read => |read|   try writer.print("{s}: {X:0>4} ({s}) -> {any:0>2}", .{ @tagName(self.requestor), self.address, getMemoryRangeName(self.address), read }),
+            .write => |write| try writer.print("{s}: {X:0>2} -> {X:0>4} ({s})", .{ @tagName(self.requestor), write, self.address, getMemoryRangeName(self.address) }),
         }
     }
     pub fn logAndReject(self: *Request) void {
@@ -119,6 +119,25 @@ pub const hram_high: u16        = 0xFFFF;
 
 pub const audio_low: u16        = 0xFF10;
 pub const audio_high: u16       = 0xFF40;
+
+pub const io_low: u16           = 0xFF00;
+pub const io_high: u16          = 0xFF80;
+
+pub fn getMemoryRangeName(addr: u16) []const u8 {
+    return switch(addr) {
+        rom_low...(rom_middle - 1) => "rom_low",
+        rom_middle...(rom_high - 1) => "rom_high",
+        vram_low...(vram_high - 1) => "vram",
+        cart_ram_low...(cart_ram_high - 1) => "cart_ram",
+        wram_low...(wram_high - 1) => "wram",
+        echo_low...(echo_high - 1) => "echo",
+        oam_low...(oam_high - 1) => "oam",
+        unused_low...(unused_high - 1) => "unused",
+        hram_low...(hram_high - 1) => "hram",
+        io_low...(io_high - 1) => "io",
+        else => "undefined",
+    };
+}
 
 // io
 pub const joypad: u16           = 0xFF00;
@@ -232,7 +251,7 @@ pub const default_color_ids: [overscan_resolution]u8 = @splat(0);
 pub const resolution_width = 160;
 pub const resolution_height = 144;
 // TODO: configureable? How?
-pub const scaling = 3;
+pub const scaling = 4;
 
 pub const window_width = resolution_width * scaling;
 pub const window_height = resolution_height * scaling;

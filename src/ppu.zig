@@ -332,7 +332,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             self.oam_scan_idx += 1;
         },
         else => { 
-            std.debug.print("PPU_MICRO_OP_NOT_IMPLEMENTED: {any}\n", .{uop});
+            std.log.err("PPU: Operation not implemented: {any}", .{uop});
             unreachable;
         },
     }

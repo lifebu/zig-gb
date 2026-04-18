@@ -708,6 +708,13 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
         Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
+    var byte_size: usize = 0;
+    for (returnVal) |bank| {
+        for (bank) |operation| {
+            byte_size += operation.items.len + @sizeOf(MicroOpData);
+        }
+    }
+    std.log.info("CPU: Opcode memory usage: {B}", .{ byte_size });
     return returnVal;
 
 }
@@ -1045,12 +1052,13 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 const opcode_bank = opcode_banks[params.bank_idx];
                 const opcode: u8 = self.registers.r8.ir;
                 if(opcode == 0x10 and params.bank_idx == opcode_bank_default) {
-                    std.debug.print("STOP_NOT_IMPLEMENTED\n", .{});
+                    std.log.err("CPU: Stop is not implemented", .{});
                     unreachable;
                 }
                 const uops: MicroOpArray = opcode_bank[opcode];
                 if(uops.items.len == 0) {
-                    std.log.err("Decoded invalid opcode. Addr: {X:0>4}, Op: [{}][{X:0>2}]", .{ self.registers.r16.pc - 1, params.bank_idx, opcode });
+                    const target: u16 = self.registers.r16.pc - 1;
+                    std.log.err("CPU: Decoded invalid opcode. Addr: {X:0>4} ({s}), Op: [{}][{X:0>2}]", .{ target, def.getMemoryRangeName(target), params.bank_idx, opcode });
                 }
                 self.uop_fifo.write(uops.items);
             }
@@ -1125,7 +1133,7 @@ pub fn cycle(self: *Self, req: *def.Request) void {
             self.registers.r8.f._unused = 0;
         },
         else => { 
-            std.debug.print("CPU_MICRO_OP_NOT_IMPLEMENTED: {any}\n", .{uop});
+            std.log.err("CPU: Operation not implemented: {any}", .{uop});
             unreachable;
         },
     }

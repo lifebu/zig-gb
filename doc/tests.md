@@ -6,6 +6,7 @@
     - Maybe I can also manually set it for unit tests.
     - Also allow tests to run on all gb versio version.
 - Make CoreType something that can be changed at runtime.
+    - Move from a build option to a Config option!
     - Instead of CoreType there is a tagged union of the subsystems that can switch.
         - PPU, APU
         const PPU = union(enum) {
