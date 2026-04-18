@@ -120,11 +120,10 @@ pub const RomRunConfig = struct {
             .sec => |value| value * def.t_cycles_in_60fps * 60,
         };
     }
-    pub fn hitExit(self: Self, core: anytype, last_ppu_lcd_y: *u8, cycle_count: usize, parse_buffer: []u8) !bool {
+    pub fn hitExit(self: Self, core: anytype, last_ppu_lcd_y: *u8, cycle_count: usize, timeout_cycles: usize, parse_buffer: []u8) !bool {
         return switch (self.exit) {
             .none => false,
             .timeout => blk: {
-                const timeout_cycles: usize = self.getTimeoutInCycles();
                 break: blk cycle_count >= timeout_cycles;
             },
             .blargg => blk: {
@@ -231,7 +230,7 @@ pub fn run(run_config: RomRunConfig) !void {
     var cycle_count: u32 = 0;
     while(cycle_count <= timeout_cycles) : (cycle_count += 1) {
         core.cyle(&irq_joypad);
-        exit_cond_hit = try run_config.hitExit(&core, &last_ppu_lcd_y, cycle_count, &parse_buffer);
+        exit_cond_hit = try run_config.hitExit(&core, &last_ppu_lcd_y, cycle_count, timeout_cycles, &parse_buffer);
         if(exit_cond_hit) break;
     }
 

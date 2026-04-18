@@ -119,7 +119,7 @@ const rom_tests: [18]RomTestConfig = .{
     // TODO: Add support for same-suite tests, one test is for ei-di and halt delays.
 };
 
-const output_file_path = "src/tst.zig";
+const output_file_path = "src/test.zig";
 const output_start = 
     \\/////////////////////////////////////////////////
     \\/// AUTO GENERATED FILE. DO NOT EDIT MANUALLY

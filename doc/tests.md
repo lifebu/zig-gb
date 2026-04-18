@@ -1,21 +1,23 @@
 # Next
 ## Test generator
-- rom_runner:
-    - hitExit() => Blagg parsing:
-        - Could improve the code by using ppu interrupts for vblank!
-    - Some cleanup pass on already existing data that gets recalculated?
 - Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
     - model_detection enum for the detection method?
     - Maybe I can also manually set it for unit tests.
-    - Also allow tests to run on all gb versio version
-- Cleanup test category, filter and exclude.
-    => Those should not be build commands for the test_generator!
+    - Also allow tests to run on all gb versio version.
 - Make CoreType something that can be changed at runtime.
-- Move from test2.zig to tst.zig.
-    - remove old test_roms.test.zig.
-- changes to the test_options seem to trigger a build of the test generator?
-    => Only thing used by both is the definition of the test_category.
+    - Instead of CoreType there is a tagged union of the subsystems that can switch.
+        - PPU, APU
+        const PPU = union(enum) {
+            ppu_void: PPUVoid,
+            ppu_cycle: PPUCycle,
+
+            // All of those have switches for the union.
+            pub fn init()
+            pub fn deinit()
+            pub fn cycle()
+            pub fn request()
+        }
 - How should release modes be used for tests?
     - All tests could use ReleaseFast?
     - If you filter for category or specific file it is Debug?
@@ -49,6 +51,7 @@ N- Build from source:
         - rgbds: 13
         - custom: 1 (gambatte)
     => To much work right now => Embedd binaries + source file.
+- Maybe use zig fetch to download game-boy-test-roms repository and run it's compile script?
 
 ## Custom test runner
 - multithreaded (zig 0.16) using io.async().
@@ -71,6 +74,7 @@ N- Build from source:
     - Should give me some statistics of passed/failed tests per category and test-suite.
     - Failed tests could also include:
         - Links to the assembly source file.
+- Should handle category, exclude and filters, so that this is no longer a compile time parameter.
 - Links:
     - How to write a basic test runner: https://www.youtube.com/watch?v=jpY6VHsHsWU
     - https://codeberg.org/ziglang/zig/src/branch/master/lib/compiler/test_runner.zig

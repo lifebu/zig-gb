@@ -76,7 +76,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/test_generator.zig"),
             .target = target,
-            .optimize = .Debug, // TODO: Change to ReleaseFast later! 
+            .optimize = .ReleaseFast,
         }),
         // TODO: If I fix debugging vscode, I can default to never using llm, making this compilation in ReleaseFast way faster!
         .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
@@ -97,7 +97,7 @@ pub fn build(b: *std.Build) void {
     const tests = b.addTest(.{
         .name = "test",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tst.zig"),
+            .root_source_file = b.path("src/test.zig"),
             .target = target,
             .optimize = optimize,
         }),
