@@ -1,5 +1,10 @@
 # Next:
 - Work on better tests (see todos in tests.md)
+- Create some easy build scripts to have the common flags for zig build into one?
+    - VsCode Debug
+    - Build watch
+    - Run Release
+    - Run Tests
 
 ## Clean up repository:
 - remove data/background.png

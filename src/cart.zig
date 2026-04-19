@@ -127,17 +127,12 @@ pub fn init(self: *Self) void {
 }
 
 pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
-    const save_path: []const u8 = getSavePath(alloc, rom_path);
-    defer alloc.free(save_path);
-
     if(self.features.has_battery and self.features.has_ram and !disable_saves) {
-        // TODO: Try to rewrite this using std.Io.Dir.cwd().writeFile()
-        const save_file: std.Io.File = std.Io.Dir.cwd().createFile(io, save_path, .{}) catch unreachable;
-        defer save_file.close(io);
+        const save_path: []const u8 = getSavePath(alloc, rom_path);
+        defer alloc.free(save_path);
 
-        for(self.ram_banks) |bank| {
-            _ = save_file.writeStreamingAll(io, &bank) catch unreachable;
-        }
+        const ram_banks_flat: []const u8 = std.mem.sliceAsBytes(self.ram_banks);
+        std.Io.Dir.cwd().writeFile(io, .{ .sub_path = save_path, .data = ram_banks_flat }) catch unreachable;
     }
 
     alloc.free(self.rom_banks);
@@ -267,28 +262,25 @@ pub fn loadFile(self: *Self, io: std.Io, alloc: std.mem.Allocator, rom_path: []c
     }
 
     // savegame
-    const save_path: []const u8 = getSavePath(alloc, rom_path);
-    defer alloc.free(save_path);
+    if (self.features.has_battery and self.features.has_ram and !disable_saves) {
+        const save_path: []const u8 = getSavePath(alloc, rom_path);
+        defer alloc.free(save_path);
 
-    // TODO: Consider just using std.Io.Dir.cwd().readFileAlloc() and do nothing on the file not found error?
-    const save_file: ?std.Io.File = std.Io.Dir.cwd().openFile(io, save_path, .{}) catch |err| blk: {
-        switch(err) { error.FileNotFound => break: blk null, else => unreachable, }
-    };
-    defer if(save_file) |file| file.close(io);
+        if (std.Io.Dir.cwd().readFileAlloc(io, save_path, alloc, .unlimited)) |save_content| {
+            defer alloc.free(save_content);
 
-    if(self.features.has_battery and self.features.has_ram and save_file != null and !disable_saves) { // Savegame ram.
-        var file_reader: std.Io.File.Reader = save_file.?.reader(io, &.{});
-        const save_content: []const u8 = file_reader.interface.allocRemaining(alloc, .unlimited) catch unreachable;
-        defer alloc.free(save_content);
-
-        for(0..num_ram_banks) |bank_idx| {
-            const start: u32 = @intCast(bank_idx * ram_bank_size_byte);
-            const end: u32 = start + ram_bank_size_byte;
-            @memcpy(&self.ram_banks[bank_idx], save_content[start..end]);
-        }
-    } else { // Default ram.
-        for(0..num_ram_banks) |bank_idx| {
-            @memset(&self.ram_banks[bank_idx], 0);
+            for(0..num_ram_banks) |bank_idx| {
+                const start: u32 = @intCast(bank_idx * ram_bank_size_byte);
+                const end: u32 = start + ram_bank_size_byte;
+                @memcpy(&self.ram_banks[bank_idx], save_content[start..end]);
+            }
+        } else |err| switch(err) { 
+            error.FileNotFound => { // Use Default ram
+                for(0..num_ram_banks) |bank_idx| {
+                    @memset(&self.ram_banks[bank_idx], 0);
+                }
+            }, 
+            else => unreachable, 
         }
     }
 }
