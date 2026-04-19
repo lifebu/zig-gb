@@ -1,55 +1,40 @@
 # Next
-- Write down all remaining todos for tests and move the rest to "docs" section.
-    - Parameters instead of build flags (no more rebuilds).
-        - filter, categories, models, exclude, break_on_fail
-    - Output like the server mode (progress, errors only after all is done).
-    - Extra reports: per suite, statistics
-    - CoreType is runtime parameter to config.
-    - folder structure
-- Split SingleStepTests into multiple actual unit tests per file.
+[SingleStep] Rewrite them, code is pretty uggly.
+    - Use rom_runner as an example.
+[SingleStep] Split into unit tests per file.
     => 500 more unit tests.
-    - Rewrite them in general. The good is pretty uggly.
-        => Use rom_runner as an example.
-
-## Custom test runner
-- multithreaded (zig 0.16) using io.async().
-- CLI:
-    custom:
-    only_categories (comma-seperated)
-    exclude_tests (comma-seperated)
-    filter_tests (comma-seperated)
-    gameboy_model (dmg, mgb, gbc, etc)
-    seed
-    break_on_fail (default: no)
-    
-    from build server:
-    --listen=-
-    --seed=
-    --cache-dir=
-- Add some metrics to the runner to see how long the work it does takes (CLI parsing, setup, etc).
-- Should support simple and server mode.
-    - simple might be required for high performance?
-    - Depending on how many tests I will actually run, use server or simple.
-- Output:
+[Testrunner] Implement parsing of the test_name:
+    - suite_category_test
+    - Note: some tests use '_' in their name!
+    => Preprocess to parse all tests.
+[Testrunner] Implement parameter filters for the following and remove them from build:
+    - only_categories (comma-seperated list)
+    - exclude_tests (comma-seperated)
+    - filter_tests (comma-seperated)
+    - break_on_fail
+[Testrunner] performance metrics:
+    - Add some metrics to the runner to see how long the work it does takes (CLI parsing, setup, etc).
+    - only what it does!
+[Testrunner] Performance:
+    - Try to have as little of allocations as possible.
+[Testrunner] Console output:
     - Should give me some statistics of passed/failed tests per category and test-suite.
     - Failed tests could also include:
         - Links to the assembly source file.
     - Output printing at least as pretty as the one used by the build server.
-- Should handle category, exclude and filters, so that this is no longer a compile time parameter.
-    - Changing these parameter no longer requires a rebuilt!
-- Links:
-    - How to write a basic test runner: https://www.youtube.com/watch?v=jpY6VHsHsWU
-    - https://codeberg.org/ziglang/zig/src/branch/master/lib/compiler/test_runner.zig
-    - Example test runner: https://github.com/dokwork/zrunner
-    - Another (complicated) test runner: https://github.com/oneopane/test-runner
-
-## Test generator
-- Find a way to filter out specific tests that are incompatible with a specfic model.
+        - Only show progress at first.
+        - Show errors only after it is done.
+    - Colors:
+        https://github.com/dokwork/zrunner
+        https://ziglang.org/documentation/0.16.0/std/#std.Io.Terminal
+        - You use a std.Io.Terminal that wrapps a writer.
+[ModelFilter] Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
     - model_detection enum for the detection method?
     - Maybe I can also manually set it for unit tests.
-    - Also allow tests to run on all gb versio version.
-- Make CoreType something that can be changed at runtime.
+    - Also allow tests to run on all gb versions.
+    => Add this as a cli parameter to the test_runner.
+[CoreType] Make CoreType something that can be changed at runtime.
     - Move from a build option to a Config option!
     - Instead of CoreType there is a tagged union of the subsystems that can switch.
         - PPU, APU
@@ -63,9 +48,6 @@
             pub fn cycle()
             pub fn request()
         }
-- How should release modes be used for tests?
-    - All tests could use ReleaseFast?
-    - If you filter for category or specific file it is Debug?
 
 ## Folder Structure
 build/
@@ -192,3 +174,30 @@ https://gbdev.io/pandocs/Power_Up_Sequence.html
         - none
         - memory location.
         - text parsing: blargg, mooneye, mbc3, bully and gambatte print on the screen.
+
+## Custom test runner
+- CLI:
+    custom:
+    only_categories (comma-seperated)
+    exclude_tests (comma-seperated)
+    filter_tests (comma-seperated)
+    gameboy_model (dmg, mgb, gbc, etc)
+    seed
+    break_on_fail (default: no)
+    
+    from build server:
+    --listen=- => Server or Simple mode. Prefer simple.
+    --seed=
+    --cache-dir= => Fuzzing not supported.
+- Output:
+    - Should give me some statistics of passed/failed tests per category and test-suite.
+    - Failed tests could also include: Links to the assembly source file.
+    - Output printing at least as pretty as the one used by the build server.
+- Should handle category, exclude and filters, so that this is no longer a compile time parameter.
+    - Changing these parameter no longer requires a rebuilt!
+- Links:
+    - How to write a basic test runner: https://www.youtube.com/watch?v=jpY6VHsHsWU
+    - https://codeberg.org/ziglang/zig/src/branch/master/lib/compiler/test_runner.zig
+    - Example test runner: https://github.com/dokwork/zrunner
+        - This does support most of the basic features that I want so it would be a good reference.
+    - Another (complicated) test runner: https://github.com/oneopane/test-runner
