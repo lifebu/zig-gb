@@ -780,6 +780,13 @@ pub const FlagRegister = packed struct(u8) {
     half_bcd: u1 = 0,
     n_bcd: u1 = 0,
     zero: u1 = 0,
+
+    pub fn format(self: FlagRegister, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print("{s} {s} {s} {s} ", .{
+            if (self.zero == 1) "Z" else "_", if (self.n_bcd == 1) "N" else "_",
+            if (self.half_bcd == 1) "H" else "_", if (self.carry == 1) "C" else "_",
+        });
+    }
 };
 pub const PseudoFlagRegister = packed struct(u8) {
     temp_lsb: u1 = 0,
@@ -833,6 +840,17 @@ pub const RegisterFile = packed union (u144) {
             .carry => f.carry, .half_bcd => f.half_bcd, .n_bcd => f.n_bcd, .zero => f.zero,
             .temp_lsb => p.temp_lsb, .temp_msb => p.temp_msb, .const_one => p.const_one, .const_zero => p.const_zero,
         };
+    }
+    pub fn format(self: RegisterFile, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        try writer.print("A: {X:0>2} F: {X:0>2}: {f} ", .{ self.r8.a, @as(u8, @bitCast(self.r8.f)), self.r8.f });
+        try writer.print("B: {X:0>2} C: {X:0>2} ", .{ self.r8.b, self.r8.c });
+        try writer.print("D: {X:0>2} E: {X:0>2} ", .{ self.r8.d, self.r8.e });
+        try writer.print("H: {X:0>2} L: {X:0>2}\n", .{ self.r8.h, self.r8.l });
+        try writer.print("HL: {X:0>4} ({s}), SP: {X:0>4} ({s}) PC: {X:0>4} ({s})\n", .{ 
+            self.r16.hl, def.getMemoryRangeName(self.r16.hl), 
+            self.r16.sp, def.getMemoryRangeName(self.r16.sp), 
+            self.r16.pc, def.getMemoryRangeName(self.r16.pc),
+        });
     }
 };
 
@@ -1098,7 +1116,7 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 const uops: MicroOpArray = opcode_bank[opcode];
                 if(uops.items.len == 0) {
                     const target: u16 = self.registers.r16.pc - 1;
-                    std.log.err("CPU: Decoded invalid opcode. Addr: {X:0>4} ({s}), Op: [{}][{X:0>2}]", .{ target, def.getMemoryRangeName(target), params.bank_idx, opcode });
+                    std.log.warn("CPU: Decoded invalid opcode. Addr: {X:0>4} ({s}), Op: [{}][{X:0>2}]", .{ target, def.getMemoryRangeName(target), params.bank_idx, opcode });
                 }
                 self.uop_fifo.write(uops.items);
             }

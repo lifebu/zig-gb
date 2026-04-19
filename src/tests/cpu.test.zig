@@ -4,8 +4,6 @@ const std = @import("std");
 const def = @import("../defines.zig");
 const CPU = @import("../cpu.zig");
 
-const cpu_helper = @import("util/cpu_helper.zig");
-
 pub fn runRegisterTests() !void {
     const r8_rfids = [_]CPU.RegisterFileID{ .a, .f, .dbus, .ir, .sph, .spl, .pch, .pcl, .w, .z, .h, .l, .d, .e, .b, .c };
     const r8_initials = [_]u8{ 0x10, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 };

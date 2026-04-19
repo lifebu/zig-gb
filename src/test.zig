@@ -8,7 +8,8 @@ const test_options = @import("test_options");
 const category = test_options.test_category;
 
 const Config = @import("config.zig");
-const rom_test = @import("tests/util/rom_runner.zig");
+const rom_runner = @import("tests/util/rom_runner.zig");
+const singlestep_runner = @import("tests/util/singlestep_runner.zig");
 
 
 const cart_test = @import("tests/cart.test.zig");
@@ -84,1775 +85,5261 @@ test "blargg_apu_dmg_sound/rom_singles/_06-overflow on trigger" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("06-overflow on trigger")) {
+    if (rom_runner.isFiltered("06-overflow on trigger")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_07-len sweep period sync" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("07-len sweep period sync")) {
+    if (rom_runner.isFiltered("07-len sweep period sync")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_03-trigger" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("03-trigger")) {
+    if (rom_runner.isFiltered("03-trigger")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_11-regs after power" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("11-regs after power")) {
+    if (rom_runner.isFiltered("11-regs after power")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_01-registers" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("01-registers")) {
+    if (rom_runner.isFiltered("01-registers")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_02-len ctr" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("02-len ctr")) {
+    if (rom_runner.isFiltered("02-len ctr")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_08-len ctr during power" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("08-len ctr during power")) {
+    if (rom_runner.isFiltered("08-len ctr during power")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_09-wave read while on" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("09-wave read while on")) {
+    if (rom_runner.isFiltered("09-wave read while on")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_04-sweep" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("04-sweep")) {
+    if (rom_runner.isFiltered("04-sweep")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_10-wave trigger while on" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("10-wave trigger while on")) {
+    if (rom_runner.isFiltered("10-wave trigger while on")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_05-sweep details" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("05-sweep details")) {
+    if (rom_runner.isFiltered("05-sweep details")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_12-wave write while on" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("12-wave write while on")) {
+    if (rom_runner.isFiltered("12-wave write while on")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_03-op sp,hl" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("03-op sp,hl")) {
+    if (rom_runner.isFiltered("03-op sp,hl")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_06-ld r,r" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("06-ld r,r")) {
+    if (rom_runner.isFiltered("06-ld r,r")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_01-special" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("01-special")) {
+    if (rom_runner.isFiltered("01-special")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/01-special.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/01-special.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_05-op rp" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("05-op rp")) {
+    if (rom_runner.isFiltered("05-op rp")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_09-op r,r" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("09-op r,r")) {
+    if (rom_runner.isFiltered("09-op r,r")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_02-interrupts" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("02-interrupts")) {
+    if (rom_runner.isFiltered("02-interrupts")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_04-op r,imm" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("04-op r,imm")) {
+    if (rom_runner.isFiltered("04-op r,imm")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_11-op a,(hl)" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("11-op a,(hl)")) {
+    if (rom_runner.isFiltered("11-op a,(hl)")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_10-bit ops" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("10-bit ops")) {
+    if (rom_runner.isFiltered("10-bit ops")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_08-misc instrs" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("08-misc instrs")) {
+    if (rom_runner.isFiltered("08-misc instrs")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_07-jr,jp,call,ret,rst" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("07-jr,jp,call,ret,rst")) {
+    if (rom_runner.isFiltered("07-jr,jp,call,ret,rst")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 1160 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 1160 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_cpu_halt_bug.gb_halt_bug" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("halt_bug")) {
+    if (rom_runner.isFiltered("halt_bug")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 200 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/halt_bug.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 200 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/halt_bug.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_instr_timing/instr_timing.gb_instr_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("instr_timing")) {
+    if (rom_runner.isFiltered("instr_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/instr_timing/instr_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/instr_timing/instr_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing/individual/_03-modify_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("03-modify_timing")) {
+    if (rom_runner.isFiltered("03-modify_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing/individual/_02-write_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("02-write_timing")) {
+    if (rom_runner.isFiltered("02-write_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/02-write_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/02-write_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing/individual/_01-read_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("01-read_timing")) {
+    if (rom_runner.isFiltered("01-read_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/01-read_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/01-read_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing-2/rom_singles/_03-modify_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("03-modify_timing")) {
+    if (rom_runner.isFiltered("03-modify_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing-2/rom_singles/_02-write_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("02-write_timing")) {
+    if (rom_runner.isFiltered("02-write_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing-2/rom_singles/_01-read_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("01-read_timing")) {
+    if (rom_runner.isFiltered("01-read_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .blargg;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .{ .text = "Passed" };
-    const context: rom_test.Context = .{ .text_parsing = .blargg };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .blargg;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .{ .text = "Passed" };
+    const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mbc3_tester_cart_mbc3-tester.gb_mbc3-tester" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("mbc3-tester")) {
+    if (rom_runner.isFiltered("mbc3-tester")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .timeout;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .mbc3;
-    const context: rom_test.Context = .{ .text_parsing = .mbc3 };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mbc3-tester/mbc3-tester.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .timeout;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .mbc3;
+    const context: rom_runner.Context = .{ .text_parsing = .mbc3 };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mbc3-tester/mbc3-tester.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/bits/_reg_f" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("reg_f")) {
+    if (rom_runner.isFiltered("reg_f")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/reg_f.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/reg_f.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/bits/_mem_oam" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("mem_oam")) {
+    if (rom_runner.isFiltered("mem_oam")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/mem_oam.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/mem_oam.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/boot/_boot_div-dmgABCmgb" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("boot_div-dmgABCmgb")) {
+    if (rom_runner.isFiltered("boot_div-dmgABCmgb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_div-dmgABCmgb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_div-dmgABCmgb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/boot/_boot_regs-dmgABC" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("boot_regs-dmgABC")) {
+    if (rom_runner.isFiltered("boot_regs-dmgABC")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_regs-dmgABC.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_regs-dmgABC.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/boot/_boot_hwio-dmgABCmgb" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("boot_hwio-dmgABCmgb")) {
+    if (rom_runner.isFiltered("boot_hwio-dmgABCmgb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_hwio-dmgABCmgb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_hwio-dmgABCmgb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime1_timing2-GS" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("halt_ime1_timing2-GS")) {
+    if (rom_runner.isFiltered("halt_ime1_timing2-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing2-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing2-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime1_timing" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("halt_ime1_timing")) {
+    if (rom_runner.isFiltered("halt_ime1_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime0_ei" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("halt_ime0_ei")) {
+    if (rom_runner.isFiltered("halt_ime0_ei")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_ei.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_ei.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime0_nointr_timing" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("halt_ime0_nointr_timing")) {
+    if (rom_runner.isFiltered("halt_ime0_nointr_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 120 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_nointr_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 120 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_nointr_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr/daa.gb_daa" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("daa")) {
+    if (rom_runner.isFiltered("daa")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr/daa.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr/daa.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_cc_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("call_cc_timing")) {
+    if (rom_runner.isFiltered("call_cc_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ret_cc_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ret_cc_timing")) {
+    if (rom_runner.isFiltered("ret_cc_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_cc_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_cc_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_cc_timing2" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("call_cc_timing2")) {
+    if (rom_runner.isFiltered("call_cc_timing2")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing2.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing2.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_div_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("div_timing")) {
+    if (rom_runner.isFiltered("div_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/div_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/div_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_jp_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("jp_timing")) {
+    if (rom_runner.isFiltered("jp_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_add_sp_e_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("add_sp_e_timing")) {
+    if (rom_runner.isFiltered("add_sp_e_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/add_sp_e_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/add_sp_e_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ei_sequence" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ei_sequence")) {
+    if (rom_runner.isFiltered("ei_sequence")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_sequence.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_sequence.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_jp_cc_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("jp_cc_timing")) {
+    if (rom_runner.isFiltered("jp_cc_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_cc_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_cc_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ld_hl_sp_e_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ld_hl_sp_e_timing")) {
+    if (rom_runner.isFiltered("ld_hl_sp_e_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ld_hl_sp_e_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ld_hl_sp_e_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_di_timing-GS" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("di_timing-GS")) {
+    if (rom_runner.isFiltered("di_timing-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/di_timing-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/di_timing-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_pop_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("pop_timing")) {
+    if (rom_runner.isFiltered("pop_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/pop_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/pop_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_intr_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_timing")) {
+    if (rom_runner.isFiltered("intr_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/intr_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/intr_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("call_timing")) {
+    if (rom_runner.isFiltered("call_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_reti_intr_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("reti_intr_timing")) {
+    if (rom_runner.isFiltered("reti_intr_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_intr_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_intr_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_push_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("push_timing")) {
+    if (rom_runner.isFiltered("push_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/push_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/push_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_rapid_di_ei" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rapid_di_ei")) {
+    if (rom_runner.isFiltered("rapid_di_ei")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rapid_di_ei.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rapid_di_ei.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_rst_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rst_timing")) {
+    if (rom_runner.isFiltered("rst_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rst_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rst_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_reti_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("reti_timing")) {
+    if (rom_runner.isFiltered("reti_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ret_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ret_timing")) {
+    if (rom_runner.isFiltered("ret_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ei_timing" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ei_timing")) {
+    if (rom_runner.isFiltered("ei_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_timing2" {
     if (category != .all and category != .instr) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("call_timing2")) {
+    if (rom_runner.isFiltered("call_timing2")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing2.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing2.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/interrupts/_ie_push" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ie_push")) {
+    if (rom_runner.isFiltered("ie_push")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/ie_push.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/ie_push.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/interrupts/_if_ie_registers" {
     if (category != .all and category != .cpu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("if_ie_registers")) {
+    if (rom_runner.isFiltered("if_ie_registers")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/if_ie_registers.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/if_ie_registers.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_oam_dma_restart" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("oam_dma_restart")) {
+    if (rom_runner.isFiltered("oam_dma_restart")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_restart.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_restart.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_oam_dma_start" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("oam_dma_start")) {
+    if (rom_runner.isFiltered("oam_dma_start")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_start.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_start.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_sources-GS" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("sources-GS")) {
+    if (rom_runner.isFiltered("sources-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/sources-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/sources-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_basic" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("basic")) {
+    if (rom_runner.isFiltered("basic")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/basic.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/basic.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_reg_read" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("reg_read")) {
+    if (rom_runner.isFiltered("reg_read")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/reg_read.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/reg_read.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_oam_dma_timing" {
     if (category != .all and category != .memory) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("oam_dma_timing")) {
+    if (rom_runner.isFiltered("oam_dma_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_0_timing" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_2_0_timing")) {
+    if (rom_runner.isFiltered("intr_2_0_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_0_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_0_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_stat_irq_blocking" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("stat_irq_blocking")) {
+    if (rom_runner.isFiltered("stat_irq_blocking")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_irq_blocking.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_irq_blocking.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_1_2_timing-GS" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_1_2_timing-GS")) {
+    if (rom_runner.isFiltered("intr_1_2_timing-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_oam_ok_timing" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_2_oam_ok_timing")) {
+    if (rom_runner.isFiltered("intr_2_oam_ok_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_oam_ok_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_oam_ok_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_lcdon_write_timing-GS" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("lcdon_write_timing-GS")) {
+    if (rom_runner.isFiltered("lcdon_write_timing-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_2_mode0_timing")) {
+    if (rom_runner.isFiltered("intr_2_mode0_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_lcdon_timing-GS" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("lcdon_timing-GS")) {
+    if (rom_runner.isFiltered("lcdon_timing-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_mode3_timing" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_2_mode3_timing")) {
+    if (rom_runner.isFiltered("intr_2_mode3_timing")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode3_timing.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode3_timing.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_hblank_ly_scx_timing-GS" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("hblank_ly_scx_timing-GS")) {
+    if (rom_runner.isFiltered("hblank_ly_scx_timing-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/hblank_ly_scx_timing-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/hblank_ly_scx_timing-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_stat_lyc_onoff" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("stat_lyc_onoff")) {
+    if (rom_runner.isFiltered("stat_lyc_onoff")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_lyc_onoff.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_lyc_onoff.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_vblank_stat_intr-GS" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("vblank_stat_intr-GS")) {
+    if (rom_runner.isFiltered("vblank_stat_intr-GS")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing_sprites" {
     if (category != .all and category != .ppu) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("intr_2_mode0_timing_sprites")) {
+    if (rom_runner.isFiltered("intr_2_mode0_timing_sprites")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing_sprites.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing_sprites.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tma_write_reloading" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tma_write_reloading")) {
+    if (rom_runner.isFiltered("tma_write_reloading")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tma_write_reloading.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tma_write_reloading.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim00" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim00")) {
+    if (rom_runner.isFiltered("tim00")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_div_write" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("div_write")) {
+    if (rom_runner.isFiltered("div_write")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/div_write.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/div_write.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim11" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim11")) {
+    if (rom_runner.isFiltered("tim11")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_rapid_toggle" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rapid_toggle")) {
+    if (rom_runner.isFiltered("rapid_toggle")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/rapid_toggle.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/rapid_toggle.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim00_div_trigger" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim00_div_trigger")) {
+    if (rom_runner.isFiltered("tim00_div_trigger")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00_div_trigger.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00_div_trigger.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim01_div_trigger" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim01_div_trigger")) {
+    if (rom_runner.isFiltered("tim01_div_trigger")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01_div_trigger.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01_div_trigger.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tima_write_reloading" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tima_write_reloading")) {
+    if (rom_runner.isFiltered("tima_write_reloading")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_write_reloading.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_write_reloading.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim01" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim01")) {
+    if (rom_runner.isFiltered("tim01")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tima_reload" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tima_reload")) {
+    if (rom_runner.isFiltered("tima_reload")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_reload.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_reload.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim10" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim10")) {
+    if (rom_runner.isFiltered("tim10")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim11_div_trigger" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim11_div_trigger")) {
+    if (rom_runner.isFiltered("tim11_div_trigger")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11_div_trigger.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11_div_trigger.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim10_div_trigger" {
     if (category != .all and category != .mmio) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("tim10_div_trigger")) {
+    if (rom_runner.isFiltered("tim10_div_trigger")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10_div_trigger.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10_div_trigger.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_ram_256kb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ram_256kb")) {
+    if (rom_runner.isFiltered("ram_256kb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_256kb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_256kb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_ram_64kb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("ram_64kb")) {
+    if (rom_runner.isFiltered("ram_64kb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_64kb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_64kb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_rom_512kb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_512kb")) {
+    if (rom_runner.isFiltered("rom_512kb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/rom_512kb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/rom_512kb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_bank1" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("bits_bank1")) {
+    if (rom_runner.isFiltered("bits_bank1")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank1.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank1.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_mode" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("bits_mode")) {
+    if (rom_runner.isFiltered("bits_mode")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_mode.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_mode.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_ramg" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("bits_ramg")) {
+    if (rom_runner.isFiltered("bits_ramg")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_ramg.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_ramg.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_bank2" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("bits_bank2")) {
+    if (rom_runner.isFiltered("bits_bank2")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 360 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank2.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 360 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank2.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_32Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_32Mb")) {
+    if (rom_runner.isFiltered("rom_32Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_32Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_32Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_512kb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_512kb")) {
+    if (rom_runner.isFiltered("rom_512kb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_512kb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_512kb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_16Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_16Mb")) {
+    if (rom_runner.isFiltered("rom_16Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_16Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_16Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_2Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_2Mb")) {
+    if (rom_runner.isFiltered("rom_2Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_2Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_2Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_64Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_64Mb")) {
+    if (rom_runner.isFiltered("rom_64Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_64Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_64Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_8Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_8Mb")) {
+    if (rom_runner.isFiltered("rom_8Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_8Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_8Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_4Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_4Mb")) {
+    if (rom_runner.isFiltered("rom_4Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_4Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_4Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_1Mb" {
     if (category != .all and category != .cart) {
         return error.SkipZigTest;
     }
-    if (rom_test.isFiltered("rom_1Mb")) {
+    if (rom_runner.isFiltered("rom_1Mb")) {
         return error.SkipZigTest;
     }
 
-    const exit: rom_test.ExitCondition = .breakpoint;
-    const timeout: rom_test.Timeout = .{ .frame = 140 };
-    const pass: rom_test.Pass = .fibonacci;
-    const context: rom_test.Context = .{ .text_parsing = .mooneye };
-    const core_config: Config = rom_test.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_1Mb.gb");
-    try rom_test.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    const exit: rom_runner.ExitCondition = .breakpoint;
+    const timeout: rom_runner.Timeout = .{ .frame = 140 };
+    const pass: rom_runner.Pass = .fibonacci;
+    const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_1Mb.gb");
+    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+}
+
+test "singlestep_instr_cb ca" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ca.json");
+}
+
+test "singlestep_instr_38" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/38.json");
+}
+
+test "singlestep_instr_da" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/da.json");
+}
+
+test "singlestep_instr_cb d6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d6.json");
+}
+
+test "singlestep_instr_0a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/0a.json");
+}
+
+test "singlestep_instr_8e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/8e.json");
+}
+
+test "singlestep_instr_fb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/fb.json");
+}
+
+test "singlestep_instr_95" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/95.json");
+}
+
+test "singlestep_instr_aa" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/aa.json");
+}
+
+test "singlestep_instr_cb d2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d2.json");
+}
+
+test "singlestep_instr_2f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/2f.json");
+}
+
+test "singlestep_instr_89" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/89.json");
+}
+
+test "singlestep_instr_b2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b2.json");
+}
+
+test "singlestep_instr_b3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b3.json");
+}
+
+test "singlestep_instr_cb b1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b1.json");
+}
+
+test "singlestep_instr_cb 3a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 3a.json");
+}
+
+test "singlestep_instr_cb cd" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb cd.json");
+}
+
+test "singlestep_instr_0e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/0e.json");
+}
+
+test "singlestep_instr_0d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/0d.json");
+}
+
+test "singlestep_instr_1b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/1b.json");
+}
+
+test "singlestep_instr_cb 44" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 44.json");
+}
+
+test "singlestep_instr_e2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e2.json");
+}
+
+test "singlestep_instr_ef" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ef.json");
+}
+
+test "singlestep_instr_47" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/47.json");
+}
+
+test "singlestep_instr_ae" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ae.json");
+}
+
+test "singlestep_instr_4e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/4e.json");
+}
+
+test "singlestep_instr_a6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a6.json");
+}
+
+test "singlestep_instr_cb 10" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 10.json");
+}
+
+test "singlestep_instr_cb ff" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ff.json");
+}
+
+test "singlestep_instr_c4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c4.json");
+}
+
+test "singlestep_instr_cb cb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb cb.json");
+}
+
+test "singlestep_instr_cb 9f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 9f.json");
+}
+
+test "singlestep_instr_cb a0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a0.json");
+}
+
+test "singlestep_instr_70" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/70.json");
+}
+
+test "singlestep_instr_a9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a9.json");
+}
+
+test "singlestep_instr_cb 6f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 6f.json");
+}
+
+test "singlestep_instr_1d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/1d.json");
+}
+
+test "singlestep_instr_cb 29" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 29.json");
+}
+
+test "singlestep_instr_cb 82" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 82.json");
+}
+
+test "singlestep_instr_cb f8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f8.json");
+}
+
+test "singlestep_instr_cb b6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b6.json");
+}
+
+test "singlestep_instr_cb 4e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 4e.json");
+}
+
+test "singlestep_instr_e7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e7.json");
+}
+
+test "singlestep_instr_64" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/64.json");
+}
+
+test "singlestep_instr_0b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/0b.json");
+}
+
+test "singlestep_instr_4b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/4b.json");
+}
+
+test "singlestep_instr_cb d4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d4.json");
+}
+
+test "singlestep_instr_cb b8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b8.json");
+}
+
+test "singlestep_instr_8d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/8d.json");
+}
+
+test "singlestep_instr_46" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/46.json");
+}
+
+test "singlestep_instr_32" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/32.json");
+}
+
+test "singlestep_instr_cb c8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c8.json");
+}
+
+test "singlestep_instr_c6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c6.json");
+}
+
+test "singlestep_instr_c7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c7.json");
+}
+
+test "singlestep_instr_cc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cc.json");
+}
+
+test "singlestep_instr_cb f3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f3.json");
+}
+
+test "singlestep_instr_9f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/9f.json");
+}
+
+test "singlestep_instr_cb 16" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 16.json");
+}
+
+test "singlestep_instr_97" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/97.json");
+}
+
+test "singlestep_instr_26" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/26.json");
+}
+
+test "singlestep_instr_cb cc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb cc.json");
+}
+
+test "singlestep_instr_cb d8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d8.json");
+}
+
+test "singlestep_instr_f7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f7.json");
+}
+
+test "singlestep_instr_55" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/55.json");
+}
+
+test "singlestep_instr_34" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/34.json");
+}
+
+test "singlestep_instr_cb 13" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 13.json");
+}
+
+test "singlestep_instr_83" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/83.json");
+}
+
+test "singlestep_instr_cb 50" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 50.json");
+}
+
+test "singlestep_instr_e1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e1.json");
+}
+
+test "singlestep_instr_18" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/18.json");
+}
+
+test "singlestep_instr_cb 62" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 62.json");
+}
+
+test "singlestep_instr_cb ec" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ec.json");
+}
+
+test "singlestep_instr_ce" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ce.json");
+}
+
+test "singlestep_instr_cb 18" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 18.json");
+}
+
+test "singlestep_instr_66" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/66.json");
+}
+
+test "singlestep_instr_cb 8e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 8e.json");
+}
+
+test "singlestep_instr_d5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d5.json");
+}
+
+test "singlestep_instr_a2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a2.json");
+}
+
+test "singlestep_instr_cb 3d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 3d.json");
+}
+
+test "singlestep_instr_27" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/27.json");
+}
+
+test "singlestep_instr_cb f7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f7.json");
+}
+
+test "singlestep_instr_cb 33" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 33.json");
+}
+
+test "singlestep_instr_1e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/1e.json");
+}
+
+test "singlestep_instr_cb 4a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 4a.json");
+}
+
+test "singlestep_instr_6a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/6a.json");
+}
+
+test "singlestep_instr_c8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c8.json");
+}
+
+test "singlestep_instr_cb 3e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 3e.json");
+}
+
+test "singlestep_instr_11" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/11.json");
+}
+
+test "singlestep_instr_50" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/50.json");
+}
+
+test "singlestep_instr_ba" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ba.json");
+}
+
+test "singlestep_instr_cb 15" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 15.json");
+}
+
+test "singlestep_instr_cb e5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e5.json");
+}
+
+test "singlestep_instr_cb 46" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 46.json");
+}
+
+test "singlestep_instr_cb 8a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 8a.json");
+}
+
+test "singlestep_instr_cb 74" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 74.json");
+}
+
+test "singlestep_instr_cb 63" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 63.json");
+}
+
+test "singlestep_instr_cd" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cd.json");
+}
+
+test "singlestep_instr_cb 7c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 7c.json");
+}
+
+test "singlestep_instr_cb b4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b4.json");
+}
+
+test "singlestep_instr_03" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/03.json");
+}
+
+test "singlestep_instr_93" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/93.json");
+}
+
+test "singlestep_instr_cb d3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d3.json");
+}
+
+test "singlestep_instr_cb 1e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 1e.json");
+}
+
+test "singlestep_instr_cb 55" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 55.json");
+}
+
+test "singlestep_instr_cb 70" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 70.json");
+}
+
+test "singlestep_instr_cb dc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb dc.json");
+}
+
+test "singlestep_instr_cb 05" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 05.json");
+}
+
+test "singlestep_instr_cb 23" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 23.json");
+}
+
+test "singlestep_instr_14" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/14.json");
+}
+
+test "singlestep_instr_cb 64" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 64.json");
+}
+
+test "singlestep_instr_cb 30" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 30.json");
+}
+
+test "singlestep_instr_cb e1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e1.json");
+}
+
+test "singlestep_instr_cb 94" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 94.json");
+}
+
+test "singlestep_instr_cb 79" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 79.json");
+}
+
+test "singlestep_instr_cb e6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e6.json");
+}
+
+test "singlestep_instr_e9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e9.json");
+}
+
+test "singlestep_instr_00" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/00.json");
+}
+
+test "singlestep_instr_07" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/07.json");
+}
+
+test "singlestep_instr_02" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/02.json");
+}
+
+test "singlestep_instr_99" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/99.json");
+}
+
+test "singlestep_instr_61" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/61.json");
+}
+
+test "singlestep_instr_cb 36" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 36.json");
+}
+
+test "singlestep_instr_d8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d8.json");
+}
+
+test "singlestep_instr_cb ac" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ac.json");
+}
+
+test "singlestep_instr_cb a9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a9.json");
+}
+
+test "singlestep_instr_cb 71" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 71.json");
+}
+
+test "singlestep_instr_d1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d1.json");
+}
+
+test "singlestep_instr_cb b2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b2.json");
+}
+
+test "singlestep_instr_cb 3c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 3c.json");
+}
+
+test "singlestep_instr_cb 04" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 04.json");
+}
+
+test "singlestep_instr_cb 9c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 9c.json");
+}
+
+test "singlestep_instr_cb 49" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 49.json");
+}
+
+test "singlestep_instr_45" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/45.json");
+}
+
+test "singlestep_instr_cb d0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d0.json");
+}
+
+test "singlestep_instr_cb 95" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 95.json");
+}
+
+test "singlestep_instr_cb de" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb de.json");
+}
+
+test "singlestep_instr_cb c0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c0.json");
+}
+
+test "singlestep_instr_cb 90" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 90.json");
+}
+
+test "singlestep_instr_de" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/de.json");
+}
+
+test "singlestep_instr_cb 1b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 1b.json");
+}
+
+test "singlestep_instr_cb 75" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 75.json");
+}
+
+test "singlestep_instr_e6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e6.json");
+}
+
+test "singlestep_instr_65" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/65.json");
+}
+
+test "singlestep_instr_cb cf" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb cf.json");
+}
+
+test "singlestep_instr_cb f0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f0.json");
+}
+
+test "singlestep_instr_cb 0a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 0a.json");
+}
+
+test "singlestep_instr_6c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/6c.json");
+}
+
+test "singlestep_instr_cb 4f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 4f.json");
+}
+
+test "singlestep_instr_fa" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/fa.json");
+}
+
+test "singlestep_instr_b1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b1.json");
+}
+
+test "singlestep_instr_cb a2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a2.json");
+}
+
+test "singlestep_instr_cb 85" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 85.json");
+}
+
+test "singlestep_instr_cb ed" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ed.json");
+}
+
+test "singlestep_instr_08" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/08.json");
+}
+
+test "singlestep_instr_cb 3b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 3b.json");
+}
+
+test "singlestep_instr_cb fe" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb fe.json");
+}
+
+test "singlestep_instr_7b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/7b.json");
+}
+
+test "singlestep_instr_cb c9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c9.json");
+}
+
+test "singlestep_instr_cb 6a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 6a.json");
+}
+
+test "singlestep_instr_fe" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/fe.json");
+}
+
+test "singlestep_instr_cb 5f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 5f.json");
+}
+
+test "singlestep_instr_e8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e8.json");
+}
+
+test "singlestep_instr_cb 60" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 60.json");
+}
+
+test "singlestep_instr_72" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/72.json");
+}
+
+test "singlestep_instr_6e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/6e.json");
+}
+
+test "singlestep_instr_cb d9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d9.json");
+}
+
+test "singlestep_instr_5f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/5f.json");
+}
+
+test "singlestep_instr_84" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/84.json");
+}
+
+test "singlestep_instr_cb da" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb da.json");
+}
+
+test "singlestep_instr_82" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/82.json");
+}
+
+test "singlestep_instr_cb 11" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 11.json");
+}
+
+test "singlestep_instr_cb 91" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 91.json");
+}
+
+test "singlestep_instr_cb 56" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 56.json");
+}
+
+test "singlestep_instr_cb 40" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 40.json");
+}
+
+test "singlestep_instr_cb c4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c4.json");
+}
+
+test "singlestep_instr_96" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/96.json");
+}
+
+test "singlestep_instr_3d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/3d.json");
+}
+
+test "singlestep_instr_cb 21" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 21.json");
+}
+
+test "singlestep_instr_19" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/19.json");
+}
+
+test "singlestep_instr_f2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f2.json");
+}
+
+test "singlestep_instr_cb 5b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 5b.json");
+}
+
+test "singlestep_instr_cb 65" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 65.json");
+}
+
+test "singlestep_instr_cb 38" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 38.json");
+}
+
+test "singlestep_instr_cb 96" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 96.json");
+}
+
+test "singlestep_instr_cb 0f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 0f.json");
+}
+
+test "singlestep_instr_75" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/75.json");
+}
+
+test "singlestep_instr_cb 09" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 09.json");
+}
+
+test "singlestep_instr_cb 20" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 20.json");
+}
+
+test "singlestep_instr_cb 00" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 00.json");
+}
+
+test "singlestep_instr_2d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/2d.json");
+}
+
+test "singlestep_instr_42" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/42.json");
+}
+
+test "singlestep_instr_cb fc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb fc.json");
+}
+
+test "singlestep_instr_cb a1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a1.json");
+}
+
+test "singlestep_instr_cb a7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a7.json");
+}
+
+test "singlestep_instr_59" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/59.json");
+}
+
+test "singlestep_instr_4a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/4a.json");
+}
+
+test "singlestep_instr_5e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/5e.json");
+}
+
+test "singlestep_instr_cb c3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c3.json");
+}
+
+test "singlestep_instr_cb 26" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 26.json");
+}
+
+test "singlestep_instr_2e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/2e.json");
+}
+
+test "singlestep_instr_cb f9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f9.json");
+}
+
+test "singlestep_instr_2a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/2a.json");
+}
+
+test "singlestep_instr_36" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/36.json");
+}
+
+test "singlestep_instr_cb fa" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb fa.json");
+}
+
+test "singlestep_instr_c2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c2.json");
+}
+
+test "singlestep_instr_ea" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ea.json");
+}
+
+test "singlestep_instr_cb 2f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 2f.json");
+}
+
+test "singlestep_instr_cb 37" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 37.json");
+}
+
+test "singlestep_instr_cb df" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb df.json");
+}
+
+test "singlestep_instr_21" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/21.json");
+}
+
+test "singlestep_instr_cb 5c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 5c.json");
+}
+
+test "singlestep_instr_cb 9e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 9e.json");
+}
+
+test "singlestep_instr_cb d5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d5.json");
+}
+
+test "singlestep_instr_cb 45" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 45.json");
+}
+
+test "singlestep_instr_cb c6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c6.json");
+}
+
+test "singlestep_instr_69" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/69.json");
+}
+
+test "singlestep_instr_3b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/3b.json");
+}
+
+test "singlestep_instr_2b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/2b.json");
+}
+
+test "singlestep_instr_cb 58" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 58.json");
+}
+
+test "singlestep_instr_cb dd" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb dd.json");
+}
+
+test "singlestep_instr_cb 51" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 51.json");
+}
+
+test "singlestep_instr_0f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/0f.json");
+}
+
+test "singlestep_instr_cb 27" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 27.json");
+}
+
+test "singlestep_instr_ac" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ac.json");
+}
+
+test "singlestep_instr_8a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/8a.json");
+}
+
+test "singlestep_instr_cb d1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d1.json");
+}
+
+test "singlestep_instr_cb 81" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 81.json");
+}
+
+test "singlestep_instr_17" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/17.json");
+}
+
+test "singlestep_instr_cb 2a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 2a.json");
+}
+
+test "singlestep_instr_cb b0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b0.json");
+}
+
+test "singlestep_instr_cb 01" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 01.json");
+}
+
+test "singlestep_instr_7d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/7d.json");
+}
+
+test "singlestep_instr_b9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b9.json");
+}
+
+test "singlestep_instr_73" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/73.json");
+}
+
+test "singlestep_instr_cb 6c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 6c.json");
+}
+
+test "singlestep_instr_cb ce" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ce.json");
+}
+
+test "singlestep_instr_51" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/51.json");
+}
+
+test "singlestep_instr_c9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c9.json");
+}
+
+test "singlestep_instr_cb ea" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ea.json");
+}
+
+test "singlestep_instr_cb fb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb fb.json");
+}
+
+test "singlestep_instr_cb ba" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ba.json");
+}
+
+test "singlestep_instr_6d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/6d.json");
+}
+
+test "singlestep_instr_cb 7b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 7b.json");
+}
+
+test "singlestep_instr_cb 47" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 47.json");
+}
+
+test "singlestep_instr_bc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/bc.json");
+}
+
+test "singlestep_instr_cb 87" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 87.json");
+}
+
+test "singlestep_instr_cb 7e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 7e.json");
+}
+
+test "singlestep_instr_85" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/85.json");
+}
+
+test "singlestep_instr_cb 22" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 22.json");
+}
+
+test "singlestep_instr_cb 41" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 41.json");
+}
+
+test "singlestep_instr_cb fd" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb fd.json");
+}
+
+test "singlestep_instr_cb a6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a6.json");
+}
+
+test "singlestep_instr_29" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/29.json");
+}
+
+test "singlestep_instr_cb bc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb bc.json");
+}
+
+test "singlestep_instr_d2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d2.json");
+}
+
+test "singlestep_instr_2c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/2c.json");
+}
+
+test "singlestep_instr_cb 0b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 0b.json");
+}
+
+test "singlestep_instr_a8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a8.json");
+}
+
+test "singlestep_instr_cb 6d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 6d.json");
+}
+
+test "singlestep_instr_9e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/9e.json");
+}
+
+test "singlestep_instr_cb 31" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 31.json");
+}
+
+test "singlestep_instr_49" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/49.json");
+}
+
+test "singlestep_instr_0c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/0c.json");
+}
+
+test "singlestep_instr_9a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/9a.json");
+}
+
+test "singlestep_instr_cb b3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b3.json");
+}
+
+test "singlestep_instr_22" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/22.json");
+}
+
+test "singlestep_instr_31" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/31.json");
+}
+
+test "singlestep_instr_44" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/44.json");
+}
+
+test "singlestep_instr_62" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/62.json");
+}
+
+test "singlestep_instr_cb 7f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 7f.json");
+}
+
+test "singlestep_instr_cb 93" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 93.json");
+}
+
+test "singlestep_instr_63" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/63.json");
+}
+
+test "singlestep_instr_cb f1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f1.json");
+}
+
+test "singlestep_instr_58" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/58.json");
+}
+
+test "singlestep_instr_98" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/98.json");
+}
+
+test "singlestep_instr_cb 8d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 8d.json");
+}
+
+test "singlestep_instr_cb be" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb be.json");
+}
+
+test "singlestep_instr_cb 6e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 6e.json");
+}
+
+test "singlestep_instr_cb b7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b7.json");
+}
+
+test "singlestep_instr_cb 8f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 8f.json");
+}
+
+test "singlestep_instr_cb bf" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb bf.json");
+}
+
+test "singlestep_instr_cb 2c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 2c.json");
+}
+
+test "singlestep_instr_37" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/37.json");
+}
+
+test "singlestep_instr_cb 80" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 80.json");
+}
+
+test "singlestep_instr_cb 4d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 4d.json");
+}
+
+test "singlestep_instr_cb e4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e4.json");
+}
+
+test "singlestep_instr_a7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a7.json");
+}
+
+test "singlestep_instr_cb e2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e2.json");
+}
+
+test "singlestep_instr_cb 4b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 4b.json");
+}
+
+test "singlestep_instr_cb 66" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 66.json");
+}
+
+test "singlestep_instr_cb 78" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 78.json");
+}
+
+test "singlestep_instr_cb e9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e9.json");
+}
+
+test "singlestep_instr_06" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/06.json");
+}
+
+test "singlestep_instr_cb 5d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 5d.json");
+}
+
+test "singlestep_instr_cb 54" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 54.json");
+}
+
+test "singlestep_instr_cb 42" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 42.json");
+}
+
+test "singlestep_instr_b6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b6.json");
+}
+
+test "singlestep_instr_5a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/5a.json");
+}
+
+test "singlestep_instr_4d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/4d.json");
+}
+
+test "singlestep_instr_df" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/df.json");
+}
+
+test "singlestep_instr_52" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/52.json");
+}
+
+test "singlestep_instr_f3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f3.json");
+}
+
+test "singlestep_instr_cb f2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f2.json");
+}
+
+test "singlestep_instr_cb 19" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 19.json");
+}
+
+test "singlestep_instr_e5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e5.json");
+}
+
+test "singlestep_instr_cb b9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b9.json");
+}
+
+test "singlestep_instr_16" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/16.json");
+}
+
+test "singlestep_instr_b7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b7.json");
+}
+
+test "singlestep_instr_cb 32" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 32.json");
+}
+
+test "singlestep_instr_bf" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/bf.json");
+}
+
+test "singlestep_instr_30" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/30.json");
+}
+
+test "singlestep_instr_cb 24" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 24.json");
+}
+
+test "singlestep_instr_cb aa" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb aa.json");
+}
+
+test "singlestep_instr_cb 77" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 77.json");
+}
+
+test "singlestep_instr_d9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d9.json");
+}
+
+test "singlestep_instr_cb 9d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 9d.json");
+}
+
+test "singlestep_instr_cb 6b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 6b.json");
+}
+
+test "singlestep_instr_a4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a4.json");
+}
+
+test "singlestep_instr_cb 97" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 97.json");
+}
+
+test "singlestep_instr_b0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b0.json");
+}
+
+test "singlestep_instr_cb 1f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 1f.json");
+}
+
+test "singlestep_instr_b8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b8.json");
+}
+
+test "singlestep_instr_4c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/4c.json");
+}
+
+test "singlestep_instr_5d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/5d.json");
+}
+
+test "singlestep_instr_c3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c3.json");
+}
+
+test "singlestep_instr_cb d7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb d7.json");
+}
+
+test "singlestep_instr_cb 5a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 5a.json");
+}
+
+test "singlestep_instr_cb 67" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 67.json");
+}
+
+test "singlestep_instr_09" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/09.json");
+}
+
+test "singlestep_instr_b4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b4.json");
+}
+
+test "singlestep_instr_cb ef" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ef.json");
+}
+
+test "singlestep_instr_5c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/5c.json");
+}
+
+test "singlestep_instr_bb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/bb.json");
+}
+
+test "singlestep_instr_7f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/7f.json");
+}
+
+test "singlestep_instr_f5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f5.json");
+}
+
+test "singlestep_instr_cb ee" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ee.json");
+}
+
+test "singlestep_instr_cb 1d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 1d.json");
+}
+
+test "singlestep_instr_cb 0e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 0e.json");
+}
+
+test "singlestep_instr_1a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/1a.json");
+}
+
+test "singlestep_instr_cb 28" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 28.json");
+}
+
+test "singlestep_instr_3f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/3f.json");
+}
+
+test "singlestep_instr_28" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/28.json");
+}
+
+test "singlestep_instr_33" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/33.json");
+}
+
+test "singlestep_instr_cb 8b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 8b.json");
+}
+
+test "singlestep_instr_cb 14" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 14.json");
+}
+
+test "singlestep_instr_1c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/1c.json");
+}
+
+test "singlestep_instr_cb 0c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 0c.json");
+}
+
+test "singlestep_instr_cb e0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e0.json");
+}
+
+test "singlestep_instr_cb 12" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 12.json");
+}
+
+test "singlestep_instr_ee" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ee.json");
+}
+
+test "singlestep_instr_9d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/9d.json");
+}
+
+test "singlestep_instr_f9" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f9.json");
+}
+
+test "singlestep_instr_e0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/e0.json");
+}
+
+test "singlestep_instr_f6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f6.json");
+}
+
+test "singlestep_instr_cb 2b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 2b.json");
+}
+
+test "singlestep_instr_cb 02" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 02.json");
+}
+
+test "singlestep_instr_cb a5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a5.json");
+}
+
+test "singlestep_instr_48" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/48.json");
+}
+
+test "singlestep_instr_d0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d0.json");
+}
+
+test "singlestep_instr_53" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/53.json");
+}
+
+test "singlestep_instr_15" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/15.json");
+}
+
+test "singlestep_instr_cb 06" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 06.json");
+}
+
+test "singlestep_instr_cb 53" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 53.json");
+}
+
+test "singlestep_instr_39" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/39.json");
+}
+
+test "singlestep_instr_a5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a5.json");
+}
+
+test "singlestep_instr_cb 52" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 52.json");
+}
+
+test "singlestep_instr_cb 7d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 7d.json");
+}
+
+test "singlestep_instr_8f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/8f.json");
+}
+
+test "singlestep_instr_80" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/80.json");
+}
+
+test "singlestep_instr_a0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a0.json");
+}
+
+test "singlestep_instr_79" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/79.json");
+}
+
+test "singlestep_instr_23" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/23.json");
+}
+
+test "singlestep_instr_43" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/43.json");
+}
+
+test "singlestep_instr_ff" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ff.json");
+}
+
+test "singlestep_instr_9b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/9b.json");
+}
+
+test "singlestep_instr_cb 68" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 68.json");
+}
+
+test "singlestep_instr_25" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/25.json");
+}
+
+test "singlestep_instr_05" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/05.json");
+}
+
+test "singlestep_instr_7e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/7e.json");
+}
+
+test "singlestep_instr_cb e8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e8.json");
+}
+
+test "singlestep_instr_91" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/91.json");
+}
+
+test "singlestep_instr_cb ad" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ad.json");
+}
+
+test "singlestep_instr_cb 08" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 08.json");
+}
+
+test "singlestep_instr_68" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/68.json");
+}
+
+test "singlestep_instr_a3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a3.json");
+}
+
+test "singlestep_instr_5b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/5b.json");
+}
+
+test "singlestep_instr_cb af" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb af.json");
+}
+
+test "singlestep_instr_cb 1a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 1a.json");
+}
+
+test "singlestep_instr_01" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/01.json");
+}
+
+test "singlestep_instr_cb 84" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 84.json");
+}
+
+test "singlestep_instr_41" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/41.json");
+}
+
+test "singlestep_instr_88" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/88.json");
+}
+
+test "singlestep_instr_8b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/8b.json");
+}
+
+test "singlestep_instr_be" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/be.json");
+}
+
+test "singlestep_instr_cb a8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a8.json");
+}
+
+test "singlestep_instr_12" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/12.json");
+}
+
+test "singlestep_instr_71" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/71.json");
+}
+
+test "singlestep_instr_cb 9b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 9b.json");
+}
+
+test "singlestep_instr_cb c7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c7.json");
+}
+
+test "singlestep_instr_cb e3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e3.json");
+}
+
+test "singlestep_instr_8c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/8c.json");
+}
+
+test "singlestep_instr_cb ab" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ab.json");
+}
+
+test "singlestep_instr_cb 8c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 8c.json");
+}
+
+test "singlestep_instr_cb 89" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 89.json");
+}
+
+test "singlestep_instr_f8" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f8.json");
+}
+
+test "singlestep_instr_d6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d6.json");
+}
+
+test "singlestep_instr_81" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/81.json");
+}
+
+test "singlestep_instr_cb c5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c5.json");
+}
+
+test "singlestep_instr_04" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/04.json");
+}
+
+test "singlestep_instr_cb c2" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c2.json");
+}
+
+test "singlestep_instr_dc" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/dc.json");
+}
+
+test "singlestep_instr_d7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d7.json");
+}
+
+test "singlestep_instr_cb 57" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 57.json");
+}
+
+test "singlestep_instr_77" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/77.json");
+}
+
+test "singlestep_instr_cb f4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f4.json");
+}
+
+test "singlestep_instr_f1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f1.json");
+}
+
+test "singlestep_instr_cb 3f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 3f.json");
+}
+
+test "singlestep_instr_20" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/20.json");
+}
+
+test "singlestep_instr_cb 1c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 1c.json");
+}
+
+test "singlestep_instr_24" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/24.json");
+}
+
+test "singlestep_instr_cb 88" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 88.json");
+}
+
+test "singlestep_instr_cb 69" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 69.json");
+}
+
+test "singlestep_instr_cb bb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb bb.json");
+}
+
+test "singlestep_instr_56" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/56.json");
+}
+
+test "singlestep_instr_a1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/a1.json");
+}
+
+test "singlestep_instr_ab" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ab.json");
+}
+
+test "singlestep_instr_cb 98" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 98.json");
+}
+
+test "singlestep_instr_cb a4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a4.json");
+}
+
+test "singlestep_instr_7a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/7a.json");
+}
+
+test "singlestep_instr_54" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/54.json");
+}
+
+test "singlestep_instr_6b" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/6b.json");
+}
+
+test "singlestep_instr_cb 5e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 5e.json");
+}
+
+test "singlestep_instr_57" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/57.json");
+}
+
+test "singlestep_instr_74" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/74.json");
+}
+
+test "singlestep_instr_c0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c0.json");
+}
+
+test "singlestep_instr_cb 59" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 59.json");
+}
+
+test "singlestep_instr_cb 72" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 72.json");
+}
+
+test "singlestep_instr_c1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c1.json");
+}
+
+test "singlestep_instr_60" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/60.json");
+}
+
+test "singlestep_instr_4f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/4f.json");
+}
+
+test "singlestep_instr_cb db" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb db.json");
+}
+
+test "singlestep_instr_3c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/3c.json");
+}
+
+test "singlestep_instr_cb 83" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 83.json");
+}
+
+test "singlestep_instr_d4" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/d4.json");
+}
+
+test "singlestep_instr_67" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/67.json");
+}
+
+test "singlestep_instr_ad" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ad.json");
+}
+
+test "singlestep_instr_cb 07" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 07.json");
+}
+
+test "singlestep_instr_35" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/35.json");
+}
+
+test "singlestep_instr_cb 03" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 03.json");
+}
+
+test "singlestep_instr_cb f5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f5.json");
+}
+
+test "singlestep_instr_cb 9a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 9a.json");
+}
+
+test "singlestep_instr_13" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/13.json");
+}
+
+test "singlestep_instr_3e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/3e.json");
+}
+
+test "singlestep_instr_cb 39" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 39.json");
+}
+
+test "singlestep_instr_cb 25" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 25.json");
+}
+
+test "singlestep_instr_92" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/92.json");
+}
+
+test "singlestep_instr_1f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/1f.json");
+}
+
+test "singlestep_instr_cb c1" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb c1.json");
+}
+
+test "singlestep_instr_cb f6" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb f6.json");
+}
+
+test "singlestep_instr_90" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/90.json");
+}
+
+test "singlestep_instr_7c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/7c.json");
+}
+
+test "singlestep_instr_cb 35" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 35.json");
+}
+
+test "singlestep_instr_87" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/87.json");
+}
+
+test "singlestep_instr_9c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/9c.json");
+}
+
+test "singlestep_instr_cb 43" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 43.json");
+}
+
+test "singlestep_instr_cb 17" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 17.json");
+}
+
+test "singlestep_instr_cb e7" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb e7.json");
+}
+
+test "singlestep_instr_86" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/86.json");
+}
+
+test "singlestep_instr_94" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/94.json");
+}
+
+test "singlestep_instr_af" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/af.json");
+}
+
+test "singlestep_instr_cb 92" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 92.json");
+}
+
+test "singlestep_instr_c5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/c5.json");
+}
+
+test "singlestep_instr_6f" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/6f.json");
+}
+
+test "singlestep_instr_b5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/b5.json");
+}
+
+test "singlestep_instr_cb a3" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb a3.json");
+}
+
+test "singlestep_instr_cb 4c" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 4c.json");
+}
+
+test "singlestep_instr_cb b5" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb b5.json");
+}
+
+test "singlestep_instr_f0" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/f0.json");
+}
+
+test "singlestep_instr_cb 2e" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 2e.json");
+}
+
+test "singlestep_instr_cb 34" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 34.json");
+}
+
+test "singlestep_instr_cb 48" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 48.json");
+}
+
+test "singlestep_instr_40" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/40.json");
+}
+
+test "singlestep_instr_ca" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/ca.json");
+}
+
+test "singlestep_instr_78" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/78.json");
+}
+
+test "singlestep_instr_cb 0d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 0d.json");
+}
+
+test "singlestep_instr_cb eb" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb eb.json");
+}
+
+test "singlestep_instr_cb 76" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 76.json");
+}
+
+test "singlestep_instr_cb 99" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 99.json");
+}
+
+test "singlestep_instr_bd" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/bd.json");
+}
+
+test "singlestep_instr_cf" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cf.json");
+}
+
+test "singlestep_instr_cb ae" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb ae.json");
+}
+
+test "singlestep_instr_cb 2d" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 2d.json");
+}
+
+test "singlestep_instr_cb 7a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 7a.json");
+}
+
+test "singlestep_instr_cb 73" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 73.json");
+}
+
+test "singlestep_instr_3a" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/3a.json");
+}
+
+test "singlestep_instr_cb bd" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb bd.json");
+}
+
+test "singlestep_instr_cb 86" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 86.json");
+}
+
+test "singlestep_instr_cb 61" {
+    if (category != .all and category != .instr) {
+        return error.SkipZigTest;
+    }
+    try singlestep_runner.run("test_data/SingleStepTests/v1/cb 61.json");
 }
 

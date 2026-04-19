@@ -1,8 +1,4 @@
 # Next
-[SingleStep] Rewrite them, code is pretty uggly.
-    - Use rom_runner as an example.
-[SingleStep] Split into unit tests per file.
-    => 500 more unit tests.
 [Testrunner] Implement parsing of the test_name:
     - suite_category_test
     - Note: some tests use '_' in their name!

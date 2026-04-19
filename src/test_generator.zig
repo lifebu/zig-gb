@@ -23,7 +23,6 @@ const unit_tests: [6]UnitTestConfig = .{
     .{ .file = "memory", .category = .memory , .test_functions = &.{ "DMA", "Request" } },
     .{ .file = "mmio", .category = .mmio , .test_functions = &.{ "Divider", "Input", "Timer" } },
     //.{ .file = "ppu", .category = .ppu , .test_functions = &.{ "Interrupt" } },
-    //.{ .file = "singlestep", .category = .instr, .test_functions = &.{ "SingleStep" } },
 };
 
 // rom tests
@@ -120,6 +119,9 @@ const rom_tests: [18]RomTestConfig = .{
     // TODO: Add support for same-suite tests, one test is for ei-di and halt delays.
 };
 
+// single step tests
+const single_step_test_folder = "test_data/SingleStepTests/v1/";
+
 const output_file_path = "src/test.zig";
 const output_start = 
     \\/////////////////////////////////////////////////
@@ -132,7 +134,8 @@ const output_start =
     \\const category = test_options.test_category;
     \\
     \\const Config = @import("config.zig");
-    \\const rom_test = @import("tests/util/rom_runner.zig");
+    \\const rom_runner = @import("tests/util/rom_runner.zig");
+    \\const singlestep_runner = @import("tests/util/singlestep_runner.zig");
     \\
     \\
     \\
@@ -156,42 +159,52 @@ const output_rom_test_start =
     \\    if (category != .all and category != .{1s}) {{
     \\        return error.SkipZigTest;
     \\    }}
-    \\    if (rom_test.isFiltered("{4s}")) {{
+    \\    if (rom_runner.isFiltered("{4s}")) {{
     \\        return error.SkipZigTest;
     \\    }}
     \\
     \\
 ;
 const output_rom_exit =
-    \\    const exit: rom_test.ExitCondition = .{0s};
+    \\    const exit: rom_runner.ExitCondition = .{0s};
     \\
 ;
 const output_rom_timeout =
-    \\    const timeout: rom_test.Timeout = .{{ .{0s} = {1} }};
+    \\    const timeout: rom_runner.Timeout = .{{ .{0s} = {1} }};
     \\
 ;
 const output_rom_pass_void =
-    \\    const pass: rom_test.Pass = .{0s};
+    \\    const pass: rom_runner.Pass = .{0s};
     \\
 ;
 const output_rom_pass_text =
-    \\    const pass: rom_test.Pass = .{{ .{0s} = "{1s}" }};
+    \\    const pass: rom_runner.Pass = .{{ .{0s} = "{1s}" }};
     \\
 ;
 const output_rom_context_void =
-    \\    const context: rom_test.Context = .{0s};
+    \\    const context: rom_runner.Context = .{0s};
     \\
 ;
 const output_rom_context_text_parsing =
-    \\    const context: rom_test.Context = .{{ .{0s} = .{1s} }};
+    \\    const context: rom_runner.Context = .{{ .{0s} = .{1s} }};
     \\
 ;
 const output_rom_core =
-    \\    const core_config: Config = rom_test.genCoreConfig(.{0s}, {1any}, "{2s}");
+    \\    const core_config: Config = rom_runner.genCoreConfig(.{0s}, {1any}, "{2s}");
     \\
 ;
 const output_rom_test_end =
-    \\    try rom_test.run(.{{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config }});
+    \\    try rom_runner.run(.{{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config }});
+    \\}}
+    \\
+    \\
+;
+const output_singlestep_test =
+    \\test "singlestep_instr_{0s}" {{
+    \\    if (category != .all and category != .instr) {{
+    \\        return error.SkipZigTest;
+    \\    }}
+    \\    try singlestep_runner.run("{1s}");
     \\}}
     \\
     \\
@@ -200,12 +213,13 @@ const output_rom_test_end =
 pub fn main(pinit: std.process.Init) !void {
     var start: std.Io.Timestamp = .now(pinit.io, .awake);
 
-    var buffer: [85_000]u8 = undefined;
+    var buffer: [200_000]u8 = undefined;
     var writer: std.Io.Writer = .fixed(&buffer);
 
     try writer.writeAll(output_start);
     try writeUnitTests(&writer);
     try writeRomTests(pinit.io, &writer);
+    try writeSingleStepTests(pinit.io, &writer);
 
     const result: []u8 = writer.buffered();
     std.Io.Dir.cwd().writeFile(pinit.io, .{ .data = result, .sub_path = output_file_path }) catch unreachable;
@@ -296,4 +310,27 @@ fn writeOneRomTest(writer: *std.Io.Writer, rom_test: RomTestConfig, rom_file: []
     }
     try writer.print(output_rom_core, .{ @tagName(rom_test.model), rom_test.force_boot_rom, rom_file});
     try writer.print(output_rom_test_end, .{});
+}
+
+fn writeSingleStepTests(io: std.Io, writer: *std.Io.Writer) !void {
+    const dir: std.Io.Dir = try std.Io.Dir.cwd().openDir(io, single_step_test_folder, .{ .iterate = true });
+    var iter = dir.iterate();
+    while (iter.next(io) catch unreachable) |entry| {
+        if(std.mem.eql(u8, entry.name, "76.json")) {
+            continue; // Skip testing halt. SingleStepTests are inaccurate for halt.
+        }
+        if(std.mem.eql(u8, entry.name, "10.json")) {
+            continue; // Stop is currently not implemented.
+        }
+        if (entry.kind != .file or !std.mem.eql(u8, std.fs.path.extension(entry.name), ".json")) {
+            continue;
+        }
+
+        const file_name: []const u8 = std.fs.path.stem(entry.name);
+
+        var full_path_buffer: [128]u8 = undefined;
+        const full_path: []const u8 = try std.fmt.bufPrint(&full_path_buffer, "{s}{s}", .{ single_step_test_folder, entry.name });
+
+        try writer.print(output_singlestep_test, .{ file_name, full_path });
+    }
 }
