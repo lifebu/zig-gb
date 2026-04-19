@@ -37,9 +37,9 @@ input_state: def.InputState = .{},
 keybinds: def.Keybinds = .{},
 
 
-pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
+pub fn init(self: *Self, io: std.Io, config: Config, imgui_cb: *const fn ([]u8) void) void {
     // ui
-    self.imgui.init(config, imgui_cb);
+    self.imgui.init(io, config, imgui_cb);
 
     // time
     sokol.time.setup();
@@ -136,15 +136,15 @@ pub fn init(self: *Self, config: Config, imgui_cb: *const fn ([]u8) void) void {
     self.keybinds = config.keybinds;
 }
 
-pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: *Config) void {
-    self.imgui.deinit(alloc, config);
+pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, config: *Config) void {
+    self.imgui.deinit(io, alloc, config);
 
     sokol.imgui.shutdown();
     sokol.gfx.shutdown();
     sokol.audio.shutdown();
 }
 
-pub fn frame(self: *Self, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo, core_delta_sample: ?u64) void {
+pub fn frame(self: *Self, io: std.Io, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo, core_delta_sample: ?u64) void {
     // ui
     sokol.imgui.newFrame(.{
         .width = sokol.app.width(),
@@ -152,7 +152,7 @@ pub fn frame(self: *Self, alloc: std.mem.Allocator, colorids: [def.overscan_reso
         .delta_time = sokol.app.frameDuration(),
         .dpi_scale = sokol.app.dpiScale(),
     });
-    self.imgui.render(alloc);
+    self.imgui.render(io, alloc);
 
     // time
     const core_delta: f64 = if(core_delta_sample) |value| sokol.time.sec(value) else 0.0166666;

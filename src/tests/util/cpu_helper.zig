@@ -40,7 +40,7 @@ pub fn isFullInstructionLoaded(cpu: *CPU, bank: u2, opcode: u8) bool {
 
     // TODO: I don't like this buffer to save the read item. Do we add a function to peakContents that returns a slice to the entire array?
     var uop_match: bool = true;
-    var uop_buffer = CPU.MicroOpArray{};
+    var uop_buffer: CPU.MicroOpArray = .empty;
     defer uop_buffer.deinit(alloc);
 
     for(instruction) |instruction_uop| {

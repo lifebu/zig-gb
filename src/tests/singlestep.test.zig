@@ -126,12 +126,13 @@ fn printTestCase(cpuState: *const CPUState) void {
 // => Apparrently I can write my own test runner to solve this!
 pub fn runSingleStepTests() !void {
     const alloc = std.testing.allocator;
+    const io = std.testing.io;
 
     // TODO: How could we create a test with an input parameter in zig testing?
     // It would be nice to define which of the instructions we want to test individually as well.
     // So that when I am fixing issues I can run a single test repeatadely.
-    var test_dir: std.fs.Dir = try std.fs.cwd().openDir("test_data/SingleStepTests/v1/", .{ .iterate = true });
-    defer test_dir.close();
+    var test_dir: std.Io.Dir = try std.Io.Dir.cwd().openDir(io, "test_data/SingleStepTests/v1/", .{ .iterate = true });
+    defer test_dir.close(io);
 
     // Initialized once to only initialize the opcode banks once!
     var cpu: CPU = .{};
@@ -141,9 +142,9 @@ pub fn runSingleStepTests() !void {
     var memory: std.AutoHashMap(u16, u8) = .init(alloc);
     defer memory.deinit();
 
-    var iter: std.fs.Dir.Iterator = test_dir.iterate();
+    var iter: std.Io.Dir.Iterator = test_dir.iterate();
     var idx: u16 = 0;
-    while(try iter.next()) |dir_entry| : (idx += 1) {
+    while(try iter.next(io)) |dir_entry| : (idx += 1) {
         std.debug.assert(dir_entry.kind == .file);
         
         // Use this to only run a single test.
@@ -157,7 +158,7 @@ pub fn runSingleStepTests() !void {
             continue; // Skip testing halt. SingleStepTests are inaccurate for halt.
         }
 
-        const test_file: []u8 = try test_dir.readFileAlloc(alloc, dir_entry.name, 1 * 1024 * 1024);
+        const test_file: []u8 = try test_dir.readFileAlloc(io, dir_entry.name, alloc, .limited(1 * 1024 * 1024));
         defer alloc.free(test_file);
 
         const json = try std.json.parseFromSlice([]TestType, alloc, test_file, .{ .ignore_unknown_fields = true });

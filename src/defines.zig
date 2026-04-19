@@ -76,7 +76,7 @@ pub const Request = struct {
     pub fn isWrite(self: *Request) bool {
         return self.value == .write;
     }
-    pub fn format(self: Request, writer: *std.io.Writer) std.io.Writer.Error!void {
+    pub fn format(self: Request, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (self.value) {
             .read => |read|   try writer.print("{s}: {X:0>4} ({s}) -> {any:0>2}", .{ @tagName(self.requestor), self.address, getMemoryRangeName(self.address), read }),
             .write => |write| try writer.print("{s}: {X:0>2} -> {X:0>4} ({s})", .{ @tagName(self.requestor), write, self.address, getMemoryRangeName(self.address) }),

@@ -20,7 +20,7 @@ pub fn Core(apu_type: type, cpu_type: type, ppu_type: type) type {
         ppu: ppu_type = .{},
         mmio: MMIO = .{},
 
-        pub fn init(self: *Self, alloc: std.mem.Allocator, config: Config) void {
+        pub fn init(self: *Self, io: std.Io, alloc: std.mem.Allocator, config: Config) void {
             self.* = .{};
             self.apu.init();
             self.cart.init();
@@ -30,14 +30,14 @@ pub fn Core(apu_type: type, cpu_type: type, ppu_type: type) type {
             self.mmio.init();
 
             assert(config.files.rom != null);
-            self.cart.loadFile(alloc, config.files.rom.?, config.debug.disable_saves);
+            self.cart.loadFile(io, alloc, config.files.rom.?, config.debug.disable_saves);
         }
 
-        pub fn deinit(self: *Self, alloc: std.mem.Allocator, config: Config) void {
+        pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, config: Config) void {
             self.cpu.deinit(alloc);
 
             assert(config.files.rom != null);
-            self.cart.deinit(alloc, config.files.rom.?, config.debug.disable_saves);
+            self.cart.deinit(io, alloc, config.files.rom.?, config.debug.disable_saves);
         }
 
         pub fn frame(self: *Self, input_state: def.InputState) void {

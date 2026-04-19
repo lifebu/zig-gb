@@ -216,14 +216,15 @@ pub fn isFiltered(path: []const u8) bool {
 
 pub fn run(run_config: RomRunConfig) !void {
     const alloc = std.testing.allocator;
+    const io = std.testing.io;
     var parse_buffer: [parse_buffer_size]u8 = undefined;
 
     var irq_joypad: bool = false;
     const timeout_cycles: usize = run_config.getTimeoutInCycles();
 
     var core: CoreType = .{};
-    core.init(alloc, run_config.core_config);
-    defer core.deinit(alloc, run_config.core_config);
+    core.init(io, alloc, run_config.core_config);
+    defer core.deinit(io, alloc, run_config.core_config);
 
     var last_ppu_lcd_y: u8 = 0;
     var exit_cond_hit: bool = false;

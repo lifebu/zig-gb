@@ -19,6 +19,14 @@ test "unit_cart_Cart" {
     try cart_test.runCartTests();
 }
 
+const cpu_test = @import("tests/cpu.test.zig");
+test "unit_cpu_Register" {
+    if (category != .all and category != .cpu) {
+        return error.SkipZigTest;
+    }
+    try cpu_test.runRegisterTests();
+}
+
 const halt_test = @import("tests/halt.test.zig");
 test "unit_cpu_Halt" {
     if (category != .all and category != .cpu) {

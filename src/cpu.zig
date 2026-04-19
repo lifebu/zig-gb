@@ -16,7 +16,7 @@ const hram_size = def.hram_high - def.hram_low;
 // I think having a defines.zig + instruction_set.zig would be best.
 
 // Note: This assumes little-endian
-const RegisterFileID = enum(u4) {
+pub const RegisterFileID = enum(u4) {
     c, b,
     e, d,
     l, h,
@@ -43,7 +43,7 @@ const RegisterFileID = enum(u4) {
     }
 };
 
-const FlagFileID = enum(u3) {
+pub const FlagFileID = enum(u3) {
     // Flags
     carry, half_bcd,
     n_bcd, zero,
@@ -108,14 +108,14 @@ const DBusParams = packed struct(u15) {
 // TODO: Consider splitting the Alu params into what we tend to need, to reduce the size of all Params.
 const AluParams = packed struct(u15) {
     input_1: RegisterFileID,
-    input_2: packed union {
+    input_2: packed union (u4) {
         rfid: RegisterFileID,
         value: u4,
     },
     ffid: FlagFileID,
     output: RegisterFileID,
 
-    pub fn Unpack(registers: *RegisterFile, params: AluParams) struct { u8, u8, u4, u8, *u8 } {
+    pub fn Unpack(registers: *RegisterFile, params: AluParams) struct { u8, u8, u4, u1, *u8 } {
         return .{
             registers.getU8(params.input_1).*,
             registers.getU8(params.input_2.rfid).*,
@@ -162,6 +162,7 @@ const MicroOpData = struct {
             .none => {},
             .addr_idu => |param| try writer.print("({s}, {}, {s})", .{ param.addr.formatU16(), param.idu, param.idu_out.formatU16() }),
             .idu_adjust => |param| try writer.print("({s}, flags: {})", .{ param.input.formatU8(), param.change_flags }),
+            // TODO: param.input_2?
             .alu => |param| try writer.print("({s}, ({s}, {}), {t}, {s})", .{ param.input_1.formatU8(), param.input_2.rfid.formatU8(), param.input_2.value, param.ffid, param.output.formatU8() }),
             .dbus => |param| try writer.print("({s}, {s})", .{ param.source.formatU8(), param.target.formatU8() }),
             .decode => |param| try writer.print("({s})", .{ 
@@ -237,7 +238,7 @@ pub const opcode_bank_pseudo = 2;
 pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
 fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]MicroOpArray {
-    var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = @splat(@splat(MicroOpArray{}));
+    var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = @splat(@splat(MicroOpArray.empty));
 
     const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .dbus, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
@@ -762,9 +763,9 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
 pub var opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
 
 // IF and IE flags.
-const InterruptFlags = packed union {
+pub const InterruptFlags = packed union (u8) {
     value: u8,
-    bits: packed struct {
+    bits: packed struct (u8) {
         // priority: highest to lowest.
         v_blank: bool = false,
         lcd_stat: bool = false,
@@ -782,15 +783,15 @@ pub const FlagRegister = packed struct(u8) {
     n_bcd: u1 = 0,
     zero: u1 = 0,
 };
-const PseudoFlagRegister = packed struct(u8) {
+pub const PseudoFlagRegister = packed struct(u8) {
     temp_lsb: u1 = 0,
     temp_msb: u1 = 0,
     const_one: u1 = 1,
     const_zero: u1 = 0,
     _: u4 = 0,
 };
-const RegisterFile = packed union {
-    r16: packed struct {
+pub const RegisterFile = packed union (u144) {
+    r16: packed struct (u144) {
         bc: u16 = 0,
         de: u16 = 0,
         hl: u16 = 0,
@@ -799,10 +800,10 @@ const RegisterFile = packed union {
         sp: u16 = 0,
         ir_dbus: u16 = 0,
         af: u16 = 0,
-        pu: u16 = 0,
+        pu: u16 = 0x04,
     },
     // Note: gb and x86 are little-endian
-    r8: packed struct {
+    r8: packed struct (u144) {
         c: u8 = 0, b: u8 = 0,
         e: u8 = 0, d: u8 = 0,
         l: u8 = 0, h: u8 = 0,
@@ -827,14 +828,13 @@ const RegisterFile = packed union {
         const base: [*]u16 = @alignCast(@ptrCast(self));
         return @ptrCast(base + index_u16);
     } 
-    pub fn getFlag(self: *RegisterFile, ffid: FlagFileID) u1 {
-        // Note: This only works for the specific memory layout above (bytes and bits).
-        // Flag followed by A followed by Pseudoflag. And the specific order of the bits.
-        const ffid_idx: u5 = @intFromEnum(ffid);
-        const base_index: u5 = ffid_idx + 4; 
-        const offset: u5 = base_index + (8 * (base_index / 8));
-        const base: *align(1) u32 = @alignCast(@ptrCast(&self.r8.f));
-        return @truncate(base.* >> offset);
+    pub fn getFlag(self: *const RegisterFile, ffid: FlagFileID) u1 {
+        const f: FlagRegister = self.r8.f;
+        const p: PseudoFlagRegister = self.r8.p;
+        return switch (ffid) {
+            .carry => f.carry, .half_bcd => f.half_bcd, .n_bcd => f.n_bcd, .zero => f.zero,
+            .temp_lsb => p.temp_lsb, .temp_msb => p.temp_msb, .const_one => p.const_one, .const_zero => p.const_zero,
+        };
     }
 };
 

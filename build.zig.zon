@@ -2,20 +2,20 @@
     .name = .zig_gb,
     .version = "0.1.0",
     .fingerprint = 0xc748c11b7056702a,
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
         .sokol = .{
-            .url = "git+https://github.com/floooh/sokol-zig.git#82b3ebac1e3aceed286dabfbfd575598b3181d10",
-            .hash = "sokol-0.1.0-pb1HK-xlNgA1VENc1Hma_6RwNBWC9uGyOi2qdvOnsUsH",
+            .url = "git+https://github.com/floooh/sokol-zig.git#9b21bb603bca71bcb81d8d917aca2e78670ccc4a",
+            .hash = "sokol-0.1.0-pb1HK2vZNgAhvQKrH6UdzKg-2tCRD2A1BJBuJMh9ZYoQ",
         },
         .cimgui = .{
-            .url = "git+https://github.com/floooh/dcimgui.git#6c2c7f0452d9f44c95094c3f7dc2969c2c6a5e1a",
-            .hash = "cimgui-0.1.0-44ClkQYjlQCl0iQX5wlquJ-mFZMqSxXA3hE2MG_3i1BT",
+            .url = "git+https://github.com/floooh/dcimgui.git#f276b9ce0d03004916441daa28504c686cd37ecc",
+            .hash = "cimgui-0.1.0-44ClkYTzmADm6eGNBxjzuN3nSFGCEoMTMorHcoR_-LJs",
         },
         .tracy = .{
-            .url = "git+https://codeberg.org/Games-by-Mason/tracy_zig.git#59fb0fcd87673c3e897c75371ccd63e7452807fd",
-            .hash = "tracy-0.0.0-R7l8BatJAQBbSjpfv7YHTyPK4AfRgyG0c--WxxFbL3S8",
+            .url = "git+https://codeberg.org/Games-by-Mason/tracy_zig.git#4921b7dec5e665793f9f87d6ec9336ad450543a4",
+            .hash = "tracy-0.0.0-R7l8BVhNAQBAcLUKg_R72dyRyWRhzTLf1lTvcqVTb9Nc",
         },
     },
 

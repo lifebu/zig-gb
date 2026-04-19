@@ -126,16 +126,17 @@ pub fn init(self: *Self) void {
     self.* = .{};
 }
 
-pub fn deinit(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
+pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
     const save_path: []const u8 = getSavePath(alloc, rom_path);
     defer alloc.free(save_path);
 
     if(self.features.has_battery and self.features.has_ram and !disable_saves) {
-        const save_file: std.fs.File = std.fs.cwd().createFile(save_path, .{}) catch unreachable;
-        defer save_file.close();
+        // TODO: Try to rewrite this using std.Io.Dir.cwd().writeFile()
+        const save_file: std.Io.File = std.Io.Dir.cwd().createFile(io, save_path, .{}) catch unreachable;
+        defer save_file.close(io);
 
         for(self.ram_banks) |bank| {
-            _ = save_file.write(&bank) catch unreachable;
+            _ = save_file.writeStreamingAll(io, &bank) catch unreachable;
         }
     }
 
@@ -198,7 +199,7 @@ pub fn request(self: *Self, req: *def.Request) void {
         },
         def.cart_ram_low...(def.cart_ram_high - 1) => {
             if(!self.features.has_ram or self.ram_banks.len == 0) {
-                std.log.info("Cart has no wram, but game tried to access to cart ram?. {f}", .{ req });
+                std.log.info("Cart has no ram, but game tried to access to cart ram?. {f}", .{ req });
                 req.reject();
                 return;
             }
@@ -212,9 +213,9 @@ pub fn request(self: *Self, req: *def.Request) void {
     }
 }
 
-pub fn loadFile(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
+pub fn loadFile(self: *Self, io: std.Io, alloc: std.mem.Allocator, rom_path: []const u8, disable_saves: bool) void {
     // file
-    const rom: []u8 = std.fs.cwd().readFileAlloc(alloc, rom_path, std.math.maxInt(u32)) catch unreachable;
+    const rom: []u8 = std.Io.Dir.cwd().readFileAlloc(io, rom_path, alloc, .unlimited) catch unreachable;
     defer alloc.free(rom);
 
     const rom_size: u8 = rom[header_rom_size];
@@ -269,11 +270,15 @@ pub fn loadFile(self: *Self, alloc: std.mem.Allocator, rom_path: []const u8, dis
     const save_path: []const u8 = getSavePath(alloc, rom_path);
     defer alloc.free(save_path);
 
-    const save_file: ?std.fs.File = std.fs.cwd().openFile(save_path, .{}) catch |err| blk: {
+    // TODO: Consider just using std.Io.Dir.cwd().readFileAlloc() and do nothing on the file not found error?
+    const save_file: ?std.Io.File = std.Io.Dir.cwd().openFile(io, save_path, .{}) catch |err| blk: {
         switch(err) { error.FileNotFound => break: blk null, else => unreachable, }
     };
+    defer if(save_file) |file| file.close(io);
+
     if(self.features.has_battery and self.features.has_ram and save_file != null and !disable_saves) { // Savegame ram.
-        const save_content: []const u8 = save_file.?.readToEndAlloc(alloc, std.math.maxInt(u32)) catch unreachable;
+        var file_reader: std.Io.File.Reader = save_file.?.reader(io, &.{});
+        const save_content: []const u8 = file_reader.interface.allocRemaining(alloc, .unlimited) catch unreachable;
         defer alloc.free(save_content);
 
         for(0..num_ram_banks) |bank_idx| {

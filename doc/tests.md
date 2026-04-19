@@ -1,4 +1,7 @@
 # Next
+- update to zig 0.16:
+    - cart.zig: Fix the two todos for std.Io.Dir.cwd().
+
 ## Test generator
 - Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?

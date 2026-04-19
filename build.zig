@@ -27,6 +27,9 @@ pub fn build(b: *std.Build) void {
     const test_filter = b.option([]const u8, "test_filter", "Only do a test with this name");
     const test_exclude = b.option([]const u8, "test_exclude", "Exclude these tests from the current run (comma seperated list).");
 
+    // TODO: If I fix debugging vscode, I can default to never using llm, making this compilation in ReleaseFast way faster!
+    const use_llvm: bool = if(builtin.os.tag == .windows) true else enable_llvm;
+
     // exe
     const exe = b.addExecutable(.{
         .name = "zig-gb",
@@ -35,7 +38,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         }),
-        .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
+        .use_llvm = use_llvm,
     });
     b.installArtifact(exe);
 
@@ -53,7 +56,8 @@ pub fn build(b: *std.Build) void {
 
     const cimgui = b.dependency("cimgui", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("cimgui", cimgui.module("cimgui"));
-    sokol.artifact("sokol_clib").addIncludePath(cimgui.path("src"));
+    sokol.artifact("sokol_clib").root_module.addIncludePath(cimgui.path("src"));
+    sokol.artifact("sokol_clib").use_llvm = use_llvm;
 
     const tracy = b.dependency("tracy", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("tracy", tracy.module("tracy"));
@@ -78,8 +82,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = .ReleaseFast,
         }),
-        // TODO: If I fix debugging vscode, I can default to never using llm, making this compilation in ReleaseFast way faster!
-        .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
+        .use_llvm = use_llvm,
     });
     b.installArtifact(test_generator);
 

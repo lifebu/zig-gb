@@ -13,10 +13,11 @@ const UnitTestConfig = struct {
 };
 
 const unit_test_folder = "src/tests/";
-const unit_tests: [6]UnitTestConfig = .{
+const unit_tests: [7]UnitTestConfig = .{
     //.{ .file = "apu", .category = .apu , .test_functions = &.{ "ApuChannel" } },
     //.{ .file = "apu_sampling", .category = .apu, .test_functions = &.{ "ApuSampling", "ApuOutput" } },
     .{ .file = "cart", .category = .cart , .test_functions = &.{ "Cart" } },
+    .{ .file = "cpu", .category = .cpu , .test_functions = &.{ "Register" } },
     .{ .file = "halt", .category = .cpu , .test_functions = &.{ "Halt" } },
     .{ .file = "interrupt", .category = .cpu , .test_functions = &.{ "Interrupt" } },
     .{ .file = "memory", .category = .memory , .test_functions = &.{ "DMA", "Request" } },
@@ -196,27 +197,29 @@ const output_rom_test_end =
     \\
 ;
 
-pub fn main() !void {
-    var timer: std.time.Timer = try .start();
+pub fn main(pinit: std.process.Init) !void {
+    var start: std.Io.Timestamp = .now(pinit.io, .awake);
 
     var buffer: [85_000]u8 = undefined;
-    var writer: std.io.Writer = .fixed(&buffer);
+    var writer: std.Io.Writer = .fixed(&buffer);
 
     try writer.writeAll(output_start);
     try writeUnitTests(&writer);
-    try writeRomTests(&writer);
+    try writeRomTests(pinit.io, &writer);
 
     const result: []u8 = writer.buffered();
-    std.fs.cwd().writeFile(.{ .data = result, .sub_path = output_file_path }) catch unreachable;
+    std.Io.Dir.cwd().writeFile(pinit.io, .{ .data = result, .sub_path = output_file_path }) catch unreachable;
 
-    const elapsed: f64 = @floatFromInt(timer.read());
+    const elapsed: std.Io.Duration = start.untilNow(pinit.io, .awake);
+    //const elapsed_us: f32 =  @floatFromInt(elapsed.toMicroseconds());
     const mem_used: f32 = @floatFromInt(result.len);
     const mem_total: f32 = @floatFromInt(buffer.len);
-    std.log.info("Generator: Total time: {d:.2}ms", .{ elapsed / std.time.ns_per_ms });
+
+    std.log.info("Generator: Total time: {f}", .{ elapsed });
     std.log.info("Generator: Memory usage: {B} ({d:.2}%)", .{ result.len, (mem_used / mem_total) * 100.0 });
 }
 
-fn writeUnitTests(writer: *std.io.Writer) !void {
+fn writeUnitTests(writer: *std.Io.Writer) !void {
     for(unit_tests) |unit_test| {
         try writer.print(output_unit_import, .{ unit_test.file });
         for(unit_test.test_functions) |unit_test_function| {
@@ -239,18 +242,18 @@ fn isFileAllowed(rom_test: RomTestConfig, path: []const u8) bool {
     return true;
 }
 
-fn writeRomTests(writer: *std.io.Writer) !void {
+fn writeRomTests(io: std.Io, writer: *std.Io.Writer) !void {
     for(rom_tests) |rom_test| {
         const suite_path: []const u8 = rom_test.getSuitePath();
         var path_buffer: [128]u8 = undefined;
         const relative_path: []const u8 = try std.fmt.bufPrint(&path_buffer, "{s}{s}", .{ suite_path, rom_test.sub_path });
 
-        const path_stat = try std.fs.cwd().statFile(relative_path);
+        const path_stat = try std.Io.Dir.cwd().statFile(io, relative_path, .{});
         switch (path_stat.kind) {
             .directory => {
-                const dir: std.fs.Dir = try std.fs.cwd().openDir(relative_path, .{ .iterate = true });
+                const dir: std.Io.Dir = try std.Io.Dir.cwd().openDir(io, relative_path, .{ .iterate = true });
                 var iter = dir.iterate();
-                while (iter.next() catch unreachable) |entry| {
+                while (iter.next(io) catch unreachable) |entry| {
                     if (entry.kind != .file or !isFileAllowed(rom_test, entry.name)) {
                         continue;
                     }
@@ -272,7 +275,7 @@ fn writeRomTests(writer: *std.io.Writer) !void {
     }
 }
 
-fn writeOneRomTest(writer: *std.io.Writer, rom_test: RomTestConfig, rom_file: []const u8) !void {
+fn writeOneRomTest(writer: *std.Io.Writer, rom_test: RomTestConfig, rom_file: []const u8) !void {
     const file_name: []const u8 = std.fs.path.stem(rom_file);
 
     try writer.print(output_rom_test_start, .{ @tagName(rom_test.suite), @tagName(rom_test.category), rom_test.sub_path, file_name, file_name });

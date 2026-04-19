@@ -41,35 +41,35 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
     if(self.files.last_dir) |data| alloc.free(data);
 }
 
-pub fn load(self: *Self, alloc: std.mem.Allocator, path: []const u8) !void {
-    const content0 = try std.fs.cwd().readFileAllocOptions(alloc, path, std.math.maxInt(u32), null, .of(u8), 0);
+pub fn load(self: *Self, io: std.Io, alloc: std.mem.Allocator, path: []const u8) !void {
+    const content0 = try std.Io.Dir.cwd().readFileAllocOptions(io, path, alloc, .unlimited, .of(u8), 0);
     defer alloc.free(content0);
 
     var diagnostics: std.zon.parse.Diagnostics = .{};
     defer diagnostics.deinit(alloc);
-    self.* = std.zon.parse.fromSlice(Self, alloc, content0, &diagnostics, .{ .free_on_error = true }) catch |err| {
+    self.* = std.zon.parse.fromSliceAlloc(Self, alloc, content0, &diagnostics, .{ .free_on_error = true }) catch |err| {
         std.log.warn("Failed to parse config file, will use default: {f}.", .{diagnostics});
         return err;
     };
 }
 
-pub fn save(self: Self, alloc: std.mem.Allocator, path: []const u8) !void {
-    var writer: std.io.Writer.Allocating = .init(alloc);
+pub fn save(self: Self, io: std.Io, alloc: std.mem.Allocator, path: []const u8) !void {
+    var writer: std.Io.Writer.Allocating = .init(alloc);
     defer writer.deinit();
     std.zon.stringify.serialize(self, .{}, &writer.writer) catch unreachable;
 
     var result: std.ArrayList(u8) = writer.toArrayList();
     defer result.deinit(alloc);
 
-    std.fs.cwd().writeFile(.{ .data = result.items, .sub_path = path }) catch unreachable;
+    std.Io.Dir.cwd().writeFile(io, .{ .data = result.items, .sub_path = path }) catch unreachable;
 }
 
-pub fn parseArgs(state: *Self, alloc: std.mem.Allocator) !void {
-    var args = try std.process.argsWithAllocator(alloc);
-    defer args.deinit();
+pub fn parseArgs(state: *Self, alloc: std.mem.Allocator, args: std.process.Args) !void {
+    var iter: std.process.Args.Iterator = try args.iterateAllocator(alloc);
+    defer iter.deinit();
 
-    _ = args.next(); // File itself
-    const file_arg: ?[]const u8 = args.next(); 
+    _ = iter.next(); // File itself
+    const file_arg: ?[]const u8 = iter.next(); 
     const file_path: []const u8 = file_arg orelse return;
     const file_extension: []const u8 = std.fs.path.extension(file_path);
     if (std.mem.eql(u8, file_extension, ".gb")) {

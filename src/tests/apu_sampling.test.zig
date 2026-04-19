@@ -198,13 +198,14 @@ pub fn runApuOutputTests(use_precalc: bool) !void {
     apu.init();
 
     const alloc = std.testing.allocator;
+    const io = std.testing.io;
 
     var state: State = .{ .use_precalc = use_precalc, .apu = &apu, .platform = &platform };
     defer state.result_samples.deinit(alloc);
     defer state.input_states.deinit(alloc);
 
     const sample_file = "test_data/apu/aceman_apu_samples.txt";
-    const sample_txt = try std.fs.cwd().readFileAlloc(alloc, sample_file, std.math.maxInt(u32));
+    const sample_txt = try std.Io.Dir.cwd().readFileAlloc(io, alloc, sample_file, std.math.maxInt(u32));
     defer alloc.free(sample_txt);
 
     var lineIt = std.mem.splitScalar(u8, sample_txt, '\n');
