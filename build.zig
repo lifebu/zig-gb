@@ -105,6 +105,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
         .use_llvm = if(builtin.os.tag == .windows) true else enable_llvm,
+        .test_runner = .{ .path = b.path("src/test_runner.zig"), .mode = .simple },
     });
     b.installArtifact(tests);
 
@@ -120,6 +121,7 @@ pub fn build(b: *std.Build) void {
     tests.root_module.addImport("tracy_impl", tracy_impl_disabled);
 
     const run_tests = b.addRunArtifact(tests);
+    if (b.args) |args| run_tests.addArgs(args);
     const tests_step = b.step("test", "Run unit tests");
     tests_step.dependOn(&run_test_generator.step);
     tests_step.dependOn(&run_tests.step);

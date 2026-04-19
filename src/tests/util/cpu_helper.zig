@@ -7,7 +7,7 @@ const CPU = @import("../../cpu.zig");
 pub fn fetchInstruction(cpu: *CPU, memory: *std.AutoHashMap(u16, u8)) !void {
     cpu.uop_fifo.clear();
     // Load a nop instruction to fetch the required instruction.
-    const opcode_bank = CPU.opcode_banks[CPU.opcode_bank_default];
+    const opcode_bank = cpu.opcode_banks[CPU.opcode_bank_default];
     const uops = opcode_bank[0];
     cpu.uop_fifo.write(uops.items);
     try executeCPUFor(cpu, memory, 4);
@@ -32,7 +32,7 @@ pub fn executeCPUFor(cpu: *CPU, memory: *std.AutoHashMap(u16, u8), t_cycles: usi
 pub fn isFullInstructionLoaded(cpu: *CPU, bank: u2, opcode: u8) bool {
     const alloc = std.testing.allocator;
 
-    const instruction = CPU.opcode_banks[bank][opcode].items;
+    const instruction = cpu.opcode_banks[bank][opcode].items;
     std.testing.expectEqual(instruction.len, cpu.uop_fifo.length()) catch {
         std.debug.print("Failed: uop fifo length does not match instruction: [{}][{X:0>2}]\n", .{ bank, opcode });
         return false;

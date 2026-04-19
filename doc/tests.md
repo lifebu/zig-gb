@@ -1,4 +1,48 @@
 # Next
+- Write down all remaining todos for tests and move the rest to "docs" section.
+    - Parameters instead of build flags (no more rebuilds).
+        - filter, categories, models, exclude, break_on_fail
+    - Output like the server mode (progress, errors only after all is done).
+    - Extra reports: per suite, statistics
+    - CoreType is runtime parameter to config.
+    - folder structure
+- Split SingleStepTests into multiple actual unit tests per file.
+    => 500 more unit tests.
+    - Rewrite them in general. The good is pretty uggly.
+        => Use rom_runner as an example.
+
+## Custom test runner
+- multithreaded (zig 0.16) using io.async().
+- CLI:
+    custom:
+    only_categories (comma-seperated)
+    exclude_tests (comma-seperated)
+    filter_tests (comma-seperated)
+    gameboy_model (dmg, mgb, gbc, etc)
+    seed
+    break_on_fail (default: no)
+    
+    from build server:
+    --listen=-
+    --seed=
+    --cache-dir=
+- Add some metrics to the runner to see how long the work it does takes (CLI parsing, setup, etc).
+- Should support simple and server mode.
+    - simple might be required for high performance?
+    - Depending on how many tests I will actually run, use server or simple.
+- Output:
+    - Should give me some statistics of passed/failed tests per category and test-suite.
+    - Failed tests could also include:
+        - Links to the assembly source file.
+    - Output printing at least as pretty as the one used by the build server.
+- Should handle category, exclude and filters, so that this is no longer a compile time parameter.
+    - Changing these parameter no longer requires a rebuilt!
+- Links:
+    - How to write a basic test runner: https://www.youtube.com/watch?v=jpY6VHsHsWU
+    - https://codeberg.org/ziglang/zig/src/branch/master/lib/compiler/test_runner.zig
+    - Example test runner: https://github.com/dokwork/zrunner
+    - Another (complicated) test runner: https://github.com/oneopane/test-runner
+
 ## Test generator
 - Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
@@ -54,35 +98,6 @@ N- Build from source:
     => To much work right now => Embedd binaries + source file.
 - Maybe use zig fetch to download game-boy-test-roms repository and run it's compile script?
 
-## Custom test runner
-- multithreaded (zig 0.16) using io.async().
-- CLI:
-    custom:
-    only_categories (comma-seperated)
-    exclude_tests (comma-seperated)
-    filter_tests (comma-seperated)
-    gameboy_model (dmg, mgb, gbc, etc)
-    seed
-    break_on_fail (default: no)
-    
-    from build server:
-    --listen=-
-    --seed=
-    --cache-dir=
-- Should support simple and server mode.
-    - simple might be required for high performance?
-- Output:
-    - Should give me some statistics of passed/failed tests per category and test-suite.
-    - Failed tests could also include:
-        - Links to the assembly source file.
-- Should handle category, exclude and filters, so that this is no longer a compile time parameter.
-- Links:
-    - How to write a basic test runner: https://www.youtube.com/watch?v=jpY6VHsHsWU
-    - https://codeberg.org/ziglang/zig/src/branch/master/lib/compiler/test_runner.zig
-    - Example test runner: https://github.com/dokwork/zrunner
-    - Another (complicated) test runner: https://github.com/oneopane/test-runner
-
-
 
 
 # Later
@@ -128,6 +143,8 @@ N- Build from source:
 https://gbdev.io/pandocs/Power_Up_Sequence.html
 - Has some tables for initial values of the system after boot up sequence.
 - This could be a good test at some point.
+
+
 
 # Docs
 ## Test generator

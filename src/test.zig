@@ -80,14 +80,6 @@ test "unit_mmio_Timer" {
     try mmio_test.runTimerTests();
 }
 
-const singlestep_test = @import("tests/singlestep.test.zig");
-test "unit_instr_SingleStep" {
-    if (category != .all and category != .instr) {
-        return error.SkipZigTest;
-    }
-    try singlestep_test.runSingleStepTests();
-}
-
 test "blargg_apu_dmg_sound/rom_singles/_06-overflow on trigger" {
     if (category != .all and category != .apu) {
         return error.SkipZigTest;

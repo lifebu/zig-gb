@@ -758,9 +758,7 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
     }
     std.log.info("CPU: Opcode memory usage: {B}", .{ byte_size });
     return returnVal;
-
 }
-pub var opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined;
 
 // IF and IE flags.
 pub const InterruptFlags = packed union (u8) {
@@ -838,6 +836,7 @@ pub const RegisterFile = packed union (u144) {
     }
 };
 
+opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined,
 
 hram: [hram_size]u8 = @splat(0),
 interrupt_enable: InterruptFlags = .{ .value = 0 },
@@ -858,14 +857,14 @@ pub fn init(self: *Self, alloc: std.mem.Allocator, skip_boot_rom: bool) void {
     self.* = .{};
     self.registers.r16.pc = if(skip_boot_rom) def.boot_rom_size else 0;
 
-    opcode_banks = genOpcodeBanks(alloc);
-    const opcode_bank = opcode_banks[opcode_bank_default];
+    self.opcode_banks = genOpcodeBanks(alloc);
+    const opcode_bank = self.opcode_banks[opcode_bank_default];
     const uops: MicroOpArray = opcode_bank[0]; // NOP
     self.uop_fifo.write(uops.items);
 }
 
-pub fn deinit(_: *Self, alloc: std.mem.Allocator) void {
-    for(&opcode_banks) |*bank| {
+pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
+    for(&self.opcode_banks) |*bank| {
         for(bank) |*instruction| {
             instruction.deinit(alloc);
         }
@@ -1076,7 +1075,7 @@ pub fn cycle(self: *Self, req: *def.Request) void {
             const interrupt_signal: u8 =  self.interrupt_enable.value & self.interrupt_flag.value;
             if(self.interrupt_master_enable and interrupt_signal != 0) {
                 const interrupt_idx: u3 = getLowestSetBit(interrupt_signal);
-                const interrupt_uops: MicroOpArray = opcode_banks[opcode_bank_pseudo][interrupt_idx];
+                const interrupt_uops: MicroOpArray = self.opcode_banks[opcode_bank_pseudo][interrupt_idx];
                 self.uop_fifo.write(interrupt_uops.items);
 
                 const mask: u8 = @as(u8, 1) << interrupt_idx;
@@ -1090,7 +1089,7 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 self.registers.r16.pc -= 1;
             } else {
                 const params: DecodeParams = uop.params.decode;
-                const opcode_bank = opcode_banks[params.bank_idx];
+                const opcode_bank = self.opcode_banks[params.bank_idx];
                 const opcode: u8 = self.registers.r8.ir;
                 if(opcode == 0x10 and params.bank_idx == opcode_bank_default) {
                     std.log.err("CPU: Stop is not implemented", .{});

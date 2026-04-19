@@ -13,7 +13,7 @@ const UnitTestConfig = struct {
 };
 
 const unit_test_folder = "src/tests/";
-const unit_tests: [7]UnitTestConfig = .{
+const unit_tests: [6]UnitTestConfig = .{
     //.{ .file = "apu", .category = .apu , .test_functions = &.{ "ApuChannel" } },
     //.{ .file = "apu_sampling", .category = .apu, .test_functions = &.{ "ApuSampling", "ApuOutput" } },
     .{ .file = "cart", .category = .cart , .test_functions = &.{ "Cart" } },
@@ -23,7 +23,7 @@ const unit_tests: [7]UnitTestConfig = .{
     .{ .file = "memory", .category = .memory , .test_functions = &.{ "DMA", "Request" } },
     .{ .file = "mmio", .category = .mmio , .test_functions = &.{ "Divider", "Input", "Timer" } },
     //.{ .file = "ppu", .category = .ppu , .test_functions = &.{ "Interrupt" } },
-    .{ .file = "singlestep", .category = .instr, .test_functions = &.{ "SingleStep" } },
+    //.{ .file = "singlestep", .category = .instr, .test_functions = &.{ "SingleStep" } },
 };
 
 // rom tests
@@ -211,7 +211,6 @@ pub fn main(pinit: std.process.Init) !void {
     std.Io.Dir.cwd().writeFile(pinit.io, .{ .data = result, .sub_path = output_file_path }) catch unreachable;
 
     const elapsed: std.Io.Duration = start.untilNow(pinit.io, .awake);
-    //const elapsed_us: f32 =  @floatFromInt(elapsed.toMicroseconds());
     const mem_used: f32 = @floatFromInt(result.len);
     const mem_total: f32 = @floatFromInt(buffer.len);
 
