@@ -2,12 +2,12 @@ const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
-const PPU = @import("../ppu.zig");
+const PpuCycle = @import("../ppu_cycle.zig");
 const Memory = @import("../memory.zig");
 
 pub fn runInterruptTests() !void {
     // TODO: just let the ppu run for a frame + buffer and check the order of interrupts we get.
-    var ppu: PPU = .{};
+    var ppu: PpuCycle = .{};
     var memory: Memory = .{}; 
     ppu.init();
 

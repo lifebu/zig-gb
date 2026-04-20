@@ -2,9 +2,9 @@ const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
-const APU = @import("../apu.zig");
+const ApuCycle = @import("../apu_cycle.zig");
 
-fn initWaveTable(apu: *APU, pattern: [32]u4) void {
+fn initWaveTable(apu: *ApuCycle, pattern: [32]u4) void {
     for(&apu.ch3_wave_table, 0..) |*wave, idx| {
         const first_idx: usize = idx * 2;
         const low_nibble: u8 = pattern[first_idx + 1];
@@ -13,17 +13,17 @@ fn initWaveTable(apu: *APU, pattern: [32]u4) void {
     }
 }
 
-fn cpuWrite(apu: *APU, address: u16, value: u8) void {
+fn cpuWrite(apu: *ApuCycle, address: u16, value: u8) void {
     var request: def.Request = .{ .address = address, .value = .{ .write = value } };
     apu.request(&request);
 }
 
 pub fn runApuChannelTests() !void {
-    var apu: APU  = .{};
+    var apu: ApuCycle  = .{};
 
     // CH3: Channel status bit is updated.
     apu.init();
-    cpuWrite(&apu, def.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
+    cpuWrite(&apu, def.ch3_high_period, @bitCast(ApuCycle.Channel3PeriodHigh{
         .period = 0, .length_on = false, .trigger = true,
     }));
     std.testing.expectEqual(true, apu.control.ch3_on) catch |err| {
@@ -53,34 +53,34 @@ pub fn runApuChannelTests() !void {
     };
     for(test_cases) |test_case| {
         apu.init();
-        cpuWrite(&apu, def.sound_control, @bitCast(APU.Control{
+        cpuWrite(&apu, def.sound_control, @bitCast(ApuCycle.Control{
             .enable_apu = true, .ch1_on = false, .ch2_on = false, .ch3_on = false, .ch4_on = false,
         }));
-        cpuWrite(&apu, def.ch3_dac, @bitCast(APU.Channel3Dac{
+        cpuWrite(&apu, def.ch3_dac, @bitCast(ApuCycle.Channel3Dac{
             .dac_on = test_case.dac,
         }));
-        cpuWrite(&apu, def.ch3_length, @bitCast(APU.Channel3Length{
+        cpuWrite(&apu, def.ch3_length, @bitCast(ApuCycle.Channel3Length{
             .initial = 0,
         }));
-        cpuWrite(&apu, def.ch3_volume, @bitCast(APU.Channel3Volume{
+        cpuWrite(&apu, def.ch3_volume, @bitCast(ApuCycle.Channel3Volume{
             .shift = test_case.volume,
         }));
-        cpuWrite(&apu, def.ch3_low_period, @bitCast(APU.Channel3PeriodLow{
+        cpuWrite(&apu, def.ch3_low_period, @bitCast(ApuCycle.Channel3PeriodLow{
             .period = @truncate(test_case.period),
         }));
-        cpuWrite(&apu, def.ch3_high_period, @bitCast(APU.Channel3PeriodHigh{
+        cpuWrite(&apu, def.ch3_high_period, @bitCast(ApuCycle.Channel3PeriodHigh{
             .period = @truncate(test_case.period >> 8), .length_on = false, .trigger = true,
         }));
 
         var pattern_idx: u5 = 1; 
         for(0..32) |sample_idx| {
-            const cycles_per_value: u13 = APU.ch3_t_cycles_per_period * (2048 - @as(u13, test_case.period));
+            const cycles_per_value: u13 = ApuCycle.ch3_t_cycles_per_period * (2048 - @as(u13, test_case.period));
             for(0..cycles_per_value) |_| {
                 _ = apu.cycle();
             }
 
             var expected = wave_pattern[pattern_idx];
-            expected = if(test_case.dac) expected else APU.ch3_dac_off_value;
+            expected = if(test_case.dac) expected else ApuCycle.ch3_dac_off_value;
             expected = if(test_case.volume == 0b00) 0 else expected >> (test_case.volume - 1);
             std.testing.expectEqual(expected, apu.channel_values[2]) catch |err| {
                 std.debug.print("Failed: Ch3: dac: {}, period: {}, vol: {}: sample {} does not match the wave table entry {}.\n", .{ test_case.dac, test_case.period, test_case.volume, sample_idx + 1, pattern_idx });

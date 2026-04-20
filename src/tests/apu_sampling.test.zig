@@ -2,7 +2,7 @@ const std = @import("std");
 
 // TODO: Use modules for the tests to not use relative paths like this!
 const def = @import("../defines.zig");
-const APU = @import("../apu.zig");
+const ApuCycle = @import("../apu_cycle.zig");
 const Platform = @import("../platform.zig");
 
 const sokol = @import("sokol");
@@ -11,7 +11,7 @@ const is_stereo = true;
 const samples_per_frame = if(is_stereo) 2 else 1;
 const default_platform_volume = 0.15;
 
-fn drawSample(apu: *APU, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
+fn drawSample(apu: *ApuCycle, ch1: u4, ch2: u4, ch3: u4, ch4: u4) def.Sample {
     apu.channel_values[0] = ch1;
     apu.channel_values[1] = ch2;
     apu.channel_values[2] = ch3;
@@ -26,7 +26,7 @@ pub fn runApuSamplingTests() !void {
     // TODO: Test that the sample rate was hit over a period of time?
     // TODO: Test that we never wasted any samples.
     // TODO: Test we handle less than 60fps correctly.
-    var apu: APU = .{};
+    var apu: ApuCycle = .{};
     apu.init();
 
     var sample: def.Sample = .{};
@@ -135,7 +135,7 @@ const State = struct {
     curr_cycles: u64 = 0,
     curr_input_idx: usize = 0,
     input_states: std.ArrayList(Inputs) = .empty,
-    apu: *APU,
+    apu: *ApuCycle,
     platform: *Platform,
 };
 export fn init_test(state_opaque: ?*anyopaque) void {
@@ -193,7 +193,7 @@ export fn frame_test(state_opaque: ?*anyopaque) void {
 }
 
 pub fn runApuOutputTests(use_precalc: bool) !void {
-    var apu: APU = .{};
+    var apu: ApuCycle = .{};
     var platform: Platform = .{};
     apu.init();
 

@@ -2,31 +2,31 @@ const std = @import("std");
 const assert = std.debug.assert;
 const tracy = @import("tracy");
 
-const Config = @import("config.zig");
+const CPU = @import("cpu.zig");
 const Cart = @import("cart.zig");
-const def = @import("defines.zig");
-const Memory = @import("memory.zig");
+const Config = @import("config.zig");
 const MMIO = @import("mmio.zig");
+const Memory = @import("memory.zig");
+const def = @import("defines.zig");
 
-
-pub fn Core(apu_type: type, cpu_type: type, ppu_type: type) type {
+pub fn Core(apu_type: type, ppu_type: type) type {
     return struct {
         const Self = @This();
 
-        apu: apu_type = .{},
+        apu: apu_type = .empty,
         cart: Cart = .{},
-        cpu: cpu_type = .{},
+        cpu: CPU = .{},
         memory: Memory = .{},
-        ppu: ppu_type = .{},
+        ppu: ppu_type = .empty,
         mmio: MMIO = .{},
 
         pub fn init(self: *Self, io: std.Io, alloc: std.mem.Allocator, config: Config) void {
             self.* = .{};
-            self.apu.init();
+            self.apu.init(config.emulation.apu_plugin);
             self.cart.init();
             self.cpu.init(alloc, config.emulation.skip_boot_rom);
             self.memory.init(config.emulation.model, config.emulation.skip_boot_rom);
-            self.ppu.init();
+            self.ppu.init(config.emulation.ppu_plugin);
             self.mmio.init();
 
             assert(config.files.rom != null);

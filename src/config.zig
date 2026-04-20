@@ -7,7 +7,7 @@ const Self = @This();
 
 const Files = struct {
     rom: ?[]const u8 = null,
-    last_dir: ?[]const u8 = null,
+    last_dir: ?[:0]const u8 = null,
 };
 const Audio = struct {
     // TODO: Sample rate would be harder to do as apu needs that info as well.
@@ -21,6 +21,8 @@ const Graphics = struct {
 };
 const Emulation = struct {
     model: def.GBModel = .dmg,
+    apu_plugin: def.ApuPlugin = .cycle,
+    ppu_plugin: def.PpuPlugin = .cycle,
     skip_boot_rom: bool = false,
 };
 const Debug = struct {

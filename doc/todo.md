@@ -5,6 +5,28 @@
     - Build watch
     - Run Release
     - Run Tests
+- Define and implement an Allocation Strategy:
+    - std.heap.ArenaAllocator wrapping a std.heap.FixedBufferAllocator.
+    - Lifetime Types:
+        - Permanent
+        - Transient (PerFrame).
+        - Temporary.
+    - Allocations:
+        - Pools: List of the same element with potentially a free list.
+    - Define Grouped Lifetimes (in a flame graph?)
+        - Global: Things that are allocated once at start and never freed until shutdown.
+        - Core: Lifetime of a single core run.
+        - Scratch: Do we need this?
+        - Transient: Multiple Frames?
+    - This can also be used for objects that have runtime strings.
+        - Have one arena for this, that when the objects get's freed the heap string do aswell.
+    - Links:
+        https://youtu.be/bUOOaXf9qIM?si=USGzEWsPsiNXnKcJ&t=1717
+        https://www.gingerbill.org/article/2019/02/01/memory-allocation-strategies-001/
+        https://www.dgtlgrove.com/p/enter-the-arena-talk
+        https://www.dgtlgrove.com/p/untangling-lifetimes-the-arena-allocator
+- Define and implement DoD:
+    - Cases where I have an array of many things: CPU instructions, PPU Instructions.
 
 ## Clean up repository:
 - remove data/background.png

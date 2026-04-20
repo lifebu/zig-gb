@@ -100,8 +100,11 @@ ch4_volume: Channel124Volume = .{},
 ch4_freq: Channel4Freq = .{},
 ch4_control: Channel4Control = .{},
 
+samples: def.SampleFifo = .{},
 
-pub fn init(self: *Self) void {
+pub const empty: Self = .{};
+
+pub fn init(self: *Self, _: def.ApuPlugin) void {
     self.* = .{};
 }
 
@@ -135,4 +138,8 @@ pub fn request(self: *Self, req: *def.Request) void {
 
 pub fn cycle(self: *Self) void {
     _ = self;
+}
+
+pub fn getSamples(self: *Self) *def.SampleFifo {
+    return &self.samples;
 }

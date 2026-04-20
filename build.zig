@@ -2,9 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 // exe
-pub const CPUModel = enum { instruction, cycle };
-pub const PPUModel = enum { void, frame, cycle };
-pub const APUModel = enum { void, cycle };
+pub const PpuPlugin = enum { runtime, void, cycle };
+pub const ApuPlugin = enum { runtime, void, cycle };
 
 // text
 pub const TestCategory = enum { all, cart, instr, cpu, memory, mmio, ppu, apu };
@@ -17,10 +16,9 @@ pub fn build(b: *std.Build) void {
     // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
     const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
     const enable_audio = b.option(bool, "enable_audio", "Enables the audio output") orelse (optimize != .Debug);
-    const cpu_model = b.option(CPUModel, "cpu_model", "Use a specific ppu model.") orelse CPUModel.cycle;
-    const ppu_model = b.option(PPUModel, "ppu_model", "Use a specific ppu model.") orelse PPUModel.cycle;
-    const apu_model = b.option(APUModel, "apu_model", "Use a specific apu model.") orelse APUModel.cycle;
-    const tracy_enabled = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
+    const enable_tracy = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
+    const ppu_plugin = b.option(PpuPlugin, "ppu_plugin", "Use a specific ppu model.") orelse PpuPlugin.runtime;
+    const apu_plugin = b.option(ApuPlugin, "apu_plugin", "Use a specific apu model.") orelse ApuPlugin.runtime;
 
     // test flags
     const test_category = b.option(TestCategory, "test_category", "Filters all tests to a specific subsystem.") orelse TestCategory.all;
@@ -43,10 +41,9 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     const exe_options = b.addOptions();
-    exe_options.addOption(CPUModel, "cpu_model", cpu_model);
-    exe_options.addOption(PPUModel, "ppu_model", ppu_model);
-    exe_options.addOption(APUModel, "apu_model", apu_model);
-    exe_options.addOption(bool, "tracy_enabled", tracy_enabled);
+    exe_options.addOption(PpuPlugin, "ppu_plugin", ppu_plugin);
+    exe_options.addOption(ApuPlugin, "apu_plugin", apu_plugin);
+    exe_options.addOption(bool, "enable_tracy", enable_tracy);
     exe_options.addOption(bool, "enable_audio", enable_audio);
     exe.root_module.addOptions("build_options", exe_options);
 
@@ -63,7 +60,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("tracy", tracy.module("tracy"));
     const tracy_impl_enabled: *std.Build.Module = tracy.module("tracy_impl_enabled");
     const tracy_impl_disabled: *std.Build.Module = tracy.module("tracy_impl_disabled");
-    exe.root_module.addImport("tracy_impl", if(tracy_enabled) tracy_impl_enabled else tracy_impl_disabled);
+    exe.root_module.addImport("tracy_impl", if(enable_tracy) tracy_impl_enabled else tracy_impl_disabled);
 
     const run_exe = b.addRunArtifact(exe);
     run_exe.step.dependOn(b.getInstallStep());

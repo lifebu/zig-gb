@@ -2,14 +2,13 @@ const std = @import("std");
 const test_options = @import("test_options");
 
 // TODO: Use modules for the tests to not use relative paths like this!
-const APU = @import("../../apu.zig");
-const APUVoid = @import("../../apu_void.zig");
+const ApuCycle = @import("../../apu_cycle.zig");
+const ApuVoid = @import("../../apu_void.zig");
 const Config = @import("../../config.zig");
 const Core = @import("../../core.zig");
-const CPU = @import("../../cpu.zig");
 const def = @import("../../defines.zig");
-const PPU = @import("../../ppu.zig");
-const PPUVoid = @import("../../ppu_void.zig");
+const PpuCycle = @import("../../ppu_cycle.zig");
+const PpuVoid = @import("../../ppu_void.zig");
 
 const cpu_breakpoint_op: u8 = 0x40; // LD B, B
 const test_palette: def.Palette = .{ 
@@ -177,14 +176,14 @@ pub const RomRunConfig = struct {
 };
 
 const CoreType = switch(test_options.test_category) {
-    .all => Core.Core(APU, CPU, PPU),
-    .apu => Core.Core(APU, CPU, PPUVoid),
-    .cart => Core.Core(APUVoid, CPU, PPUVoid),
-    .cpu => Core.Core(APUVoid, CPU, PPUVoid),
-    .instr => Core.Core(APUVoid, CPU, PPUVoid),
-    .memory => Core.Core(APUVoid, CPU, PPUVoid),
-    .mmio => Core.Core(APUVoid, CPU, PPUVoid),
-    .ppu => Core.Core(APUVoid, CPU, PPU),
+    .all => Core.Core(ApuCycle, PpuCycle),
+    .apu => Core.Core(ApuCycle, PpuVoid),
+    .cart => Core.Core(ApuVoid, PpuVoid),
+    .cpu => Core.Core(ApuVoid, PpuVoid),
+    .instr => Core.Core(ApuVoid, PpuVoid),
+    .memory => Core.Core(ApuVoid, PpuVoid),
+    .mmio => Core.Core(ApuVoid, PpuVoid),
+    .ppu => Core.Core(ApuVoid, PpuCycle),
 };
 
 pub fn genCoreConfig(model: def.GBModel, force_boot_rom: bool, rom: []const u8) Config {

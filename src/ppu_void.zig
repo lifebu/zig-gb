@@ -74,7 +74,9 @@ oam: [def.oam_size_byte]u8 = @splat(0),
 // TODO: rename to color_ids (naming convention)
 front_buffer: [def.overscan_resolution]u8 = def.default_color_ids,
 
-pub fn init(self: *Self) void {
+pub const empty: Self = .{};
+
+pub fn init(self: *Self, _: def.PpuPlugin) void {
     self.* = .{};
 }
 
@@ -181,4 +183,8 @@ pub fn request(self: *Self, req: *def.Request) void {
         },
         else => {},
     }
+}
+
+pub fn getFrontBuffer(self: *Self) [def.overscan_resolution]u8 {
+    return self.front_buffer;
 }

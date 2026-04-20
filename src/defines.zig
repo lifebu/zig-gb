@@ -236,6 +236,8 @@ pub const tile_map_pixel_size_y = tile_map_size_y * tile_size_y;
 
 // system
 pub const GBModel = enum  { dmg };
+pub const ApuPlugin = enum { void, cycle };
+pub const PpuPlugin = enum { void, cycle };
 
 // graphics
 pub const Palette = struct {

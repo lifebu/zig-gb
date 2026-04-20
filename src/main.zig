@@ -5,11 +5,9 @@ const sokol = @import("sokol");
 const APU = @import("apu.zig");
 const Config = @import("config.zig");
 const Core = @import("core.zig");
-const CPU = @import("cpu.zig");
 const def = @import("defines.zig");
 const Platform = @import("platform.zig");
 const PPU = @import("ppu.zig");
-const PPUVoid = @import("ppu_void.zig");
 
 // tracy (required to be in root file).
 pub const tracy_impl = @import("tracy_impl");
@@ -28,16 +26,7 @@ pub const tracy_option: tracy.options = .{
     .default_callstack_depth = 0,
 };
 
-const APUType = switch (build_options.apu_model) {
-    .void => APU, .cycle => APU,
-};
-const CPUType = switch (build_options.cpu_model) {
-    .cycle => CPU, .instruction => CPU,
-};
-const PPUType = switch (build_options.ppu_model) {
-    .void => PPUVoid, .cycle => PPU, .frame => PPU,
-};
-const CoreType = Core.Core(APUType, CPUType, PPU);
+const CoreType = Core.Core(APU.Apu, PPU.Ppu);
 const state = struct {
     var alloc: std.mem.Allocator = undefined;
     var io: std.Io = undefined;
@@ -87,7 +76,7 @@ export fn frame() void {
         const start: u64 = sokol.time.now();
         loaded_core.frame(state.platform.input_state);
         const core_delta: u64 = sokol.time.since(start);
-        state.platform.frame(state.io, state.alloc, loaded_core.ppu.front_buffer, &loaded_core.apu.samples, core_delta);
+        state.platform.frame(state.io, state.alloc, loaded_core.ppu.getFrontBuffer(), loaded_core.apu.getSamples(), core_delta);
     } else {
         state.platform.frame(state.io, state.alloc, def.default_color_ids, null, null);
     }
@@ -114,7 +103,7 @@ pub fn main(pinit: std.process.Init) void {
     // TODO: Creates panic at deinit()?
     // var tracy_allocator: tracy.Allocator = .{ .parent = state.allocator.allocator() };
     // state.alloc = tracy_allocator.allocator();
-    state.alloc = if(build_options.tracy_enabled) pinit.gpa else pinit.gpa;
+    state.alloc = if(build_options.enable_tracy) pinit.gpa else pinit.gpa;
     state.args = pinit.minimal.args;
 
     state.platform.run(init, frame, deinit);

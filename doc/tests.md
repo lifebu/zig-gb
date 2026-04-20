@@ -34,19 +34,11 @@
     - Also allow tests to run on all gb versions.
     => Add this as a cli parameter to the test_runner.
 [CoreType] Make CoreType something that can be changed at runtime.
-    - Move from a build option to a Config option!
-    - Instead of CoreType there is a tagged union of the subsystems that can switch.
-        - PPU, APU
-        const PPU = union(enum) {
-            ppu_void: PPUVoid,
-            ppu_cycle: PPUCycle,
-
-            // All of those have switches for the union.
-            pub fn init()
-            pub fn deinit()
-            pub fn cycle()
-            pub fn request()
-        }
+    - It should be build option and runtime option.
+        - build option now has a "runtime" version which is default.
+    - rom_runner: CoreType:
+        - Make a set of core types for all of the test categories!
+        - Then pass it in the RomTestConfig as a type in the struct.
 
 ## Folder Structure
 build/
