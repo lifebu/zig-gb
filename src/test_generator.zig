@@ -189,12 +189,16 @@ const output_rom_context_text_parsing =
     \\    const context: rom_runner.Context = .{{ .{0s} = .{1s} }};
     \\
 ;
+const output_rom_core_type =
+    \\    const core_type = rom_runner.genCoreType(.{0s});
+    \\
+;
 const output_rom_core =
     \\    const core_config: Config = rom_runner.genCoreConfig(.{0s}, {1any}, "{2s}");
     \\
 ;
 const output_rom_test_end =
-    \\    try rom_runner.run(.{{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config }});
+    \\    try rom_runner.run(core_type, .{{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config }});
     \\}}
     \\
     \\
@@ -308,6 +312,7 @@ fn writeOneRomTest(writer: *std.Io.Writer, rom_test: RomTestConfig, rom_file: []
         .memory => unreachable, // Does not seem to be used right now?
         .text_parsing => |value| try writer.print(output_rom_context_text_parsing, .{ @tagName(rom_test.context), @tagName(value) }),
     }
+    try writer.print(output_rom_core_type, .{ @tagName(rom_test.category) });
     try writer.print(output_rom_core, .{ @tagName(rom_test.model), rom_test.force_boot_rom, rom_file});
     try writer.print(output_rom_test_end, .{});
 }

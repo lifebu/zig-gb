@@ -13,7 +13,7 @@
     - only what it does!
 [Testrunner] Performance:
     - Try to have as little of allocations as possible.
-    - Check the MT implementation. Sometimes the entire runner segfaults in Release?
+    - Check the MT implementation. Sometimes the entire runner segfaults in Release? (when the SingleStepTests fail)?
 [Testrunner] Console output:
     - Should give me some statistics of passed/failed tests per category and test-suite.
     - Failed tests could also include:
@@ -33,12 +33,6 @@
     - Maybe I can also manually set it for unit tests.
     - Also allow tests to run on all gb versions.
     => Add this as a cli parameter to the test_runner.
-[CoreType] Make CoreType something that can be changed at runtime.
-    - It should be build option and runtime option.
-        - build option now has a "runtime" version which is default.
-    - rom_runner: CoreType:
-        - Make a set of core types for all of the test categories!
-        - Then pass it in the RomTestConfig as a type in the struct.
 
 ## Folder Structure
 build/

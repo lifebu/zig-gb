@@ -175,16 +175,18 @@ pub const RomRunConfig = struct {
     }
 };
 
-const CoreType = switch(test_options.test_category) {
-    .all => Core.Core(ApuCycle, PpuCycle),
-    .apu => Core.Core(ApuCycle, PpuVoid),
-    .cart => Core.Core(ApuVoid, PpuVoid),
-    .cpu => Core.Core(ApuVoid, PpuVoid),
-    .instr => Core.Core(ApuVoid, PpuVoid),
-    .memory => Core.Core(ApuVoid, PpuVoid),
-    .mmio => Core.Core(ApuVoid, PpuVoid),
-    .ppu => Core.Core(ApuVoid, PpuCycle),
-};
+pub fn genCoreType(category: test_options.@"build.TestCategory") type {
+    return switch(category) {
+        .all => Core.Core(ApuCycle, PpuCycle),
+        .apu => Core.Core(ApuCycle, PpuVoid),
+        .cart => Core.Core(ApuVoid, PpuVoid),
+        .cpu => Core.Core(ApuVoid, PpuVoid),
+        .instr => Core.Core(ApuVoid, PpuVoid),
+        .memory => Core.Core(ApuVoid, PpuVoid),
+        .mmio => Core.Core(ApuVoid, PpuVoid),
+        .ppu => Core.Core(ApuVoid, PpuCycle),
+    };
+}
 
 pub fn genCoreConfig(model: def.GBModel, force_boot_rom: bool, rom: []const u8) Config {
     var core_config: Config = .default;
@@ -213,7 +215,7 @@ pub fn isFiltered(path: []const u8) bool {
     return false;
 }
 
-pub fn run(run_config: RomRunConfig) !void {
+pub fn run(core_type: type, run_config: RomRunConfig) !void {
     const alloc = std.testing.allocator;
     const io = std.testing.io;
     var parse_buffer: [parse_buffer_size]u8 = undefined;
@@ -221,7 +223,7 @@ pub fn run(run_config: RomRunConfig) !void {
     var irq_joypad: bool = false;
     const timeout_cycles: usize = run_config.getTimeoutInCycles();
 
-    var core: CoreType = .{};
+    var core: core_type = .{};
     core.init(io, alloc, run_config.core_config);
     defer core.deinit(io, alloc, run_config.core_config);
 

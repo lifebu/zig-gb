@@ -93,8 +93,9 @@ test "blargg_apu_dmg_sound/rom_singles/_06-overflow on trigger" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/06-overflow on trigger.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_07-len sweep period sync" {
@@ -109,8 +110,9 @@ test "blargg_apu_dmg_sound/rom_singles/_07-len sweep period sync" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/07-len sweep period sync.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_03-trigger" {
@@ -125,8 +127,9 @@ test "blargg_apu_dmg_sound/rom_singles/_03-trigger" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/03-trigger.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_11-regs after power" {
@@ -141,8 +144,9 @@ test "blargg_apu_dmg_sound/rom_singles/_11-regs after power" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/11-regs after power.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_01-registers" {
@@ -157,8 +161,9 @@ test "blargg_apu_dmg_sound/rom_singles/_01-registers" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/01-registers.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_02-len ctr" {
@@ -173,8 +178,9 @@ test "blargg_apu_dmg_sound/rom_singles/_02-len ctr" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/02-len ctr.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_08-len ctr during power" {
@@ -189,8 +195,9 @@ test "blargg_apu_dmg_sound/rom_singles/_08-len ctr during power" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/08-len ctr during power.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_09-wave read while on" {
@@ -205,8 +212,9 @@ test "blargg_apu_dmg_sound/rom_singles/_09-wave read while on" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/09-wave read while on.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_04-sweep" {
@@ -221,8 +229,9 @@ test "blargg_apu_dmg_sound/rom_singles/_04-sweep" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/04-sweep.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_10-wave trigger while on" {
@@ -237,8 +246,9 @@ test "blargg_apu_dmg_sound/rom_singles/_10-wave trigger while on" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/10-wave trigger while on.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_05-sweep details" {
@@ -253,8 +263,9 @@ test "blargg_apu_dmg_sound/rom_singles/_05-sweep details" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/05-sweep details.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_apu_dmg_sound/rom_singles/_12-wave write while on" {
@@ -269,8 +280,9 @@ test "blargg_apu_dmg_sound/rom_singles/_12-wave write while on" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.apu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/dmg_sound/rom_singles/12-wave write while on.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_03-op sp,hl" {
@@ -285,8 +297,9 @@ test "blargg_instr_cpu_instrs/individual/_03-op sp,hl" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/03-op sp,hl.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_06-ld r,r" {
@@ -301,8 +314,9 @@ test "blargg_instr_cpu_instrs/individual/_06-ld r,r" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/06-ld r,r.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_01-special" {
@@ -317,8 +331,9 @@ test "blargg_instr_cpu_instrs/individual/_01-special" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/01-special.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_05-op rp" {
@@ -333,8 +348,9 @@ test "blargg_instr_cpu_instrs/individual/_05-op rp" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/05-op rp.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_09-op r,r" {
@@ -349,8 +365,9 @@ test "blargg_instr_cpu_instrs/individual/_09-op r,r" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/09-op r,r.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_02-interrupts" {
@@ -365,8 +382,9 @@ test "blargg_instr_cpu_instrs/individual/_02-interrupts" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/02-interrupts.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_04-op r,imm" {
@@ -381,8 +399,9 @@ test "blargg_instr_cpu_instrs/individual/_04-op r,imm" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/04-op r,imm.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_11-op a,(hl)" {
@@ -397,8 +416,9 @@ test "blargg_instr_cpu_instrs/individual/_11-op a,(hl)" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/11-op a,(hl).gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_10-bit ops" {
@@ -413,8 +433,9 @@ test "blargg_instr_cpu_instrs/individual/_10-bit ops" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/10-bit ops.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_08-misc instrs" {
@@ -429,8 +450,9 @@ test "blargg_instr_cpu_instrs/individual/_08-misc instrs" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/08-misc instrs.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_cpu_instrs/individual/_07-jr,jp,call,ret,rst" {
@@ -445,8 +467,9 @@ test "blargg_instr_cpu_instrs/individual/_07-jr,jp,call,ret,rst" {
     const timeout: rom_runner.Timeout = .{ .frame = 1160 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_cpu_halt_bug.gb_halt_bug" {
@@ -461,8 +484,9 @@ test "blargg_cpu_halt_bug.gb_halt_bug" {
     const timeout: rom_runner.Timeout = .{ .frame = 200 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/halt_bug.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_instr_instr_timing/instr_timing.gb_instr_timing" {
@@ -477,8 +501,9 @@ test "blargg_instr_instr_timing/instr_timing.gb_instr_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/instr_timing/instr_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing/individual/_03-modify_timing" {
@@ -493,8 +518,9 @@ test "blargg_memory_mem_timing/individual/_03-modify_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/03-modify_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing/individual/_02-write_timing" {
@@ -509,8 +535,9 @@ test "blargg_memory_mem_timing/individual/_02-write_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/02-write_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing/individual/_01-read_timing" {
@@ -525,8 +552,9 @@ test "blargg_memory_mem_timing/individual/_01-read_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing/individual/01-read_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing-2/rom_singles/_03-modify_timing" {
@@ -541,8 +569,9 @@ test "blargg_memory_mem_timing-2/rom_singles/_03-modify_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/03-modify_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing-2/rom_singles/_02-write_timing" {
@@ -557,8 +586,9 @@ test "blargg_memory_mem_timing-2/rom_singles/_02-write_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/02-write_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "blargg_memory_mem_timing-2/rom_singles/_01-read_timing" {
@@ -573,8 +603,9 @@ test "blargg_memory_mem_timing-2/rom_singles/_01-read_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .{ .text = "Passed" };
     const context: rom_runner.Context = .{ .text_parsing = .blargg };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/blargg/mem_timing-2/rom_singles/01-read_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mbc3_tester_cart_mbc3-tester.gb_mbc3-tester" {
@@ -589,8 +620,9 @@ test "mbc3_tester_cart_mbc3-tester.gb_mbc3-tester" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .mbc3;
     const context: rom_runner.Context = .{ .text_parsing = .mbc3 };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mbc3-tester/mbc3-tester.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/bits/_reg_f" {
@@ -605,8 +637,9 @@ test "mooneye_memory_acceptance/bits/_reg_f" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/reg_f.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/bits/_mem_oam" {
@@ -621,8 +654,9 @@ test "mooneye_memory_acceptance/bits/_mem_oam" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/bits/mem_oam.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/boot/_boot_div-dmgABCmgb" {
@@ -637,8 +671,9 @@ test "mooneye_memory_acceptance/boot/_boot_div-dmgABCmgb" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_div-dmgABCmgb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/boot/_boot_regs-dmgABC" {
@@ -653,8 +688,9 @@ test "mooneye_memory_acceptance/boot/_boot_regs-dmgABC" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_regs-dmgABC.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/boot/_boot_hwio-dmgABCmgb" {
@@ -669,8 +705,9 @@ test "mooneye_memory_acceptance/boot/_boot_hwio-dmgABCmgb" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/boot/boot_hwio-dmgABCmgb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime1_timing2-GS" {
@@ -685,8 +722,9 @@ test "mooneye_cpu_acceptance/halt/_halt_ime1_timing2-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing2-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime1_timing" {
@@ -701,8 +739,9 @@ test "mooneye_cpu_acceptance/halt/_halt_ime1_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime1_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime0_ei" {
@@ -717,8 +756,9 @@ test "mooneye_cpu_acceptance/halt/_halt_ime0_ei" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_ei.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/halt/_halt_ime0_nointr_timing" {
@@ -733,8 +773,9 @@ test "mooneye_cpu_acceptance/halt/_halt_ime0_nointr_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 120 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, true, "test_data/roms/mooneye-test-suite/acceptance/halt/halt_ime0_nointr_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr/daa.gb_daa" {
@@ -749,8 +790,9 @@ test "mooneye_instr_acceptance/instr/daa.gb_daa" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr/daa.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_cc_timing" {
@@ -765,8 +807,9 @@ test "mooneye_instr_acceptance/instr_timing/_call_cc_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ret_cc_timing" {
@@ -781,8 +824,9 @@ test "mooneye_instr_acceptance/instr_timing/_ret_cc_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_cc_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_cc_timing2" {
@@ -797,8 +841,9 @@ test "mooneye_instr_acceptance/instr_timing/_call_cc_timing2" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_cc_timing2.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_div_timing" {
@@ -813,8 +858,9 @@ test "mooneye_instr_acceptance/instr_timing/_div_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/div_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_jp_timing" {
@@ -829,8 +875,9 @@ test "mooneye_instr_acceptance/instr_timing/_jp_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_add_sp_e_timing" {
@@ -845,8 +892,9 @@ test "mooneye_instr_acceptance/instr_timing/_add_sp_e_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/add_sp_e_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ei_sequence" {
@@ -861,8 +909,9 @@ test "mooneye_instr_acceptance/instr_timing/_ei_sequence" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_sequence.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_jp_cc_timing" {
@@ -877,8 +926,9 @@ test "mooneye_instr_acceptance/instr_timing/_jp_cc_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/jp_cc_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ld_hl_sp_e_timing" {
@@ -893,8 +943,9 @@ test "mooneye_instr_acceptance/instr_timing/_ld_hl_sp_e_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ld_hl_sp_e_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_di_timing-GS" {
@@ -909,8 +960,9 @@ test "mooneye_instr_acceptance/instr_timing/_di_timing-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/di_timing-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_pop_timing" {
@@ -925,8 +977,9 @@ test "mooneye_instr_acceptance/instr_timing/_pop_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/pop_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_intr_timing" {
@@ -941,8 +994,9 @@ test "mooneye_instr_acceptance/instr_timing/_intr_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/intr_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_timing" {
@@ -957,8 +1011,9 @@ test "mooneye_instr_acceptance/instr_timing/_call_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_reti_intr_timing" {
@@ -973,8 +1028,9 @@ test "mooneye_instr_acceptance/instr_timing/_reti_intr_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_intr_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_push_timing" {
@@ -989,8 +1045,9 @@ test "mooneye_instr_acceptance/instr_timing/_push_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/push_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_rapid_di_ei" {
@@ -1005,8 +1062,9 @@ test "mooneye_instr_acceptance/instr_timing/_rapid_di_ei" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rapid_di_ei.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_rst_timing" {
@@ -1021,8 +1079,9 @@ test "mooneye_instr_acceptance/instr_timing/_rst_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/rst_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_reti_timing" {
@@ -1037,8 +1096,9 @@ test "mooneye_instr_acceptance/instr_timing/_reti_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/reti_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ret_timing" {
@@ -1053,8 +1113,9 @@ test "mooneye_instr_acceptance/instr_timing/_ret_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ret_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_ei_timing" {
@@ -1069,8 +1130,9 @@ test "mooneye_instr_acceptance/instr_timing/_ei_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/ei_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_instr_acceptance/instr_timing/_call_timing2" {
@@ -1085,8 +1147,9 @@ test "mooneye_instr_acceptance/instr_timing/_call_timing2" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.instr);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/instr_timing/call_timing2.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/interrupts/_ie_push" {
@@ -1101,8 +1164,9 @@ test "mooneye_cpu_acceptance/interrupts/_ie_push" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/ie_push.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cpu_acceptance/interrupts/_if_ie_registers" {
@@ -1117,8 +1181,9 @@ test "mooneye_cpu_acceptance/interrupts/_if_ie_registers" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cpu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/interrupts/if_ie_registers.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_oam_dma_restart" {
@@ -1133,8 +1198,9 @@ test "mooneye_memory_acceptance/oam_dma/_oam_dma_restart" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_restart.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_oam_dma_start" {
@@ -1149,8 +1215,9 @@ test "mooneye_memory_acceptance/oam_dma/_oam_dma_start" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_start.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_sources-GS" {
@@ -1165,8 +1232,9 @@ test "mooneye_memory_acceptance/oam_dma/_sources-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/sources-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_basic" {
@@ -1181,8 +1249,9 @@ test "mooneye_memory_acceptance/oam_dma/_basic" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/basic.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_reg_read" {
@@ -1197,8 +1266,9 @@ test "mooneye_memory_acceptance/oam_dma/_reg_read" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/reg_read.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_memory_acceptance/oam_dma/_oam_dma_timing" {
@@ -1213,8 +1283,9 @@ test "mooneye_memory_acceptance/oam_dma/_oam_dma_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.memory);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/oam_dma/oam_dma_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_0_timing" {
@@ -1229,8 +1300,9 @@ test "mooneye_ppu_acceptance/ppu/_intr_2_0_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_0_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_stat_irq_blocking" {
@@ -1245,8 +1317,9 @@ test "mooneye_ppu_acceptance/ppu/_stat_irq_blocking" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_irq_blocking.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_1_2_timing-GS" {
@@ -1261,8 +1334,9 @@ test "mooneye_ppu_acceptance/ppu/_intr_1_2_timing-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_oam_ok_timing" {
@@ -1277,8 +1351,9 @@ test "mooneye_ppu_acceptance/ppu/_intr_2_oam_ok_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_oam_ok_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_lcdon_write_timing-GS" {
@@ -1293,8 +1368,9 @@ test "mooneye_ppu_acceptance/ppu/_lcdon_write_timing-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing" {
@@ -1309,8 +1385,9 @@ test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_lcdon_timing-GS" {
@@ -1325,8 +1402,9 @@ test "mooneye_ppu_acceptance/ppu/_lcdon_timing-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_mode3_timing" {
@@ -1341,8 +1419,9 @@ test "mooneye_ppu_acceptance/ppu/_intr_2_mode3_timing" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode3_timing.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_hblank_ly_scx_timing-GS" {
@@ -1357,8 +1436,9 @@ test "mooneye_ppu_acceptance/ppu/_hblank_ly_scx_timing-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/hblank_ly_scx_timing-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_stat_lyc_onoff" {
@@ -1373,8 +1453,9 @@ test "mooneye_ppu_acceptance/ppu/_stat_lyc_onoff" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/stat_lyc_onoff.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_vblank_stat_intr-GS" {
@@ -1389,8 +1470,9 @@ test "mooneye_ppu_acceptance/ppu/_vblank_stat_intr-GS" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing_sprites" {
@@ -1405,8 +1487,9 @@ test "mooneye_ppu_acceptance/ppu/_intr_2_mode0_timing_sprites" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.ppu);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/ppu/intr_2_mode0_timing_sprites.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tma_write_reloading" {
@@ -1421,8 +1504,9 @@ test "mooneye_mmio_acceptance/timer/_tma_write_reloading" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tma_write_reloading.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim00" {
@@ -1437,8 +1521,9 @@ test "mooneye_mmio_acceptance/timer/_tim00" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_div_write" {
@@ -1453,8 +1538,9 @@ test "mooneye_mmio_acceptance/timer/_div_write" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/div_write.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim11" {
@@ -1469,8 +1555,9 @@ test "mooneye_mmio_acceptance/timer/_tim11" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_rapid_toggle" {
@@ -1485,8 +1572,9 @@ test "mooneye_mmio_acceptance/timer/_rapid_toggle" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/rapid_toggle.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim00_div_trigger" {
@@ -1501,8 +1589,9 @@ test "mooneye_mmio_acceptance/timer/_tim00_div_trigger" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim00_div_trigger.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim01_div_trigger" {
@@ -1517,8 +1606,9 @@ test "mooneye_mmio_acceptance/timer/_tim01_div_trigger" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01_div_trigger.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tima_write_reloading" {
@@ -1533,8 +1623,9 @@ test "mooneye_mmio_acceptance/timer/_tima_write_reloading" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_write_reloading.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim01" {
@@ -1549,8 +1640,9 @@ test "mooneye_mmio_acceptance/timer/_tim01" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim01.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tima_reload" {
@@ -1565,8 +1657,9 @@ test "mooneye_mmio_acceptance/timer/_tima_reload" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tima_reload.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim10" {
@@ -1581,8 +1674,9 @@ test "mooneye_mmio_acceptance/timer/_tim10" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim11_div_trigger" {
@@ -1597,8 +1691,9 @@ test "mooneye_mmio_acceptance/timer/_tim11_div_trigger" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim11_div_trigger.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_mmio_acceptance/timer/_tim10_div_trigger" {
@@ -1613,8 +1708,9 @@ test "mooneye_mmio_acceptance/timer/_tim10_div_trigger" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.mmio);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/acceptance/timer/tim10_div_trigger.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_ram_256kb" {
@@ -1629,8 +1725,9 @@ test "mooneye_cart_emulator-only/mbc1/_ram_256kb" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_256kb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_ram_64kb" {
@@ -1645,8 +1742,9 @@ test "mooneye_cart_emulator-only/mbc1/_ram_64kb" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/ram_64kb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_rom_512kb" {
@@ -1661,8 +1759,9 @@ test "mooneye_cart_emulator-only/mbc1/_rom_512kb" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/rom_512kb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_bank1" {
@@ -1677,8 +1776,9 @@ test "mooneye_cart_emulator-only/mbc1/_bits_bank1" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank1.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_mode" {
@@ -1693,8 +1793,9 @@ test "mooneye_cart_emulator-only/mbc1/_bits_mode" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_mode.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_ramg" {
@@ -1709,8 +1810,9 @@ test "mooneye_cart_emulator-only/mbc1/_bits_ramg" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_ramg.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc1/_bits_bank2" {
@@ -1725,8 +1827,9 @@ test "mooneye_cart_emulator-only/mbc1/_bits_bank2" {
     const timeout: rom_runner.Timeout = .{ .frame = 360 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc1/bits_bank2.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_32Mb" {
@@ -1741,8 +1844,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_32Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_32Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_512kb" {
@@ -1757,8 +1861,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_512kb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_512kb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_16Mb" {
@@ -1773,8 +1878,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_16Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_16Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_2Mb" {
@@ -1789,8 +1895,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_2Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_2Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_64Mb" {
@@ -1805,8 +1912,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_64Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_64Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_8Mb" {
@@ -1821,8 +1929,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_8Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_8Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_4Mb" {
@@ -1837,8 +1946,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_4Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_4Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "mooneye_cart_emulator-only/mbc5/_rom_1Mb" {
@@ -1853,8 +1963,9 @@ test "mooneye_cart_emulator-only/mbc5/_rom_1Mb" {
     const timeout: rom_runner.Timeout = .{ .frame = 140 };
     const pass: rom_runner.Pass = .fibonacci;
     const context: rom_runner.Context = .{ .text_parsing = .mooneye };
+    const core_type = rom_runner.genCoreType(.cart);
     const core_config: Config = rom_runner.genCoreConfig(.dmg, false, "test_data/roms/mooneye-test-suite/emulator-only/mbc5/rom_1Mb.gb");
-    try rom_runner.run(.{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
+    try rom_runner.run(core_type, .{ .exit = exit, .timeout = timeout, .pass = pass, .context = context, .core_config = core_config });
 }
 
 test "singlestep_instr_cb ca" {
