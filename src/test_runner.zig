@@ -141,7 +141,7 @@ fn mainTerminal(runner_io: std.Io, init: std.process.Init) void {
         } else |err| switch (err) {
             error.SkipZigTest => {
                 skip_count += 1;
-                std.debug.print("{d}/{d} {s}...SKIP\n", .{ i + 1, builtin.test_functions.len, test_fn.name });
+                //std.debug.print("{d}/{d} {s}...SKIP\n", .{ i + 1, builtin.test_functions.len, test_fn.name });
             },
             else => {
                 fail_count += 1;

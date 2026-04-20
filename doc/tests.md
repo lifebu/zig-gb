@@ -13,6 +13,7 @@
     - only what it does!
 [Testrunner] Performance:
     - Try to have as little of allocations as possible.
+    - Check the MT implementation. Sometimes the entire runner segfaults in Release?
 [Testrunner] Console output:
     - Should give me some statistics of passed/failed tests per category and test-suite.
     - Failed tests could also include:
@@ -24,6 +25,8 @@
         https://github.com/dokwork/zrunner
         https://ziglang.org/documentation/0.16.0/std/#std.Io.Terminal
         - You use a std.Io.Terminal that wrapps a writer.
+[TestGenerator] Why does changing anything in the core, retrigger a build in the TestGenerator?
+    - It seems the way I set up the build, means it needs to always build it before running it?
 [ModelFilter] Find a way to filter out specific tests that are incompatible with a specfic model.
     - Auto detect it by filename (different detection method per suite)?
     - model_detection enum for the detection method?

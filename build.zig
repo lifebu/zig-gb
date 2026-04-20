@@ -80,9 +80,9 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/test_generator.zig"),
             .target = target,
-            .optimize = .ReleaseSafe,
+            .optimize = .Debug,
         }),
-        .use_llvm = use_llvm,
+        .use_llvm = false,
     });
     b.installArtifact(test_generator);
 

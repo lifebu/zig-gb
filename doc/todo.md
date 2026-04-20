@@ -11,10 +11,12 @@
 - re-organize or remove unused docs.
 - remove ppu_static
 
-## Move src to better folder structure and build modules.
+## Improve Build scripts
+- Move src to better folder structure and build modules.
 - When I do this also try to use correct build modules and their corresponding tests.
 - Note: tests need some defines only found in the src folder. and test_generator also needs some general definitions.
 - How do other projects do this? flooh-chipz? Sameboy?
+- Also: If I just run "build run" it should not compile the tests as well!
 - Folder structure:
 src/
     main.zig => exe
