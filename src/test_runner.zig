@@ -7,27 +7,31 @@ pub const std_options: std.Options = .{ .logFn = log };
 var log_err_count: usize = 0;
 const use_threads: bool = true;
 
+// TODO: Move those to a comon declaration for all "systems".
 const GBModel = enum {
     all, dmg,
 };
+const Category = enum { 
+    all, cart, instr, cpu, memory, mmio, ppu, apu 
+};
 
 const CliArgs = struct {
-    print_help: bool = false,
     is_server: bool = false,
     seed: u32 = 0,
     break_on_fail: bool = false,
-    only_categories: [][]const u8 = undefined,
-    exclude_tests: [][]const u8 = undefined,
-    filter_tests: [][]const u8 = undefined,
+    only_category: Category = .all,
+    exclude_tests: [10][]const u8 = undefined,
+    filter_tests: [10][]const u8 = undefined,
     model: GBModel = .dmg,
 
-    fn parse(alloc: std.mem.Allocator, args: std.process.Args) CliArgs {
+    fn parse(alloc: std.mem.Allocator, args: std.process.Args) ?CliArgs {
         var result: CliArgs = .{};
 
         const arg_slice = args.toSlice(alloc) catch |err| panic("unable to parse command line args: {t}", .{err});
         for (arg_slice[1..]) |arg| {
             if (std.mem.eql(u8, arg, "--help")) {
                 std.debug.print("No one can help you here heheheh!\n", .{});
+                return null;
             } else if (std.mem.eql(u8, arg, "--listen=-")) {
                 result.is_server = true;
             } else if (std.mem.startsWith(u8, arg, "--seed=")) {
@@ -35,11 +39,20 @@ const CliArgs = struct {
             } else if (std.mem.startsWith(u8, arg, "--break_on_fail")) {
                 result.break_on_fail = true;
             } else if (std.mem.startsWith(u8, arg, "--only_categories=")) {
-                // TODO: Implement (comma seperated list).
+                const value: []const u8 = arg["--only_categories=".len..];
+                result.only_category = std.meta.stringToEnum(Category, value) orelse .all;
             } else if (std.mem.startsWith(u8, arg, "--exclude_tests=")) {
-                // TODO: Implement (comma seperated list).
+                const value: []const u8 = arg["--exclude_tests=".len..];
+                var iter = std.mem.splitScalar(u8, value, ',');
+                for(&result.exclude_tests) |*elem| {
+                    elem.* = if(iter.next()) |next| next else "";
+                }
             } else if (std.mem.startsWith(u8, arg, "--filter_tests=")) {
-                // TODO: Implement (comma seperated list).
+                const value: []const u8 = arg["--filter_tests=".len..];
+                var iter = std.mem.splitScalar(u8, value, ',');
+                for(&result.exclude_tests) |*elem| {
+                    elem.* = if(iter.next()) |next| next else "";
+                }
             } else if (std.mem.startsWith(u8, arg, "--model=")) {
                 const value: []const u8 = arg["--model=".len..];
                 result.model = std.meta.stringToEnum(GBModel, value) orelse @panic("unable to parse --model argument");
@@ -61,7 +74,7 @@ pub fn main(init: std.process.Init) void {
     defer threaded.deinit();
     const runner_io = if (use_threads) threaded.io() else std.Io.Threaded.global_single_threaded.io();
 
-    const args: CliArgs = .parse(init.gpa, init.minimal.args);
+    const args: CliArgs = CliArgs.parse(init.gpa, init.minimal.args) orelse return;
     std.testing.random_seed = args.seed;
 
     if (args.is_server) {

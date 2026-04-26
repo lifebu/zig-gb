@@ -19,16 +19,15 @@ zig build run
 zig build run -- <path-to-rom.gb>
 ```
 
-### Run with Specific Model
+### Run with Specific Plugin Model
 ```bash
-zig build run -Dcpu_model=cycle -Dppu_model=cycle -Dapu_model=cycle
-# Or: -Dcpu_model=instruction, -Dppu_model=void|frame|cycle
+zig build run -Dppu_plugin=cycle -Dapu_plugin=cycle
+# Or: -Dppu_plugin=void|frame|runtime, -Dapu_plugin=void|runtime
 ```
 
 ### Build Options
-- `-Dcpu_model`: `instruction` or `cycle` (default: `cycle`)
-- `-Dppu_model`: `void`, `frame`, or `cycle` (default: `cycle`)
-- `-Dapu_model`: `void` or `cycle` (default: `cycle`)
+- `-Dppu_plugin`: `runtime`, `void`, `frame`, or `cycle` (default: `runtime`)
+- `-Dapu_plugin`: `runtime`, `void`, or `cycle` (default: `runtime`)
 - `-Denable_audio`: `true` or `false` (default: `true` in Release/asan modes)
 - `-Dtracy`: Enable Tracy profiler (default: `true`)
 
@@ -39,10 +38,17 @@ zig build run -Dcpu_model=cycle -Dppu_model=cycle -Dapu_model=cycle
 zig build test
 ```
 
+### Run Test Generator
+```bash
+zig build test_generator
+```
+Note: The test generator creates test files from `.gb` ROMs in the `tests/` directory. Run this before running tests when adding new test ROMs.
+
 ### Run Single Test Category
 ```bash
-zig build test -Dtest_category=cart   # cart, cpu, memory, mmio, ppu, apu
+zig build test -Dtest_category=cart   # cart, instr, cpu, memory, mmio, ppu, apu
 ```
+
 ### Run Specific Test by Name
 ```bash
 zig build test -Dtest_filter=tma_write_reload
@@ -58,7 +64,7 @@ zig build test -Dtest_exclude=tma_write_reload,tima_write_reloading
 Note: Do not include the `.gb` extension.
 
 ### Available Test Categories
-- `all` (default), `cart`, `cpu`, `memory`, `mmio`, `ppu`, `apu`
+- `all` (default), `cart`, `instr`, `cpu`, `memory`, `mmio`, `ppu`, `apu`
 
 ## Code Style Guidelines
 
@@ -117,20 +123,22 @@ zig build -Dverbose=true  # Analyze build
 ## Project Structure
 ```
 src/
-├── main.zig          # Application entry
-├── test.zig          # Test entry
-├── cpu.zig           # CPU: instructions, registers, interrupts, halt
-├── ppu.zig           # PPU: pixel rendering, LCD, sprites, palettes
-├── apu.zig           # APU: audio channels, wave, noise, envelope
-├── memory.zig        # Memory: boot rom, RAM, dma controller
-├── cart.zig          # Cartridge: cart-rom, cart-ram, mbc
-├── mmio.zig          # MMIO: timer, divider, serial, joypad
-├── core.zig          # Core emulator loop
-├── config.zig        # Configuration
-├── platform.zig      # Platform (sokol/app)
-├── defines.zig       # Shared definitions
-├── tests/*.test.zig  # Test files
-└── shaders/*.glsl    # Graphics shaders
+├── main.zig             # Application entry
+├── test.zig             # Test entry
+├── test_runner.zig      # Custom test runner
+├── test_generator.zig   # Test generator (creates tests from ROMs)
+├── cpu.zig               # CPU: instructions, registers, interrupts, halt
+├── ppu.zig               # PPU: pixel rendering, LCD, sprites, palettes
+├── apu.zig               # APU: audio channels, wave, noise, envelope
+├── memory.zig            # Memory: boot rom, RAM, dma controller
+├── cart.zig              # Cartridge: cart-rom, cart-ram, mbc
+├── mmio.zig              # MMIO: timer, divider, serial, joypad
+├── core.zig              # Core emulator loop
+├── config.zig            # Configuration
+├── platform.zig          # Platform (sokol/app)
+├── defines.zig           # Shared definitions
+├── tests/*.test.zig      # Test files
+└── shaders/*.glsl        # Graphics shaders
 ```
 
 ## External Dependencies
@@ -142,6 +150,7 @@ src/
 - Minimum Zig version: 0.15.2 (see `build.zig.zon`)
 - Uses custom build system in `build.zig` (not standard `build.zig.zon`)
 - Tests filtered by category at build time, not runtime
+- Test generator runs automatically with `zig build test` to generate tests from ROMs
 - Tracy can be disabled with `-Dtracy=false` for faster builds
 
 ## Important Notes

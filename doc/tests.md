@@ -1,4 +1,6 @@
 # Next
+[LSP] Add a check step to the build.zig for zls
+    - In this check step I can always use a debug build that has no llvm
 [Testrunner] Implement parsing of the test_name:
     - suite_category_test
     - Note: some tests use '_' in their name!
