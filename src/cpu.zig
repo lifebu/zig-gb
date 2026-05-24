@@ -877,8 +877,7 @@ pub fn init(self: *Self, alloc: std.mem.Allocator, skip_boot_rom: bool) void {
     self.registers.r16.pc = if(skip_boot_rom) def.boot_rom_size else 0;
 
     self.opcode_banks = genOpcodeBanks(alloc);
-    const opcode_bank = self.opcode_banks[opcode_bank_default];
-    const uops: MicroOpArray = opcode_bank[0]; // NOP
+    const uops: MicroOpArray = self.opcode_banks[opcode_bank_default][0]; // NOP
     self.uop_fifo.write(uops.items);
 }
 
@@ -1111,13 +1110,12 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 self.registers.r16.pc -= 1;
             } else {
                 const params: DecodeParams = uop.params.decode;
-                const opcode_bank = self.opcode_banks[params.bank_idx];
                 const opcode: u8 = self.registers.r8.ir;
                 if(opcode == 0x10 and params.bank_idx == opcode_bank_default) {
                     std.log.err("CPU: Stop is not implemented", .{});
                     unreachable;
                 }
-                const uops: MicroOpArray = opcode_bank[opcode];
+                const uops: MicroOpArray = self.opcode_banks[params.bank_idx][opcode];
                 if(uops.items.len == 0) {
                     const target: u16 = self.registers.r16.pc - 1;
                     std.log.warn("CPU: Decoded invalid opcode. Addr: {X:0>4} ({s}), Op: [{}][{X:0>2}]", .{ target, def.getMemoryRangeName(target), params.bank_idx, opcode });
