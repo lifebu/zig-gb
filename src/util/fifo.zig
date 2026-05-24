@@ -86,24 +86,24 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
 
         /// Returns if the underlying buffer is aligned. 
         /// This property is useful for functions that require to iterate over a contiguous memory region (sorting).
-        pub fn isAligned(self: Self) bool {
+        pub fn isAligned(self: *Self) bool {
             return self.read_index == 0;
         }
 
         /// Is the Fifo empty.
-        pub fn isEmpty(self: Self) bool {
+        pub fn isEmpty(self: *Self) bool {
             return self.write_index == self.read_index;
         }
         
         /// How many elements the Fifo has.
-        pub fn length(self: Self) usize {
+        pub fn length(self: *Self) usize {
             const wrap_offset = 2 * self.buffer.len * @intFromBool(self.write_index < self.read_index);
             const adjusted_write_index = self.write_index + wrap_offset;
             return adjusted_write_index - self.read_index;
         }
 
         // Returns the average value in the Fifo.
-        pub fn average(self: Self) T {
+        pub fn average(self: *Self) T {
             var sum: T = 0;
             for(self.buffer) |elem| {
                 sum += elem;
@@ -111,11 +111,11 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
             return sum / self.buffer.len;
         }
 
-        fn mask(self: Self, index: usize) usize {
+        fn mask(self: *Self, index: usize) usize {
             return index % self.buffer.len;
         }
 
-        fn mask2(self: Self, index: usize) usize {
+        fn mask2(self: *Self, index: usize) usize {
             return index % (2 * self.buffer.len);
         }
     };

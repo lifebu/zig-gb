@@ -1,5 +1,6 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const tracy = @import("tracy");
 
 const def = @import("defines.zig");
 const ApuCycle = @import("apu_cycle.zig");
@@ -25,12 +26,18 @@ pub const Apu = switch (build_options.ppu_plugin) {
             }
         }
         pub fn cycle(self: *Self) void {
+            const zone = tracy.Zone.begin(.{ .name = "apu_cycle_dispatch", .src = @src(), .color = .alice_blue });
+            defer zone.end();
+
             switch(self.*) {
                 .apu_void => self.apu_void.cycle(),
                 .apu_cycle => self.apu_cycle.cycle(),
             }
         }
         pub fn request(self: *Self, req: *def.Request) void {
+            const zone = tracy.Zone.begin(.{ .name = "apu_request_dispatch", .src = @src(), .color = .alice_blue });
+            defer zone.end();
+
             switch(self.*) {
                 .apu_void => self.apu_void.request(req),
                 .apu_cycle => self.apu_cycle.request(req),

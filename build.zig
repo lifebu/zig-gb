@@ -17,8 +17,12 @@ pub fn build(b: *std.Build) void {
     const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
     const enable_audio = b.option(bool, "enable_audio", "Enables the audio output") orelse (optimize != .Debug);
     const enable_tracy = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
-    const ppu_plugin = b.option(PpuPlugin, "ppu_plugin", "Use a specific ppu model.") orelse PpuPlugin.runtime;
-    const apu_plugin = b.option(ApuPlugin, "apu_plugin", "Use a specific apu model.") orelse ApuPlugin.runtime;
+    // TODO: config dependant, runtime core type to have "plugins" is currently bad for performance.
+        // Why? => Unsure. Apparently the tagged-union runtime switch costs me a lot of time.
+        // This happens per module (apu, ppu) per cycle. Feels like the cost of a dynamic dispatch (vtable) in a hot-loop.
+        // Therefore we put the APU and PPU to cycle not runtime as default.
+    const ppu_plugin = b.option(PpuPlugin, "ppu_plugin", "Use a specific ppu model.") orelse PpuPlugin.cycle;
+    const apu_plugin = b.option(ApuPlugin, "apu_plugin", "Use a specific apu model.") orelse ApuPlugin.cycle;
 
     // test flags
     const test_category = b.option(TestCategory, "test_category", "Filters all tests to a specific subsystem.") orelse TestCategory.all;
