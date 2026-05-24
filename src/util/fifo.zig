@@ -30,8 +30,8 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
         pub fn writeItem(self: *Self, item: T) void {
             assert(self.length() + 1 <= self.buffer.len);
 
-            self.buffer[self.mask(self.write_index)] = item;
-            self.write_index = self.mask2(self.write_index + 1);
+            self.buffer[mask(self.write_index)] = item;
+            self.write_index = mask2(self.write_index + 1);
         }
 
         /// Write single item. Will not write if the fifo is full.
@@ -40,14 +40,14 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
                 return;
             }
 
-            self.buffer[self.mask(self.write_index)] = item;
-            self.write_index = self.mask2(self.write_index + 1);
+            self.buffer[mask(self.write_index)] = item;
+            self.write_index = mask2(self.write_index + 1);
         }
 
         // Write single item. Will overwrite the oldest element if full.
         pub fn writeItemOverrideWhenFull(self: *Self, item: T) void {
-            self.buffer[self.mask(self.write_index)] = item;
-            self.write_index = self.mask2(self.write_index + 1);
+            self.buffer[mask(self.write_index)] = item;
+            self.write_index = mask2(self.write_index + 1);
         }
 
         /// Read single item. Removes it from FiFo
@@ -59,19 +59,16 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
         pub fn readItemAssumeContent(self: *Self) T {
             assert(!self.isEmpty());
 
-            const item_index: usize = self.mask(self.read_index);
-            const item = self.buffer[item_index];
-            self.buffer[item_index] = undefined;
-
-            self.read_index = self.mask2(self.read_index + 1);
-            return item;
+            const item_index: usize = mask(self.read_index);
+            self.read_index = mask2(self.read_index + 1);
+            return self.buffer[item_index];
         }
 
         /// Read single item. Does not remove it from FiFo
         pub fn peekItem(self: *Self) T {
             assert(!self.isEmpty());
 
-            const item_index: usize = self.mask(self.read_index);
+            const item_index: usize = mask(self.read_index);
             return self.buffer[item_index];
         }
 
@@ -116,12 +113,12 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
             return sum / self.buffer.len;
         }
 
-        fn mask(self: *Self, index: usize) usize {
-            return index % self.buffer.len;
+        inline fn mask(index: usize) usize {
+            return index % capacity;
         }
 
-        fn mask2(self: *Self, index: usize) usize {
-            return index % (2 * self.buffer.len);
+        inline fn mask2(index: usize) usize {
+            return index % (2 * capacity);
         }
     };
 }

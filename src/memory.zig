@@ -49,7 +49,11 @@ pub fn cycle(self: *Self, req: *def.Request) void {
 }
 
 fn cycleDMA(self: *Self, req: *def.Request) void {
-    const uop = self.dma_fifo.readItem() orelse return;
+    if(self.dma_fifo.isEmpty()) {
+        return;
+    }
+
+    const uop = self.dma_fifo.readItemAssumeContent();
     switch(uop) {
         .nop => {},
         .bus_conflict => {
