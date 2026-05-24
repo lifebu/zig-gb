@@ -1214,11 +1214,10 @@ pub fn request(self: *Self, req: *def.Request) void {
 }
 
 pub fn pushInterrupts(self: *Self, vblank: bool, stat: bool, timer: bool, serial: bool, joypad: bool) void {
-    self.interrupt_flag.bits.v_blank |= vblank;
-    self.interrupt_flag.bits.lcd_stat |= stat;
-    self.interrupt_flag.bits.timer |= timer;
-    self.interrupt_flag.bits.serial |= serial;
-    self.interrupt_flag.bits.joypad |= joypad;
+    const flags: InterruptFlags = .{ 
+        .bits = .{ .joypad = joypad, .serial = serial, .timer = timer, .v_blank = vblank, .lcd_stat = stat } 
+    };
+    self.interrupt_flag.value |= flags.value;
 }
 
 fn getLowestSetBit(value: u8) u3 {
