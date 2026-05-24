@@ -63,7 +63,8 @@ const MapperRange = struct {
     low: u16, high: u16,
 };
 fn isInRange(range: ?MapperRange, value: u16) bool {
-    return range != null and value >= range.?.low and value <= range.?.high; 
+    const range_value: MapperRange = range orelse return false;
+    return value >= range_value.low and value <= range_value.high; 
 }
 const MapperRanges = struct {
     ram_enable: ?MapperRange = null,
@@ -141,47 +142,46 @@ pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, rom_path: []con
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
-    const zone = tracy.Zone.begin(.{ .name = "cart_request", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     // TODO: Having this very different code section for mbc only and the witch case below feels like not the best code structure?
     // The "IsInRange() and isWrite()" feels very microoptimized.
     // mbc
-    if (isInRange(self.ranges.ram_enable, req.address) and req.isWrite()) {
-        // TODO: This also enables access to the RTC registers.
-        self.ram_enable = @as(u4, @truncate(req.value.write)) == 0xA;
-        // TODO: Write to savefile every time we disable the ram bank?
+    if(req.isWrite()) {
+        if (isInRange(self.ranges.ram_enable, req.address)) {
+            // TODO: This also enables access to the RTC registers.
+            self.ram_enable = @as(u4, @truncate(req.value.write)) == 0xA;
+            // TODO: Write to savefile every time we disable the ram bank?
 
-    } else if (isInRange(self.ranges.rom_bank, req.address) and req.isWrite()) {
-        // TODO: This truncation for each mbc gives further evidence that I should split this better?
-        const register_sized: u8 = switch(self.features.mapper) {
-            .mbc_1 => @as(u5, @truncate(req.value.write)),
-            .mbc_3 => @as(u8, @truncate(req.value.write)),
-            .mbc_5, .no_mbc => req.value.write,
-            .unsupported => unreachable,
-        };
-        const mask: u9 = @intCast(self.rom_banks.len - 1);
-        self.rom_bank_high = @truncate(@max(self.ranges.min_bank, register_sized) & mask);
+        } else if (isInRange(self.ranges.rom_bank, req.address)) {
+            // TODO: This truncation for each mbc gives further evidence that I should split this better?
+            const register_sized: u8 = switch(self.features.mapper) {
+                .mbc_1 => @as(u5, @truncate(req.value.write)),
+                .mbc_3 => @as(u8, @truncate(req.value.write)),
+                .mbc_5, .no_mbc => req.value.write,
+                .unsupported => unreachable,
+            };
+            const mask: u9 = @intCast(self.rom_banks.len - 1);
+            self.rom_bank_high = @truncate(@max(self.ranges.min_bank, register_sized) & mask);
 
-    } else if (isInRange(self.ranges.rom_bank_msb, req.address) and req.isWrite()) {
-        self.rom_bank_highest_bit = @truncate(req.value.write);
+        } else if (isInRange(self.ranges.rom_bank_msb, req.address)) {
+            self.rom_bank_highest_bit = @truncate(req.value.write);
 
-    } else if (isInRange(self.ranges.ram_bank, req.address) and req.isWrite()) {
-        // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
-        // Depending on what you write you can access different registers.
-        if(self.ram_banks.len > 1) {
-            const mask: u9 = @intCast(self.ram_banks.len - 1);
-            self.ram_bank = @truncate(req.value.write & mask);
-        }
+        } else if (isInRange(self.ranges.ram_bank, req.address)) {
+            // TODO: MBC_3 Writing 0x08-0x0C to this register does not map a ram bank to A000-BFFF but a single RTC Register to that range (read/write).
+            // Depending on what you write you can access different registers.
+            if(self.ram_banks.len > 1) {
+                const mask: u9 = @intCast(self.ram_banks.len - 1);
+                self.ram_bank = @truncate(req.value.write & mask);
+            }
 
-    } else if (isInRange(self.ranges.bank_mode, req.address) and req.isWrite()) {
-        // TODO: Implement banking mode for mbc_1 when alternative wiring is used.
-        self.bank_mode = @truncate(req.value.write);
+        } else if (isInRange(self.ranges.bank_mode, req.address)) {
+            // TODO: Implement banking mode for mbc_1 when alternative wiring is used.
+            self.bank_mode = @truncate(req.value.write);
 
-    } else if (isInRange(self.ranges.rtc, req.address) and req.isWrite()) {
-        // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
-        // That "latched" data will not change until you do it again by repeating this pattern.
-        // This way you can read the RTC registers while the clocks keeps ticking.
+        } else if (isInRange(self.ranges.rtc, req.address)) {
+            // TODO: Writing 00 followed by 01. The current time becomes "latched" into the RTC registers.
+            // That "latched" data will not change until you do it again by repeating this pattern.
+            // This way you can read the RTC registers while the clocks keeps ticking.
+        }    
     }
 
     // memory

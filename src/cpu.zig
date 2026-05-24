@@ -890,11 +890,8 @@ pub fn deinit(self: *Self, alloc: std.mem.Allocator) void {
 }
 
 pub fn cycle(self: *Self, req: *def.Request) void {
-    const zone = tracy.Zone.begin(.{ .name = "cpu_cycle", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     const flags = self.registers.r8.f;
-    const uop: MicroOpData = self.uop_fifo.readItem().?;
+    const uop: MicroOpData = self.uop_fifo.readItemAssumeContent();
     switch(uop.operation) {
         .addr_idu => {
             const params: AddrIduParams = uop.params.addr_idu;
@@ -1200,9 +1197,6 @@ pub fn cycle(self: *Self, req: *def.Request) void {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
-    const zone = tracy.Zone.begin(.{ .name = "cpu_request", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     switch(req.address) {
         def.hram_low...(def.hram_high - 1) => {
             const hram_idx: u16 = req.address - def.hram_low;

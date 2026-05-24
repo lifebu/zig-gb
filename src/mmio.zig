@@ -50,9 +50,6 @@ pub fn init(self: *Self) void {
 }
 
 pub fn cycle(self: *Self) struct{ bool, bool } {
-    const zone = tracy.Zone.begin(.{ .name = "mmio_cycle", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     const irq_serial: bool = cycleSerial(self);
     const irq_timer: bool = cycleTimer(self);
     return .{ irq_serial, irq_timer };
@@ -94,9 +91,6 @@ fn cycleTimer(self: *Self) bool {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
-    const zone = tracy.Zone.begin(.{ .name = "mmio_request", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     switch (req.address) {
         def.joypad => {
             req.applyAllowedRW(&self.joypad, 0xFF, 0x30);

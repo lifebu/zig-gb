@@ -53,6 +53,11 @@ pub fn RingbufferFifo(comptime T: type, comptime capacity: usize) type {
         /// Read single item. Removes it from FiFo
         pub fn readItem(self: *Self) ?T {
             if(self.isEmpty()) return null;
+            return self.readItemAssumeContent();
+        }
+
+        pub fn readItemAssumeContent(self: *Self) T {
+            assert(!self.isEmpty());
 
             const item_index: usize = self.mask(self.read_index);
             const item = self.buffer[item_index];

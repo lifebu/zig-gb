@@ -182,9 +182,6 @@ pub fn init(self: *Self, _: def.PpuPlugin) void {
 }
 
 pub fn cycle(self: *Self) struct{ bool, bool } {
-    const zone = tracy.Zone.begin(.{ .name = "ppu_cycle", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     var irq_stat: bool = false;
     var irq_vblank: bool = false;
 
@@ -193,7 +190,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
         return .{ irq_vblank, irq_stat };
     }
 
-    const uop: MicroOp = self.uop_fifo.readItem().?;
+    const uop: MicroOp = self.uop_fifo.readItemAssumeContent();
     switch(uop) {
         .advance_draw => {
             self.lcd_stat.mode = .draw;
@@ -287,7 +284,7 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
             tryPushPixel(self);
         },
         .fetch_tile_obj => {
-            const current_object: FetcherData = self.oam_line_list.readItem() orelse unreachable;
+            const current_object: FetcherData = self.oam_line_list.readItemAssumeContent();
             self.fetcher_data = current_object;
 
             // In double height mode you are allowed to use either an even tile_index or the next odd tile_index and draw the same object.
@@ -355,9 +352,6 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
-    const zone = tracy.Zone.begin(.{ .name = "ppu_request", .src = @src(), .color = .alice_blue });
-    defer zone.end();
-
     switch(req.address) {
         def.lcd_control => {
             const lcd_was_off: bool = !self.lcd_control.lcd_enable;
@@ -574,7 +568,7 @@ fn tryPushPixel(self: *Self) void {
     assert(self.lcd_y < def.resolution_height); // we tried to put a pixel outside of the screen.
 
     const obj_pixel: FifoData = self.object_fifo.readItem() orelse transparent_pixel;
-    const bg_pixel: FifoData = self.background_fifo.readItem() orelse unreachable;
+    const bg_pixel: FifoData = self.background_fifo.readItemAssumeContent();
 
     const used_pixel: FifoData = mixBackgroundAndObject(bg_pixel, obj_pixel);
     const palette_packed: u8 = used_pixel.palette_addr[used_pixel.palette_index];
