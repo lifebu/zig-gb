@@ -147,7 +147,7 @@ const MiscParams = packed struct(u15) {
 };
 const MicroOpData = struct {
     operation: MicroOp,
-    params: union(enum) {
+    params: union(enum(u4)) {
         none: void,
         addr_idu: AddrIduParams,
         idu_adjust: IduAdjustParams,
@@ -751,13 +751,16 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
         Nop(), Nop(), Nop(), Decode(opcode_bank_pseudo),
     }) catch unreachable;
 
-    var byte_size: usize = 0;
+    const uop_size: usize = @sizeOf(MicroOpData);
+    var uop_count: usize = 0;
+    var byte_total: usize = 0;
     for (returnVal) |bank| {
         for (bank) |operation| {
-            byte_size += operation.items.len + @sizeOf(MicroOpData);
+            byte_total += operation.items.len * uop_size;
+            uop_count += operation.items.len;
         }
     }
-    std.log.info("CPU: Opcode memory usage: {B}", .{ byte_size });
+    std.log.info("CPU: Opcode memory: size/count/total: {}/{}/{B}", .{ uop_size, uop_count, byte_total });
     return returnVal;
 }
 

@@ -112,7 +112,7 @@ const FetcherData = struct {
 };
 const ObjectLineFifo = Fifo.RingbufferFifo(FetcherData, obj_per_line);
 
-const MicroOp = enum {
+const MicroOp = enum(u4) {
     advance_draw,
     advance_hblank,
     advance_oam_scan,
@@ -544,10 +544,11 @@ fn getTileMapTileAddr(self: *Self, tilemap_addr_type: TileMapAddress, tile_x_off
 } 
 
 fn mixBackgroundAndObject(bg_pixel: FifoData, obj_pixel: FifoData) FifoData {
+    // TODO: Can we improve this logic?
     if(obj_pixel.bg_prio == .obj_over_bg) {
         return if(obj_pixel.color_id == color_id_transparent) bg_pixel else obj_pixel;
     } else {
-        return if(bg_pixel.color_id == color_id_transparent) obj_pixel else bg_pixel;
+        return if(bg_pixel.color_id == color_id_transparent and obj_pixel.color_id != color_id_transparent) obj_pixel else bg_pixel;
     }
 }
 
