@@ -1,5 +1,8 @@
 # Next:
 - Work on better tests (see todos in tests.md)
+- Dynamic core type is expensive in debug.
+    - Virtual Function call in a hot loop!
+    => Build flag to either have a dynamic CoreType (from config) or compiled CoreType (from build script).
 - Create some easy build scripts to have the common flags for zig build into one?
     - VsCode Debug
     - Build watch

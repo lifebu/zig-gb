@@ -3,6 +3,7 @@ const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
+const tracy = @import("tracy");
 
 const Self = @This();
 
@@ -44,6 +45,9 @@ pub fn init(self: *Self, model: def.GBModel, skip_boot_rom: bool) void {
 }
 
 pub fn cycle(self: *Self, req: *def.Request) void {
+    const zone = tracy.Zone.begin(.{ .name = "mem_cycle", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     cycleDMA(self, req);
 }
 
@@ -79,6 +83,9 @@ fn dmaBusConflict(req: *def.Request) void {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
+    const zone = tracy.Zone.begin(.{ .name = "mem_request", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     switch (req.address) {
         0...(def.boot_rom_size - 1) => {
             if(!self.boot.finished) {

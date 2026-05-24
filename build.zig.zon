@@ -14,8 +14,8 @@
             .hash = "cimgui-0.1.0-44ClkYTzmADm6eGNBxjzuN3nSFGCEoMTMorHcoR_-LJs",
         },
         .tracy = .{
-            .url = "git+https://codeberg.org/Games-by-Mason/tracy_zig.git#4921b7dec5e665793f9f87d6ec9336ad450543a4",
-            .hash = "tracy-0.0.0-R7l8BVhNAQBAcLUKg_R72dyRyWRhzTLf1lTvcqVTb9Nc",
+            .url = "git+https://codeberg.org/Games-by-Mason/tracy_zig.git#64d3caa521e44b1ebce438c0958bd5537e250193",
+            .hash = "tracy-1.0.0+0.13.1-R7l8BUhQAQCLinsSpkKfLYpdgnI8aVTJG3v0XLBkJE5T",
         },
     },
 

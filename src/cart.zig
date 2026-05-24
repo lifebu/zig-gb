@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const def = @import("defines.zig");
+const tracy = @import("tracy");
 
 const Self = @This();
 
@@ -140,6 +141,9 @@ pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, rom_path: []con
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
+    const zone = tracy.Zone.begin(.{ .name = "cart_request", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     // TODO: Having this very different code section for mbc only and the witch case below feels like not the best code structure?
     // The "IsInRange() and isWrite()" feels very microoptimized.
     // mbc

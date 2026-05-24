@@ -3,6 +3,7 @@ const assert = std.debug.assert;
 
 const def = @import("defines.zig");
 const Fifo = @import("util/fifo.zig");
+const tracy = @import("tracy");
 
 const Self = @This();
 
@@ -181,6 +182,9 @@ pub fn init(self: *Self, _: def.PpuPlugin) void {
 }
 
 pub fn cycle(self: *Self) struct{ bool, bool } {
+    const zone = tracy.Zone.begin(.{ .name = "ppu_cycle", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     var irq_stat: bool = false;
     var irq_vblank: bool = false;
 
@@ -351,6 +355,9 @@ pub fn cycle(self: *Self) struct{ bool, bool } {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
+    const zone = tracy.Zone.begin(.{ .name = "ppu_request", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     switch(req.address) {
         def.lcd_control => {
             const lcd_was_off: bool = !self.lcd_control.lcd_enable;

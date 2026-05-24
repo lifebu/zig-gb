@@ -7,6 +7,7 @@
 const std = @import("std");
 
 const def = @import("defines.zig");
+const tracy = @import("tracy");
 
 const Self = @This();
 
@@ -163,6 +164,9 @@ pub fn init(self: *Self, _: def.ApuPlugin) void {
 }
 
 pub fn request(self: *Self, req: *def.Request) void {
+    const zone = tracy.Zone.begin(.{ .name = "apu_request", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     switch(req.address) {
         def.sound_panning => { req.apply(&self.panning); },
         def.master_volume => { req.apply(&self.volume); },
@@ -275,6 +279,9 @@ pub fn request(self: *Self, req: *def.Request) void {
 }
 
 pub fn cycle(self: *Self) void {
+    const zone = tracy.Zone.begin(.{ .name = "apu_cycle", .src = @src(), .color = .alice_blue });
+    defer zone.end();
+
     if(!self.apu_on) {
         sample(self);
     }
