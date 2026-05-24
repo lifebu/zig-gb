@@ -206,6 +206,31 @@ test_data/
 - Add .dll hot-reloading of emulator code.
 - Some of the data that I need to create with the uOps i could do with a memory arena scratch space (like the fetcher_data_low, fetcher_data_high).
 
+## Multithreaded core:
+- Write down some of the ideas for a multithreaded core.
+1. Frame-Chip-Level Pipeline:
+    - Let CPU+MMIO+Memory run in one thread producing a write-record for the PPU and APU.
+    - The CPU has a fake PPU that only handles the exact timing of lines given the content.
+    - This can be precomputed per line (Mode 3 Penalties).
+    - Then once the CPU Thread is done (VSync) it waits for the PPU to complete.
+    - Then the write records are passed to the PPU, the CPU thread is started again.
+    - The PPU thread then uses the write records to generate the image one frame delayed.
+    - The same should be possible with the APU.
+    => So we would have 3 threads.
+2. Cycle-Level Pipeline:
+    - I can basically cut the core cycle function into multiple different stages.
+    - CPU + Memory + Requests -> mmio -> ppu -> apu
+    - But here the individual tasks might be to small for actual threads?
+    - More like a job queue?
+    - 2.1: Even Requests are their own jobs:
+        - The Individual tasks only communicate using the requests.
+        - Although read requests are weird in that sense that they change the cpu state.
+        - That results needs to be accessible for the next instruction.
+        - This creates a circular dependency => not good for threading.
+    - 2.2: CPU + Memory + Requests: Combined.
+        - Then the rest of the systems that do not depend on any inputs anymore.
+        - The only problem is that the cpu reads/writes data that other threads might also access in the ppu and apu for example.
+
 # Later:
 - Should I readd bgb mode (side by side)?
     - spawn bgb with the same gb file and sleep for 500_000_000 nanoseconds.

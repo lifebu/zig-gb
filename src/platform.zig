@@ -12,13 +12,15 @@ const shaderTypes = @import("shaders/shader_types.zig");
 
 const Self = @This();
 
+const fps_buffer_size = 30;
 
 // ui
 imgui: Imgui = .{},
 
 // time
-core_delta_buffer: Fifo.RingbufferFifo(f64, 60) = .{},
-user_delta_buffer: Fifo.RingbufferFifo(f64, 60) = .{},
+core_delta_buffer: Fifo.RingbufferFifo(f64, fps_buffer_size) = .{},
+platform_delta_buffer: Fifo.RingbufferFifo(f64, fps_buffer_size) = .{},
+user_delta_buffer: Fifo.RingbufferFifo(f64, fps_buffer_size) = .{},
 
 // gfx
 bind: sokol.gfx.Bindings = .{},
@@ -144,7 +146,7 @@ pub fn deinit(self: *Self, io: std.Io, alloc: std.mem.Allocator, config: *Config
     sokol.audio.shutdown();
 }
 
-pub fn frame(self: *Self, io: std.Io, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo, core_delta_sample: ?u64) void {
+pub fn frame(self: *Self, io: std.Io, alloc: std.mem.Allocator, colorids: [def.overscan_resolution]u8, samples_opt: ?*def.SampleFifo, core_delta_sample: ?u64, platform_delta_sample: ?u64) void {
     // ui
     sokol.imgui.newFrame(.{
         .width = sokol.app.width(),
@@ -155,6 +157,10 @@ pub fn frame(self: *Self, io: std.Io, alloc: std.mem.Allocator, colorids: [def.o
     self.imgui.render(io, alloc);
 
     // time
+    const platform_delta: f64 = if(platform_delta_sample) |value| sokol.time.sec(value) else 0.0166666;
+    self.platform_delta_buffer.writeItemOverrideWhenFull(platform_delta);
+    const smooth_platform_delta: f64 = self.platform_delta_buffer.average();
+
     const core_delta: f64 = if(core_delta_sample) |value| sokol.time.sec(value) else 0.0166666;
     self.core_delta_buffer.writeItemOverrideWhenFull(core_delta);
     const smooth_core_delta: f64 = self.core_delta_buffer.average();
@@ -165,8 +171,9 @@ pub fn frame(self: *Self, io: std.Io, alloc: std.mem.Allocator, colorids: [def.o
 
     // graphics
     var window_title: [128]u8 = undefined;
-    const new_title = std.fmt.bufPrintZ(&window_title, "Zig GB Emulator. FPS: user: {d:0>6.2}, core: {d:0>6.2}", .{
-        1.0 / smooth_user_delta, 1.0 / smooth_core_delta
+    const new_title = std.fmt.bufPrintZ(&window_title, "Zig GB Emulator. (u/c): {d:0>6.2}/{d:0>6.2} FPS. (u/c/p): {d:0>6.2}/{d:0>6.2}/{d:0>6.2} ms", .{
+        1.0 / smooth_user_delta, 1.0 / smooth_core_delta,
+        smooth_user_delta * 1000.0, smooth_core_delta * 1000.0, smooth_platform_delta * 1000.0,
     }) catch unreachable;
     sokol.app.setWindowTitle(new_title);
 

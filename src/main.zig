@@ -35,6 +35,7 @@ const state = struct {
     var core: ?CoreType = null;
     var config: Config = .default;
     var platform: Platform = .{};
+    var last_platform_time: u64 = 0;
 };
 
 
@@ -72,13 +73,15 @@ fn imgui_cb(file_path: []const u8) void {
 }
 
 export fn frame() void {
+    const platform_delta: u64 = sokol.time.since(state.last_platform_time);
     if(state.core) |*loaded_core| {
         const start: u64 = sokol.time.now();
         loaded_core.frame(state.platform.input_state);
         const core_delta: u64 = sokol.time.since(start);
-        state.platform.frame(state.io, state.alloc, loaded_core.ppu.getFrontBuffer(), loaded_core.apu.getSamples(), core_delta);
+        state.last_platform_time = sokol.time.now();
+        state.platform.frame(state.io, state.alloc, loaded_core.ppu.getFrontBuffer(), loaded_core.apu.getSamples(), core_delta, platform_delta);
     } else {
-        state.platform.frame(state.io, state.alloc, def.default_color_ids, null, null);
+        state.platform.frame(state.io, state.alloc, def.default_color_ids, null, null, null);
     }
 }
 

@@ -35,6 +35,8 @@
     - Maybe I can also manually set it for unit tests.
     - Also allow tests to run on all gb versions.
     => Add this as a cli parameter to the test_runner.
+[BuildOptions] Define the type of the build options somewhere else.
+    => So that the code is not as dependent on the build options.
 
 ## Folder Structure
 build/
