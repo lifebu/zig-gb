@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const sokol = @import("sokol");
 
@@ -23,7 +24,7 @@ pub const tracy_option: tracy.options = .{
     .verbose = false,
     .data_port = null,
     .broadcast_port = null,
-    .default_callstack_depth = 0,
+    .default_callstack_depth = 10,
 };
 
 const CoreType = Core.Core(APU.Apu, PPU.Ppu);
@@ -99,15 +100,27 @@ export fn deinit() void {
     state.config.save(state.io, state.alloc, def.config_path) catch unreachable;
 
     state.config.deinit(state.alloc);
+
+    tracy.cleanExit(state.io);
 }
 
-pub fn main(pinit: std.process.Init) void {
-    state.io = pinit.io;
-    // TODO: Creates panic at deinit()?
-    // var tracy_allocator: tracy.Allocator = .{ .parent = state.allocator.allocator() };
-    // state.alloc = tracy_allocator.allocator();
-    state.alloc = if(build_options.enable_tracy) pinit.gpa else pinit.gpa;
-    state.args = pinit.minimal.args;
+pub fn main(init_minimal: std.process.Init.Minimal) void {
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = debug_allocator.deinit();
+
+    const use_debug_allocator: bool = builtin.mode == .Debug;
+    const base_alloc: std.mem.Allocator = if(use_debug_allocator) debug_allocator.allocator() else std.heap.c_allocator;
+
+    var io_impl: std.Io.Threaded = .init(base_alloc, .{ 
+        .argv0 = .init(.{ .vector = init_minimal.args.vector }), 
+        .environ = .{ .block = init_minimal.environ.block } 
+    });
+    defer io_impl.deinit();
+    state.io = io_impl.io();
+
+    var tracy_allocator: tracy.Allocator = .{ .parent = base_alloc };
+    state.alloc = tracy_allocator.allocator();
+    state.args = init_minimal.args;
 
     state.platform.run(init, frame, deinit);
 }
