@@ -108,12 +108,12 @@ export fn deinit() void {
 pub fn main(init_minimal: std.process.Init.Minimal) void {
     state.args = init_minimal.args;
 
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = debug_allocator.deinit();
+    const stack_alloc_size = 5 * 1024 * 1024; // Should be fine for up to 2MByte carts.
+    var stack_alloc_buffer: [stack_alloc_size]u8 = undefined;
+    var stack_allocator: std.heap.FixedBufferAllocator = .init(&stack_alloc_buffer);
+    const used_alloc = stack_allocator.allocator();
 
-    const use_debug_allocator: bool = builtin.mode == .Debug;
-    const base_alloc: std.mem.Allocator = if(use_debug_allocator) debug_allocator.allocator() else std.heap.c_allocator;
-    var tracy_allocator: tracy.Allocator = .{ .parent = base_alloc };
+    var tracy_allocator: tracy.Allocator = .{ .parent = used_alloc };
     state.alloc = tracy_allocator.allocator();
 
     var io_impl: std.Io.Threaded = .init(state.alloc, .{ 
