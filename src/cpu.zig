@@ -145,17 +145,17 @@ const MiscParams = packed struct(u15) {
     cc: ConditionCheck = .not_zero,
     _: u3 = 0,
 };
-const MicroOpData = struct {
-    operation: MicroOp,
-    params: union(enum(u4)) {
-        none: void,
+const MicroOpData = packed struct(u20) {
+    operation: MicroOp = .nop,
+    params: packed union {
+        none: u15,
         addr_idu: AddrIduParams,
         idu_adjust: IduAdjustParams,
         alu: AluParams,
         dbus: DBusParams,
         decode: DecodeParams,
         misc: MiscParams,
-    },
+    } = .{ .none = 0 },
 
     pub fn format(self: MicroOpData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print("{t}", .{ self.operation });
@@ -229,7 +229,7 @@ fn MiscIME(ime: bool) MicroOpData {
     return .{ .operation = .change_ime, .params = .{ .misc = MiscParams{ .ime_value = ime } } };
 }
 fn Nop() MicroOpData {
-    return .{ .operation = .nop, .params = .none };
+    return .{ .operation = .nop, .params = .{ .none = 0 } };
 }
 
 pub const opcode_bank_default = 0;
@@ -858,6 +858,7 @@ pub const RegisterFile = packed union (u144) {
     }
 };
 
+// TODO: Try to use on contiguous memory storage for the MicropData (Arena) and not random heap allocation?
 opcode_banks: [num_opcode_banks][num_opcodes]MicroOpArray = undefined,
 
 hram: [hram_size]u8 = @splat(0),

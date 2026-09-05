@@ -60,19 +60,18 @@ const type_table: [256]CartFeatures = blk: {
 };
 
 const MapperRange = struct {
-    low: u16, high: u16,
+    low: u16 = 0xFFFF, high: u16 = 0x0000,
 };
-fn isInRange(range: ?MapperRange, value: u16) bool {
-    const range_value: MapperRange = range orelse return false;
-    return value >= range_value.low and value <= range_value.high; 
+inline fn isInRange(range: MapperRange, value: u16) bool {
+    return value >= range.low and value <= range.high; 
 }
 const MapperRanges = struct {
-    ram_enable: ?MapperRange = null,
-    rom_bank: ?MapperRange = null,
-    rom_bank_msb: ?MapperRange = null,
-    ram_bank: ?MapperRange = null,
-    bank_mode: ?MapperRange = null,
-    rtc: ?MapperRange = null,
+    ram_enable: MapperRange = .{},
+    rom_bank: MapperRange = .{},
+    rom_bank_msb: MapperRange = .{},
+    ram_bank: MapperRange = .{},
+    bank_mode: MapperRange = .{},
+    rtc: MapperRange = .{},
     min_bank: u1 = 1,
 };
 const info_table: std.EnumArray(MapperType, MapperRanges) = .{ .values = .{
@@ -198,7 +197,7 @@ pub fn request(self: *Self, req: *def.Request) void {
         },
         def.cart_ram_low...(def.cart_ram_high - 1) => {
             if(!self.features.has_ram or self.ram_banks.len == 0) {
-                std.log.info("Cart has no ram, but game tried to access to cart ram?. {f}", .{ req });
+                std.log.info("Cart has no ram, but game tried to access it?. {f}", .{ req });
                 req.reject();
                 return;
             }

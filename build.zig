@@ -14,9 +14,9 @@ pub fn build(b: *std.Build) void {
 
     // exe flags
     // llvm backend required for vscode debug symbols and performance is bad with self-hosted backend.
-    const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse true;
+    const enable_llvm = b.option(bool, "enable_llvm", "Enable llvm backed to allow debug symbols in vscode") orelse false;
     const enable_audio = b.option(bool, "enable_audio", "Enables the audio output") orelse (optimize != .Debug);
-    const enable_tracy = b.option(bool, "tracy", "Build with Tracy support.") orelse true;
+    const enable_tracy = b.option(bool, "tracy", "Build with Tracy support.") orelse false;
     // TODO: config dependant, runtime core type to have "plugins" is currently bad for performance.
         // Why? => Unsure. Apparently the tagged-union runtime switch costs me a lot of time.
         // This happens per module (apu, ppu) per cycle. Feels like the cost of a dynamic dispatch (vtable) in a hot-loop.

@@ -61,6 +61,7 @@ export fn init() void {
 }
 
 fn imgui_cb(file_path: []const u8) void {
+
     if(state.core) |*loaded_core| {
         loaded_core.deinit(state.io, state.alloc, state.config);
     }
@@ -105,22 +106,22 @@ export fn deinit() void {
 }
 
 pub fn main(init_minimal: std.process.Init.Minimal) void {
+    state.args = init_minimal.args;
+
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
     defer _ = debug_allocator.deinit();
 
     const use_debug_allocator: bool = builtin.mode == .Debug;
     const base_alloc: std.mem.Allocator = if(use_debug_allocator) debug_allocator.allocator() else std.heap.c_allocator;
+    var tracy_allocator: tracy.Allocator = .{ .parent = base_alloc };
+    state.alloc = tracy_allocator.allocator();
 
-    var io_impl: std.Io.Threaded = .init(base_alloc, .{ 
+    var io_impl: std.Io.Threaded = .init(state.alloc, .{ 
         .argv0 = .init(.{ .vector = init_minimal.args.vector }), 
         .environ = .{ .block = init_minimal.environ.block } 
     });
     defer io_impl.deinit();
     state.io = io_impl.io();
-
-    var tracy_allocator: tracy.Allocator = .{ .parent = base_alloc };
-    state.alloc = tracy_allocator.allocator();
-    state.args = init_minimal.args;
 
     state.platform.run(init, frame, deinit);
 }

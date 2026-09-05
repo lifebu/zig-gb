@@ -4,6 +4,16 @@
         {
             "label": "build",
             "type": "shell",
+            "command": "~/Software/zig/0.16/zig build -Doptimize=Debug -Denable_llvm=true",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "build valgrind",
+            "type": "shell",
             "command": "~/Software/zig/0.16/zig build -Dcpu=x86_64 -Doptimize=Debug -Denable_llvm=true",
             "problemMatcher": [],
             "group": {
@@ -34,9 +44,11 @@
 			"command": "valgrind",
 			"args": [
 				"--tool=callgrind",
+                "--dump-instr=yes",
+                "--collect-jumps=yes",
 				"--callgrind-out-file=zig-out/callgrind.out",
 				"${workspaceFolder}/zig-out/bin/zig-gb",
-                "playground/pkmn_blu.gb",
+                "playground/link_awake.gb",
 			],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -53,8 +65,11 @@
 			"command": "valgrind",
 			"args": [
 				"--tool=cachegrind",
+                "--cache-sim=yes",
+                "--branch-sim=yes",
 				"--cachegrind-out-file=zig-out/cachegrind.out",
 				"${workspaceFolder}/zig-out/bin/zig-gb",
+                "playground/link_awake.gb",
 			],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -71,8 +86,12 @@
 			"command": "valgrind",
 			"args": [
 				"--tool=massif",
+                "--stacks=yes",
+                "--heap=no",
+                "--threshold=0.1",
 				"--massif-out-file=zig-out/massif.out",
 				"${workspaceFolder}/zig-out/bin/zig-gb",
+                "playground/link_awake.gb",
 			],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -92,6 +111,7 @@
 				"--leak-check=full",
 				"--show-leak-kinds=all",
 				"${workspaceFolder}/zig-out/bin/zig-gb",
+                "playground/link_awake.gb",
 			],
 			"options": {
 				"cwd": "${workspaceFolder}"
