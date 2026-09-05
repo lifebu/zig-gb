@@ -108,12 +108,22 @@ export fn deinit() void {
 pub fn main(init_minimal: std.process.Init.Minimal) void {
     state.args = init_minimal.args;
 
-    const stack_alloc_size = 5 * 1024 * 1024; // Should be fine for up to 2MByte carts.
-    var stack_alloc_buffer: [stack_alloc_size]u8 = undefined;
-    var stack_allocator: std.heap.FixedBufferAllocator = .init(&stack_alloc_buffer);
-    const used_alloc = stack_allocator.allocator();
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = debug_allocator.deinit();
 
-    var tracy_allocator: tracy.Allocator = .{ .parent = used_alloc };
+    const use_stack_alloc: bool = false;
+
+    var base_alloc: std.mem.Allocator = undefined;
+    if (use_stack_alloc) {
+        const stack_alloc_size = 5 * 1024 * 1024; // Should be fine for up to 2MByte carts.
+        var stack_alloc_buffer: [stack_alloc_size]u8 = undefined;
+        var stack_allocator: std.heap.FixedBufferAllocator = .init(&stack_alloc_buffer);
+        base_alloc = stack_allocator.allocator();
+    } else {
+        const use_debug_allocator: bool = builtin.mode == .Debug;
+        base_alloc = if(use_debug_allocator) debug_allocator.allocator() else std.heap.c_allocator;
+    }
+    var tracy_allocator: tracy.Allocator = .{ .parent = base_alloc };
     state.alloc = tracy_allocator.allocator();
 
     var io_impl: std.Io.Threaded = .init(state.alloc, .{ 
