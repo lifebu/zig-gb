@@ -128,7 +128,8 @@ const AluParams = packed struct(u15) {
 };
 const DecodeParams = packed struct(u15) {
     bank_idx: u2 = opcode_bank_default,
-    _: u13 = 0,
+    check_interrupt: bool,
+    _: u12 = 0,
 };
 // TODO: Replace ConditionCheck with FlagFileID?
 const ConditionCheck = enum(u3) {
@@ -211,7 +212,10 @@ fn Dbus(source: RegisterFileID, target: RegisterFileID) MicroOpData {
     return .{ .operation = .dbus, .params = .{ .dbus = DBusParams{ .source = source, .target = target } } };
 }
 fn Decode(bank_idx: u2) MicroOpData {
-    return .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = bank_idx } } };
+    return .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = bank_idx, .check_interrupt = true } } };
+}
+fn DecodeNoInt(bank_idx: u2) MicroOpData {
+    return .{ .operation = .decode, .params = .{ .decode = DecodeParams{ .bank_idx = bank_idx, .check_interrupt = false } } };
 }
 fn MiscWB(rfid: RegisterFileID) MicroOpData {
     return .{ .operation = .wz_writeback, .params = .{ .misc = MiscParams{ .write_back = rfid } } };
@@ -232,6 +236,79 @@ fn Nop() MicroOpData {
     return .{ .operation = .nop, .params = .{ .none = 0 } };
 }
 
+// M-Cycle patterns
+// TODO: Try to reduce the variations using the parameters plz!
+const FetchDecodeParam = struct { idu: i2, dbus: bool, exec: MicroOpData, decode: MicroOpData };
+fn FetchDecode(param: FetchDecodeParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    assert(param.decode.operation == .decode);
+    return .{ 
+        AddrIdu(.pcl, param.idu, .pcl), 
+        // TODO: The only case why we have this is because of STOP in the default bank. 
+        // Could we get rid of this edge case?
+        if (param.dbus) Dbus(.dbus, .ir) else Nop(), 
+        param.exec, 
+        // TODO: This decode paramter only exists because of EI, where we use DecodeNoInt() instead of Decode().
+        // Could we get rid of it?
+        param.decode,
+    };
+}
+const ImmFetchParam = struct { dest: RegisterFileID, cc: MicroOpData };
+fn ImmFetch(param: ImmFetchParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    assert(param.dest == .z or param.dest == .w);
+    assert(param.cc.operation == .nop or param.cc.operation == .conditional_check);
+    return .{
+        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, param.dest), param.cc, Nop(),
+    };
+}
+const MemReadParam = struct { addr_idu: MicroOpData, dest: RegisterFileID = .z, };
+fn MemRead(param: MemReadParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    assert(param.addr_idu.operation == .addr_idu or param.addr_idu.operation == .addr_idu_low);
+    return .{
+        param.addr_idu, Dbus(.dbus, param.dest), Nop(), Nop(),
+    };
+}
+const MemWriteParam = struct { addr_idu: MicroOpData, dbus_src: RegisterFileID };
+fn MemWrite(param: MemWriteParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    assert(param.addr_idu.operation == .addr_idu or param.addr_idu.operation == .addr_idu_low);
+    return .{
+        param.addr_idu, Dbus(param.dbus_src, .dbus), Nop(), Nop(),
+    };
+}
+const ReadModifyWriteParam = struct { alu: MicroOpData };
+fn ReadModifyWrite(param: ReadModifyWriteParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    return .{
+        AddrIdu(.l, 0, .l), param.alu, Dbus(.z, .dbus), Nop(),
+    };
+}
+const StackPushParam = struct { idu: i2, src: ?RegisterFileID, exec: MicroOpData };
+fn StackPush(param: StackPushParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    assert(param.idu == -1 or param.idu == 0);
+    return .{
+        AddrIdu(.spl, param.idu, .spl),
+        if (param.src) |src| Dbus(src, .dbus) else Nop(),
+        param.exec, Nop(),
+    };
+}
+const BranchWaitParam = struct { exec: MicroOpData, bank: ?u2 };
+fn BranchWait(param: BranchWaitParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    return .{
+        Nop(), Nop(), param.exec,
+        if (param.bank) |bank| Decode(bank) else Nop(),
+    };
+}
+const AdjustParam = struct { reg: RegisterFileID, set_flags: bool, exec: MicroOpData };
+fn Adjust(param: AdjustParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    return .{
+        IduAdjust(param.reg, param.set_flags), Nop(), param.exec, Nop(),
+    };
+}
+const AddrUpdateParam = struct { rfid: RegisterFileID, delta: i2 };
+fn AddrUpdate(param: AddrUpdateParam) [def.t_cycles_per_m_cycle]MicroOpData {
+    return .{
+        AddrIdu(param.rfid, param.delta, param.rfid), Nop(), Nop(), Nop(),
+    };
+}
+
 pub const opcode_bank_default = 0;
 pub const opcode_bank_prefix = 1;
 // 0x10 = STOP, 0x00-0x04: Interrupt Handler
@@ -240,6 +317,9 @@ pub const num_opcode_banks = 3;
 pub const num_opcodes = 256;
 fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]MicroOpArray {
     var returnVal: [num_opcode_banks][num_opcodes]MicroOpArray = @splat(@splat(MicroOpArray.empty));
+
+    const example = FetchDecode(.{ .idu = 0, .dbus = true, .exec = MiscHALT(), .decode = Decode(opcode_bank_default) });
+    if(example.len == 4) {}
 
     const r8_rfids = [_]RegisterFileID{ .b, .c, .d, .e, .h, .l, .dbus, .a };
     const r16_rfids = [_]RegisterFileID{ .c, .e, .l, .spl };
@@ -652,8 +732,8 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
 
     // EI (Enable Interrupts)
     returnVal[opcode_bank_default][0xFB].appendSlice(alloc, &[_]MicroOpData{
-        // Note: switching MiscIME with Decode allowes the effect of the EI instruction to be delayed by one instruction.
-        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), Decode(opcode_bank_default), MiscIME(true),
+        // Note: using DecodeNoInt() means we delay the effect of EI by one instruction.
+        AddrIdu(.pcl, 1, .pcl), Dbus(.dbus, .ir), MiscIME(true), DecodeNoInt(opcode_bank_default),
     }) catch unreachable;
 
     // LD HL, SP+imm8(signed)
@@ -752,14 +832,17 @@ fn genOpcodeBanks(alloc: std.mem.Allocator) [num_opcode_banks][num_opcodes]Micro
     }) catch unreachable;
 
     const uop_size: usize = @sizeOf(MicroOpData);
+    var instruction_count: usize = 0;
     var uop_count: usize = 0;
     var byte_total: usize = 0;
     for (returnVal) |bank| {
         for (bank) |operation| {
+            instruction_count += if(operation.items.len == 0) 0 else 1;
             byte_total += operation.items.len * uop_size;
             uop_count += operation.items.len;
         }
     }
+    std.log.info("CPU: instruction count: {}", .{ instruction_count });
     std.log.info("CPU: Opcode memory: size/count/total: {}/{}/{B}", .{ uop_size, uop_count, byte_total });
     return returnVal;
 }
@@ -1094,8 +1177,9 @@ pub fn cycle(self: *Self, req: *def.Request) void {
             // TODO: Using an external system would also allow me to split this decode function into decode and decode_interrupt
             // When an interrupt is pending or the IE bits are changed, we will inform the cpu about this. if all other conditions are met,
             // the cpu will replace the last instruction (decode) with the decode_interrupt instruction!
+            const params: DecodeParams = uop.params.decode;
             const interrupt_signal: u8 =  self.interrupt_enable.value & self.interrupt_flag.value;
-            if(self.interrupt_master_enable and interrupt_signal != 0) {
+            if(params.check_interrupt and self.interrupt_master_enable and interrupt_signal != 0) {
                 const interrupt_idx: u3 = getLowestSetBit(interrupt_signal);
                 const interrupt_uops: MicroOpArray = self.opcode_banks[opcode_bank_pseudo][interrupt_idx];
                 self.uop_fifo.write(interrupt_uops.items);
@@ -1110,7 +1194,6 @@ pub fn cycle(self: *Self, req: *def.Request) void {
                 // And how that interacts with the EI instruction.
                 self.registers.r16.pc -= 1;
             } else {
-                const params: DecodeParams = uop.params.decode;
                 const opcode: u8 = self.registers.r8.ir;
                 if(opcode == 0x10 and params.bank_idx == opcode_bank_default) {
                     std.log.err("CPU: Stop is not implemented", .{});

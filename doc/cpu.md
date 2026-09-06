@@ -42,6 +42,55 @@ MiscHalt():
 - Actual Microops in instruction set: 3.172.
 - Instruction Set: 3.172 * 17 Bit = 53.924 Bit = 6740,5 Byte = ~6,5kByte
 
+# M-Cycle CPU:
+- If I analyze the m-cycles of the cpu instructions there are clear patterns.
+- If I just count the unique lines, we have 65 (out of 129 source lines) that are unique.
+- But If I parameterize these unique lines we can reduce the amount of unique "templates" to 9:
+    1. FetchDecode(exec = Nop, bank = default, idu = 1, dbus = true, swap_exec = false)
+    AddrIdu(.pcl, idu, .pcl), [Dbus(.dbus,.ir)], exec, Decode(bank)
+        - Absorbs most of the default bank: 
+        all ALU-op fetch lines, Dbus(.dbus,.ir) fetch+decode, prefix fetches, 
+        DI/RETI (exec=MiscIME), EI (via swap_exec), HALT (idu=0), STOP (dbus=false), 
+        JP HL/JP (HL) via the addr param (AddrIdu(.l,1,.pcl) / .z,1,.pcl).
+
+    2. ImmFetch(dest: z|w, cc = null)
+    AddrIdu(.pcl,1,.pcl), Dbus(.dbus, dest), [MiscCC(cc)], Nop()
+        - Covers the immediate half-fetch lines (LD r16,imm16, JP/JR, LD (imm16)), with =MiscCC for the conditional JR/JP/CALL first fetch.
+
+    3. MemRead(addr, idu, addr_out, dest, low = false)
+    AddrIdu*(addr, idu, addr_out), Dbus(.dbus, dest), Nop(), Nop()
+        - Covers all memory reads into a temp: LD a,(BC/DE/HL±), (HL) operand reads, LDH a,(a8/C) (low=true), 
+        LD a,(imm16), POP (.spl,1, dest .z/.w).
+
+    4. MemWrite(addr, idu, addr_out, src, low = false)
+    AddrIdu*(addr, idu, addr_out), Dbus(src, .dbus), Nop(), Nop()
+        - Covers LD (r16mem),a, LD (imm16),SP (two calls, src=.spl/.sph), LDH (a8),a / LDH (C),a (low=true).
+
+    5. ReadModifyWrite(alu)
+    AddrIdu(.l,0,.l), alu(…,.z,…), Dbus(.z,.dbus), Nop()
+        - Covers INC/DEC (HL), all 8 prefix shifts/rotates/SWAP on (HL), and RES/SET (HL) — alu is the ALU microop applied to z.
+
+    6. StackPush(idu: -1|0, src = null, exec = Nop)
+    AddrIdu(.spl, idu, .spl), [Dbus(src,.dbus)], exec, Nop()
+        - Covers the whole push family: 
+        SP-decrement-only cycles, PUSH high/low stores, CALL's pch/pcl+MiscWB(.pcl), RST's MiscRST(idx), and the interrupt handler's MiscIME(false).
+
+    7. BranchWait(exec = Nop, bank = null)
+    Nop(), Nop(), exec, [Decode(bank)]
+        - Covers the tail/guard cycles: RET/RETI/CALL/JP MiscWB(.pcl), cond checks MiscCC(cc), 
+        ADD HL,r16 low ALU, pure idle, and the pseudo STOP (bank=pseudo).
+
+    8. Adjust(reg, set_flags, exec = Nop)
+    IduAdjust(reg, set_flags), Nop(), exec, Nop()
+        - Covers JR (.pcl, false), ADD SP,e8 (.spl, true), and LD HL,SP+e8 (exec=MiscWB(.l)).
+
+    9. AddrUpdate(rfid, delta)
+    AddrIdu(rfid, delta, rfid), Nop(), Nop(), Nop()
+        - Covers INC/DEC r16.
+
+- Could potentially merge MemRead/MemWrite into Mem(direction, ...)
+- "[]" = "may or may not be emitted, depending on the parameters."
+
 # Testing 
 
 zig test src/test.zig --test-filter "MMIO"

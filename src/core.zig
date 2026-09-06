@@ -53,9 +53,6 @@ pub fn Core(apu_type: type, ppu_type: type) type {
         }
 
         pub fn cyle(self: *Self, irq_joypad: *bool) void {
-            const zone = tracy.Zone.begin(.{ .name = "core_cycle", .src = @src(), .color = .alice_blue });
-            defer zone.end();
-
             var request: def.Request = .{};
             self.cpu.cycle(&request);
             self.cpu.request(&request);
